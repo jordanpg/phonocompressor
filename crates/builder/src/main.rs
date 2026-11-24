@@ -52,7 +52,9 @@ fn main() -> Result<(), String> {
     println!("cmudict: {} words", lexicon.len());
 
     let translit = Translit::parse_tsv(&read(&args.translit)?)?;
-    let chunks = ChunkSet::new(&translit, phono_core::chunks::Script::allowed_by_default);
+    // Chunk stats for the default model; the data file itself doesn't depend on the model.
+    let profile = phono_core::model::DEFAULT;
+    let chunks = ChunkSet::new(&translit, profile, |s| profile.script(s).default_on);
     let spelling = chunks.chunks.iter().filter(|c| c.kind == ChunkKind::Spelling).count();
     println!(
         "translit: {} codepoints → {} chunks ({} spelling, {} phonetic), trie {} nodes",

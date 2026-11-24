@@ -4,6 +4,7 @@
 //! `unidecode` does) and reads the concatenation as English. A *chunk* is the Latin string of
 //! one codepoint; the search picks one representative codepoint per distinct chunk.
 
+use crate::model::{ModelProfile, ScriptReading};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -64,7 +65,8 @@ fn unescape_json(s: &str) -> Option<String> {
     Some(out)
 }
 
-/// Script blocks from the community list, in representative-preference order.
+/// Script blocks from the community list. How each is read depends on the TTS model
+/// ([`crate::model::ModelProfile::scripts`]).
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub enum Script {
     Latin,
@@ -83,9 +85,7 @@ pub enum Script {
     CjkUnified,
     /// U+0483–0489 combining Cyrillic number signs (`҈` → "*100.000*").
     CyrillicNumber,
-    /// Read natively on Flash v2.5 (exp0: `क` → "ka"), so not a transliteration chunk.
     Devanagari,
-    /// Read natively (Russian is supported), except the number signs above.
     Cyrillic,
     Other,
 }
@@ -112,35 +112,6 @@ impl Script {
             0xAC00..=0xD7A3 => Script::Hangul,
             _ => Script::Other,
         }
-    }
-
-    /// Penalty per codepoint for how unpredictable this script's reading has been in the
-    /// harness (exp0–exp2): Latin, Hangul and Yi behaved; CJK, kana, syllabics, Ethiopic and
-    /// conjoining jamo produced most misreadings. Scaled by `Predict::risk_scale`.
-    pub fn risk(self) -> f32 {
-        match self {
-            Script::Latin | Script::Hangul | Script::Yi | Script::CjkCompat | Script::CyrillicNumber => 0.0,
-            Script::HangulCompatJamo | Script::Cherokee => 0.01,
-            Script::CjkUnified | Script::Hiragana | Script::Katakana | Script::HangulJamo => 0.03,
-            Script::Runic | Script::Armenian => 0.04,
-            Script::Ucas | Script::Ethiopic => 0.05,
-            Script::Devanagari | Script::Cyrillic | Script::Other => 0.1,
-        }
-    }
-
-    /// Can the search emit characters of this script at all? (Devanagari and Cyrillic are
-    /// read natively, not transliterated.)
-    pub fn usable(self) -> bool {
-        !matches!(self, Script::Devanagari | Script::Cyrillic | Script::Other)
-    }
-
-    /// Does the search use this script unless told otherwise? Off by default, on the evidence
-    /// of exp0–exp4 (Flash v2.5):
-    /// - Ethiopic, Canadian syllabics and conjoining Hangul jamo were misread often (mean
-    ///   outcome 0.59, 0.69 and 0.64 across clips vs 0.76–0.80 for Hangul, Latin, Yi).
-    /// - Runic came out silent or as "Yeah." (exp0 `ᚠ`).
-    pub fn allowed_by_default(self) -> bool {
-        self.usable() && !matches!(self, Script::Ethiopic | Script::Ucas | Script::HangulJamo | Script::Runic)
     }
 }
 
@@ -265,20 +236,22 @@ pub struct ChunkSet {
 }
 
 impl ChunkSet {
-    /// Chunks from the scripts `allowed` accepts (see [`Script::allowed_by_default`]).
-    pub fn new(translit: &Translit, allowed: impl Fn(Script) -> bool) -> Self {
+    /// Chunks from the scripts `profile` reads by transliteration and `allowed` accepts (for
+    /// the model's defaults, `|s| profile.script(s).default_on`).
+    pub fn new(translit: &Translit, profile: &ModelProfile, allowed: impl Fn(Script) -> bool) -> Self {
         let mut best: HashMap<String, Chunk> = HashMap::new();
         for (&ch, raw) in &translit.map {
             let script = Script::of(ch);
-            if !script.usable() || !allowed(script) || ch.is_ascii_uppercase() {
+            if profile.script(script).reading != ScriptReading::Transliterated || !allowed(script) || ch.is_ascii_uppercase() {
                 continue;
             }
             let Some((latin, kind)) = normalize(raw) else { continue };
             let cand = Chunk { ch, latin: latin.clone(), script, kind };
-            // Prefer reliable scripts, then lowercase forms (Armenian `ճ` "ch" over `Ճ` "Ch").
+            // Prefer the model's preferred scripts, then lowercase forms (Armenian `ճ` "ch" over `Ճ` "Ch").
             let caps = |c: char| translit.get(c).chars().any(|x| x.is_ascii_uppercase());
+            let rank = |s: Script| profile.preference(s);
             match best.get(&latin) {
-                Some(cur) if (cur.script, caps(cur.ch), cur.ch) <= (script, caps(ch), ch) => {}
+                Some(cur) if (rank(cur.script), caps(cur.ch), cur.ch) <= (rank(script), caps(ch), ch) => {}
                 _ => {
                     best.insert(latin, cand);
                 }
@@ -329,7 +302,8 @@ mod tests {
             (' ', " "),
             (',', ","),
         ]);
-        let set = ChunkSet::new(&t, Script::allowed_by_default);
+        let p = &crate::model::FLASH_V2_5;
+        let set = ChunkSet::new(&t, p, |s| p.script(s).default_on);
         let by_latin: HashMap<&str, char> = set.chunks.iter().map(|c| (c.latin.as_str(), c.ch)).collect();
         assert_eq!(by_latin["a"], 'a', "lowercase Latin, never uppercase");
         assert_eq!(by_latin["ba"], '바', "Hangul preferred over Yi");

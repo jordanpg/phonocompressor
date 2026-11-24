@@ -16,6 +16,7 @@
 //! by their symbol. The reranker decides which tilings actually sound right.
 
 use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet, Script, symbol_word};
+use crate::model::ModelProfile;
 use std::collections::HashMap;
 
 /// One piece of the phrase to cover.
@@ -184,7 +185,14 @@ impl Tiler<'_> {
 
 /// Tilings of `phrase`'s spelling in ≤ `max_cp` codepoints with ≤ `max_edits` letter edits,
 /// fewest edits first (at most `limit`). Returns (text, edits).
-pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, limit: usize) -> Vec<(String, usize)> {
+pub fn tile(
+    chunks: &ChunkSet,
+    profile: &ModelProfile,
+    phrase: &str,
+    max_cp: usize,
+    max_edits: usize,
+    limit: usize,
+) -> Vec<(String, usize)> {
     let mut fixed: HashMap<String, Vec<u32>> = HashMap::new();
     let mut symbols: HashMap<&str, Vec<u32>> = HashMap::new();
     for (i, c) in chunks.chunks.iter().enumerate() {
@@ -227,7 +235,7 @@ pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, li
         t.go(0, 0, &mut Vec::new(), 0);
     }
     // Fewest edits, then the most reliable scripts, then the fewest codepoints.
-    let risk = |s: &str| s.chars().map(|c| (Script::of(c).risk() * 1000.0).round() as u32).sum::<u32>();
+    let risk = |s: &str| s.chars().map(|c| (profile.script(Script::of(c)).risk * 1000.0).round() as u32).sum::<u32>();
     let mut all: Vec<(String, usize, String)> = t.out;
     all.sort_by_cached_key(|(s, e, _)| (*e, risk(s), s.chars().count(), s.clone()));
     // Tilings that spell the same letters read alike: keep the best of each, so the rerank
@@ -242,6 +250,7 @@ pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, li
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::FLASH_V2_5;
     use crate::chunks::Translit;
 
     fn set() -> ChunkSet {
@@ -264,12 +273,12 @@ mod tests {
             ('@', "@"),
         ];
         let t = Translit { map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect() };
-        ChunkSet::new(&t, Script::allowed_by_default)
+        ChunkSet::new(&t, &FLASH_V2_5, |s| FLASH_V2_5.script(s).default_on)
     }
 
     #[test]
     fn tiles_exact_spelling_first() {
-        let out = tile(&set(), "bad dream", 6, 2, 100);
+        let out = tile(&set(), &FLASH_V2_5, "bad dream", 6, 2, 100);
         assert!(!out.is_empty());
         assert_eq!(out[0].1, 0, "an exact tiling exists");
         let texts: Vec<&str> = out.iter().map(|(t, _)| t.as_str()).collect();
@@ -279,7 +288,7 @@ mod tests {
 
     #[test]
     fn spaced_chunks_x_and_symbols() {
-        let out = tile(&set(), "kaka chucks at bad", 6, 1, 1000);
+        let out = tile(&set(), &FLASH_V2_5, "kaka chucks at bad", 6, 1, 1000);
         let texts: Vec<&str> = out.iter().map(|(t, _)| t.as_str()).collect();
         assert!(texts.contains(&"嬶ꍱ@바d"), "{texts:?}");
         assert!(out.iter().any(|(t, e)| t == "嬶ꍱ@바d" && *e == 1));
@@ -287,13 +296,13 @@ mod tests {
 
     #[test]
     fn punctuation_is_skipped() {
-        let out = tile(&set(), "bad - bad", 6, 0, 100);
+        let out = tile(&set(), &FLASH_V2_5, "bad - bad", 6, 0, 100);
         assert!(!out.is_empty() && out.iter().all(|(t, _)| !t.contains('@')), "{out:?}");
     }
 
     #[test]
     fn numbers_use_number_chunks() {
-        let out = tile(&set(), "100,000 bad", 6, 0, 100);
+        let out = tile(&set(), &FLASH_V2_5, "100,000 bad", 6, 0, 100);
         assert!(out.iter().any(|(t, _)| t.starts_with('҈')), "{out:?}");
     }
 }

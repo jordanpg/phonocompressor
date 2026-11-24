@@ -17,8 +17,12 @@ struct Cli {
     /// Data file from `mise run data`.
     #[arg(long, global = true, default_value = "data/generated/phono.bin")]
     data: PathBuf,
-    /// Also search scripts that are off by default (Ethiopic, Canadian syllabics, conjoining
-    /// Hangul jamo, Runic), which exp0–exp4 found unreliable.
+    /// ElevenLabs model to predict readings for. Calibration and fitting use only its clips.
+    #[arg(long, global = true, default_value = phono_core::model::DEFAULT.model_ids[0])]
+    model: String,
+    /// Also search scripts the model's profile leaves off by default (on Flash v2.5:
+    /// Ethiopic, Canadian syllabics, conjoining Hangul jamo, Runic, which exp0–exp4 found
+    /// unreliable).
     #[arg(long, global = true)]
     all_scripts: bool,
     #[command(subcommand)]
@@ -73,11 +77,13 @@ enum Command {
         /// Predict from the single best reading only (no n-best expectation).
         #[arg(long)]
         no_nbest: bool,
-        #[arg(long, default_value_t = phono_core::Predict::default().risk_scale)]
-        risk_scale: f32,
-        /// Weight of spelling closeness to the phrase's real words (0 = sound only).
-        #[arg(long, default_value_t = phono_core::Predict::default().spelling)]
-        spelling: f32,
+        /// Script risk multiplier [default: the model profile's].
+        #[arg(long)]
+        risk_scale: Option<f32>,
+        /// Weight of spelling closeness to the phrase's real words (0 = sound only) [default:
+        /// the model profile's].
+        #[arg(long)]
+        spelling: Option<f32>,
         /// Override the Phoible voicing weight (periodicGlottalSource).
         #[arg(long)]
         voicing: Option<f32>,
@@ -126,7 +132,10 @@ fn main() -> Result<(), String> {
     let cli = Cli::parse();
     let t = Instant::now();
     let bytes = std::fs::read(&cli.data).map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
-    let mut engine = Engine::from_bytes(&bytes)?;
+    let profile = phono_core::model::for_model(&cli.model).ok_or_else(|| {
+        format!("no calibrated profile for model {:?} (have: {})", cli.model, phono_core::model::known_model_ids().join(", "))
+    })?;
+    let mut engine = Engine::from_bytes(&bytes, profile)?;
     if cli.all_scripts {
         engine.allow_all_scripts();
     }
@@ -157,7 +166,7 @@ fn main() -> Result<(), String> {
             println!("reads:    {}", words_str(&words));
             println!("target:   {}", engine.target(&phrase).iter().map(|w| fmt_phones(w)).collect::<Vec<_>>().join(" | "));
             println!("fidelity: {:.3} (cost {:.2} / {:.2})", a.fidelity, a.cost, a.max_cost);
-            let predicted = engine.predict(&text, &engine.target_of(&phrase), &phono_core::Predict::default());
+            let predicted = engine.predict(&text, &engine.target_of(&phrase), &engine.profile.predict);
             println!("predict:  {predicted:.3} (n-best expectation, script risk, spelling: what the search ranks by)");
             let ops: Vec<String> = a
                 .ops
@@ -200,7 +209,12 @@ fn main() -> Result<(), String> {
         }
         Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, spelling, voicing, dump, hand } => {
             let heard = phono_core::score::Heard { vowel_scale: heard_vowel_scale, rhotic: heard_rhotic };
-            let mut predict = phono_core::Predict { nbest: !no_nbest, risk_scale, spelling };
+            let defaults = engine.profile.predict;
+            let mut predict = phono_core::Predict {
+                nbest: !no_nbest,
+                risk_scale: risk_scale.unwrap_or(defaults.risk_scale),
+                spelling: spelling.unwrap_or(defaults.spelling),
+            };
             let mut engine = engine;
             if hand {
                 engine.weights = phono_core::score::Weights::HAND;
@@ -271,7 +285,7 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
     println!("{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}", "id", "phrase", "theirs", "", "ours", "");
     for (id, unicode, spoken) in &messages {
         let target = engine.target_of(spoken);
-        let their = engine.predict(unicode, &target, &cfg.predict);
+        let their = engine.predict(unicode, &target, &engine.profile.predict);
         let best = searcher.search(spoken, &cfg);
         let (our_text, our) = best.first().map(|c| (c.text.clone(), c.fidelity)).unwrap_or_default();
         theirs += their;
@@ -327,12 +341,18 @@ struct Clip {
     phones: String,
 }
 
-fn load_clips(path: &PathBuf) -> Result<Vec<Clip>, String> {
+/// Harness clips recorded with one of `profile`'s models; clips from other models are skipped.
+fn load_clips(path: &PathBuf, profile: &phono_core::model::ModelProfile) -> Result<Vec<Clip>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e} (run `mise run harness:export`)", path.display()))?;
     let mut out = Vec::new();
+    let mut other = 0;
     for line in text.lines().skip(1) {
         let f: Vec<&str> = line.split('\t').collect();
         if f.len() < 8 {
+            continue;
+        }
+        if !profile.model_ids.contains(&f[3]) {
+            other += 1;
             continue;
         }
         out.push(Clip {
@@ -343,6 +363,12 @@ fn load_clips(path: &PathBuf) -> Result<Vec<Clip>, String> {
             whisper: f[6].into(),
             phones: f[7].into(),
         });
+    }
+    if other > 0 {
+        eprintln!("skipped {other} clips from models other than {}", profile.model_ids.join("/"));
+    }
+    if out.is_empty() {
+        return Err(format!("{}: no clips from {}", path.display(), profile.model_ids.join("/")));
     }
     Ok(out)
 }
@@ -428,7 +454,7 @@ fn calibrate(
     predict: &phono_core::Predict,
     dump: Option<&PathBuf>,
 ) -> Result<(), String> {
-    let clips = load_clips(path)?;
+    let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
     let scorer = phono_core::score::Scorer::with_weights(&engine.dist, phono_core::score::Weights::HAND);
     struct Row<'a> {
@@ -465,7 +491,7 @@ fn calibrate(
                     )
                 })
                 .collect();
-            let risk: f32 = r.clip.text.chars().map(|c| phono_core::chunks::Script::of(c).risk()).sum();
+            let risk = engine.profile.risk(&r.clip.text);
             let (spell, share) = phono_core::words::spelling(&target, &read).unwrap_or((0.0, 0.0));
             out += &format!(
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",

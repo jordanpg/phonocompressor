@@ -3,12 +3,16 @@
 //! Pipeline (docs/PLAN.md): phrase → target phones (CMUdict / G2P) → search for codepoint
 //! sequences whose transliteration spells something with those sounds → re-read each candidate
 //! the way the TTS would ([`reading`]) → score against the target ([`score`]).
+//!
+//! What depends on the TTS model (how it reads each script, reader constants, fitted weights)
+//! is in a [`model::ModelProfile`]; the [`Engine`] is built for one.
 
 pub mod chunks;
 pub mod data;
 pub mod features;
 pub mod g2p;
 pub mod lexicon;
+pub mod model;
 pub mod phone;
 pub mod reading;
 pub mod score;
@@ -20,6 +24,7 @@ use chunks::{ChunkSet, Translit};
 use features::{FeatureSpace, PhoneDistance};
 use g2p::G2p;
 use lexicon::Lexicon;
+use model::ModelProfile;
 use phone::Phone;
 use reading::{Reader, Source, Word};
 use score::{Alignment, Scorer, TargetPhone, Weights, flatten_target};
@@ -29,24 +34,17 @@ use score::{Alignment, Scorer, TargetPhone, Weights, flatten_target};
 pub struct Predict {
     /// Average over the G2P n-best readings of unknown words, not just the best one.
     pub nbest: bool,
-    /// Multiplier on the per-script risk penalty ([`chunks::Script::risk`]); 0 disables it.
+    /// Multiplier on the per-script risk penalty ([`model::ScriptProfile::risk`]); 0 disables it.
     pub risk_scale: f32,
     /// Weight of spelling closeness to the phrase's real words ([`words::spelling`]), scaled by
-    /// the share of the phrase that is real words; 0 disables it. Introduced in v4 at 0.4 (fit on
-    /// exp1–exp3); v6 refits it with the scorer weights ([`score::Weights::FIT`]).
+    /// the share of the phrase that is real words; 0 disables it.
     pub spelling: f32,
 }
 
 impl Predict {
-    /// v1–v5's values, for comparison (`phono calibrate --hand`).
+    /// v1–v5's values, for comparison (`phono calibrate --hand`). Each model's fitted values
+    /// are in its profile ([`model::ModelProfile::predict`]).
     pub const HAND: Predict = Predict { nbest: true, risk_scale: 1.0, spelling: 0.4 };
-}
-
-impl Default for Predict {
-    /// Fitted with [`score::Weights::FIT`] by `phono fit`.
-    fn default() -> Self {
-        Predict { nbest: true, risk_scale: 1.3, spelling: 0.52 }
-    }
 }
 
 /// A phrase to compress: its words (real or not) and their phones, flattened for alignment.
@@ -57,44 +55,48 @@ pub struct Target {
 }
 
 pub struct Engine {
+    /// The TTS model the engine predicts readings for.
+    pub profile: &'static ModelProfile,
     pub features: FeatureSpace,
     pub dist: PhoneDistance,
     pub lexicon: Lexicon,
     pub g2p: G2p,
     pub translit: Translit,
     pub chunks: ChunkSet,
-    /// Alignment weights for prediction and generation ([`Engine::scorer`]).
+    /// Alignment weights for prediction and generation ([`Engine::scorer`]). Starts as the
+    /// profile's; calibration and fitting change it.
     pub weights: Weights,
 }
 
 impl Engine {
-    pub fn new(data: data::Data) -> Result<Self, String> {
+    pub fn new(data: data::Data, profile: &'static ModelProfile) -> Result<Self, String> {
         let features = FeatureSpace::new(data.features);
         let dist = PhoneDistance::new(&features)?;
-        let chunks = ChunkSet::new(&data.translit, chunks::Script::allowed_by_default);
+        let chunks = ChunkSet::new(&data.translit, profile, |s| profile.script(s).default_on);
         Ok(Engine {
+            profile,
             features,
             dist,
             lexicon: data.lexicon,
             g2p: G2p::new(data.g2p),
             translit: data.translit,
             chunks,
-            weights: Weights::default(),
+            weights: profile.weights.clone(),
         })
     }
 
-    /// Let the search use every script it can, including the ones off by default
-    /// ([`chunks::Script::allowed_by_default`]).
+    /// Let the search use every script the model transliterates, including the ones off by
+    /// default ([`model::ScriptProfile::default_on`]).
     pub fn allow_all_scripts(&mut self) {
-        self.chunks = ChunkSet::new(&self.translit, chunks::Script::usable);
+        self.chunks = ChunkSet::new(&self.translit, self.profile, |_| true);
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
-        Self::new(data::Data::from_bytes(bytes)?)
+    pub fn from_bytes(bytes: &[u8], profile: &'static ModelProfile) -> Result<Self, String> {
+        Self::new(data::Data::from_bytes(bytes)?, profile)
     }
 
     pub fn reader(&self) -> Reader<'_> {
-        Reader { lexicon: &self.lexicon, g2p: &self.g2p }
+        Reader { lexicon: &self.lexicon, g2p: &self.g2p, params: self.profile.reader }
     }
 
     pub fn scorer(&self) -> Scorer<'_> {
@@ -196,8 +198,7 @@ impl Engine {
                 offset += w.phones.len();
             }
         }
-        let risk: f32 = text.chars().map(|c| chunks::Script::of(c).risk()).sum();
-        (expected - opts.risk_scale * risk).max(0.0)
+        (expected - opts.risk_scale * self.profile.risk(text)).max(0.0)
     }
 
     /// Score how well `text` (any Unicode) would be heard as `phrase`.

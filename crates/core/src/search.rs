@@ -42,7 +42,8 @@ pub struct SearchConfig {
     /// nowhere near precise to 0.005, and filler letters the scorer finds almost free (`e` in
     /// `gigamaxedong`) are still heard (exp3/exp5: "gigamaxidong"). Not part of `fidelity`.
     pub codepoint_cost: f32,
-    pub predict: crate::Predict,
+    /// How candidates are scored; `None` uses the engine's model profile.
+    pub predict: Option<crate::Predict>,
 }
 
 impl Default for SearchConfig {
@@ -58,7 +59,7 @@ impl Default for SearchConfig {
             spelled: 400,
             spelled_edits: 2,
             codepoint_cost: 0.005,
-            predict: crate::Predict::default(),
+            predict: None,
         }
     }
 }
@@ -272,7 +273,8 @@ impl<'a> Searcher<'a> {
     pub fn search(&self, phrase: &str, cfg: &SearchConfig) -> Vec<Candidate> {
         let target = self.engine.target_of(phrase);
         let generated = self.generate(&target.phones, cfg);
-        let spelled = crate::tile::tile(&self.engine.chunks, phrase, cfg.max_codepoints, cfg.spelled_edits, cfg.spelled);
+        let spelled =
+            crate::tile::tile(&self.engine.chunks, self.engine.profile, phrase, cfg.max_codepoints, cfg.spelled_edits, cfg.spelled);
         // Phonetic candidates first, then spelled ones not already among them.
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let all = generated
@@ -476,10 +478,11 @@ impl<'a> Searcher<'a> {
 
     /// Stage 2: read each candidate the way the TTS would and score it against the target.
     fn rerank(&self, target: &crate::Target, generated: impl Iterator<Item = (String, f32)>, cfg: &SearchConfig) -> Vec<Candidate> {
+        let predict = cfg.predict.unwrap_or(self.engine.profile.predict);
         let mut out: Vec<Candidate> = Vec::new();
         for (text, gen_cost) in generated {
             let (latin, words) = self.engine.read(&text);
-            let fidelity = self.engine.predict_read(&text, &words, target, &cfg.predict);
+            let fidelity = self.engine.predict_read(&text, &words, target, &predict);
             out.push(Candidate { codepoints: text.chars().count(), text, latin, words, fidelity, gen_cost });
         }
         let rank = |c: &Candidate| c.fidelity - cfg.codepoint_cost * c.codepoints as f32;

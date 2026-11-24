@@ -36,8 +36,8 @@ pub const READING_NBEST: usize = 3;
 
 enum Token {
     Letters(String),
-    /// A digit run. `glued`: letters follow with no separator (`3the`), which the TTS's text
-    /// normalizer handles unpredictably (see [`GLUED_NUMBER_DROP`]).
+    /// A digit run. `glued`: letters follow with no separator (`3the`), which the TTS handles
+    /// unpredictably (see [`ReaderParams::glued_number_drop`]).
     Number { text: String, glued: bool },
     /// A lone `s` right after a number or an initialism (`2s`, `PCs`): a plural ending.
     Plural,
@@ -199,23 +199,27 @@ fn number_token_words(tok: &str) -> Vec<&'static str> {
 pub struct Reader<'a> {
     pub lexicon: &'a Lexicon,
     pub g2p: &'a G2p,
+    pub params: ReaderParams,
 }
 
-// Word splitting costs: each piece costs 1; a dictionary piece of only 3 letters costs extra
-// (CMUdict is full of short names and acronyms); each letter left to G2P costs SPLIT_G2P_LETTER.
-const SPLIT_SHORT_WORD: f32 = 0.5;
-const SPLIT_G2P_LETTER: f32 = 0.3;
-const SPLIT_LONE_LETTER: f32 = 0.7;
-/// A split between a consonant letter and a vowel letter (`mold|ifrog`, `is|epic`) costs as
-/// much as an extra piece. Readers carry the consonant over to the vowel (maximal onset): the
-/// TTS read "varymoldifrog" as "very moldy frog" (exp1), "thisisepicswang" as "this is Sepik
-/// swang" (exp2) and "biepbiepamtruck" as "beep beep'em truck" (exp5). 0.3–1.0 all help
-/// offline; 1.0 also keeps `gigamaxdong` from splitting as gig|amax|dong.
-const SPLIT_ONSET: f32 = 1.0;
-
-/// How often a number glued to following letters (`3the`, `2eut`) is dropped, relative to being
-/// read: exp2–exp5 heard the digit in 5 of 10 such clips. Plural `2s` was read both times.
-const GLUED_NUMBER_DROP: f32 = 1.0;
+/// How the model splits and reads run-together letters and numbers. The values come from the
+/// model's harness clips ([`crate::model::ModelProfile::reader`]).
+#[derive(Clone, Copy, Debug)]
+pub struct ReaderParams {
+    /// Word splitting costs: each piece costs 1; a dictionary piece of only 3 letters costs this
+    /// much extra (CMUdict is full of short names and acronyms).
+    pub split_short_word: f32,
+    /// Cost per letter of a piece left to G2P.
+    pub split_g2p_letter: f32,
+    /// Extra cost of a one-letter piece ("d" + "isis"): rarely how a reader splits a word.
+    pub split_lone_letter: f32,
+    /// Cost of a split between a consonant letter and a vowel letter (`mold|ifrog`, `is|epic`):
+    /// readers carry the consonant over to the vowel (maximal onset).
+    pub split_onset: f32,
+    /// How often a number glued to following letters (`3the`, `2eut`) is dropped, relative to
+    /// being read.
+    pub glued_number_drop: f32,
+}
 
 fn has_vowel(w: &str) -> bool {
     w.bytes().any(|b| b"aeiouy".contains(&b))
@@ -236,6 +240,7 @@ impl Reader<'_> {
     /// whole. The TTS does this: exp1 heard "iowasux" as "Iowa sucks", "baddream" as "bad dream".
     /// Returns (piece, is_dictionary_word).
     pub fn segment<'w>(&self, w: &'w str) -> Vec<(&'w str, bool)> {
+        let p = &self.params;
         let n = w.len();
         let bytes = w.as_bytes();
         let mut best: Vec<(f32, usize, bool)> = vec![(f32::INFINITY, 0, false); n + 1];
@@ -245,17 +250,16 @@ impl Reader<'_> {
                 continue;
             }
             let onset = if i > 0 && !b"aeiouy".contains(&bytes[i - 1]) && b"aeiou".contains(&bytes[i]) {
-                SPLIT_ONSET
+                p.split_onset
             } else {
                 0.0
             };
             for j in i + 1..=n {
                 let piece = &w[i..j];
-                // A lone leftover letter ("d" + "isis") is rarely how a reader splits a word.
-                let lone = if piece.len() == 1 && n > 1 { SPLIT_LONE_LETTER } else { 0.0 };
-                let g2p_cost = 1.0 + SPLIT_G2P_LETTER * piece.len() as f32 + lone + onset;
+                let lone = if piece.len() == 1 && n > 1 { p.split_lone_letter } else { 0.0 };
+                let g2p_cost = 1.0 + p.split_g2p_letter * piece.len() as f32 + lone + onset;
                 let dict_cost = (piece.len() >= 3 && has_vowel(piece) && self.lexicon.first(piece).is_some())
-                    .then_some(1.0 + if piece.len() == 3 { SPLIT_SHORT_WORD } else { 0.0 } + onset);
+                    .then_some(1.0 + if piece.len() == 3 { p.split_short_word } else { 0.0 } + onset);
                 let (cost, dict) = match dict_cost {
                     Some(d) if d <= g2p_cost => (d, true),
                     _ => (g2p_cost, false),
@@ -324,7 +328,7 @@ impl Reader<'_> {
                         // One word, so the n-best expectation can drop it as a whole.
                         let phones = words.iter().flat_map(|w| self.word(w)).collect();
                         let text = words.join(" ");
-                        out.push(Word { text, phones, source: Source::Dictionary, alternatives: vec![(vec![], GLUED_NUMBER_DROP)] });
+                        out.push(Word { text, phones, source: Source::Dictionary, alternatives: vec![(vec![], self.params.glued_number_drop)] });
                     } else {
                         for w in words {
                             out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });

@@ -230,7 +230,7 @@ pub enum TruthKind {
 }
 
 pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -> Result<(), String> {
-    let clips: Vec<Clip> = load_clips(path)?;
+    let clips: Vec<Clip> = load_clips(path, engine.profile)?;
     let truth_scorer = Scorer::with_weights(&engine.dist, Weights::HAND);
     // Distinct answers, truth averaged over seeds and over experiments that reused a clip.
     for name in &opts.fix {
@@ -377,13 +377,12 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
         );
     }
     println!("\n{:<16} {:>7} {:>7} {:>8}", "parameter", "hand", "fitted", "default");
-    let current = Params { weights: Weights::default(), predict: Predict::default() };
+    let current = Params { weights: engine.profile.weights.clone(), predict: engine.profile.predict };
     for (i, name) in NAMES.iter().enumerate() {
         println!("{name:<16} {:>7.3} {:>7.3} {:>8.3}", get(&hand, i), get(&fitted, i), get(&current, i));
     }
-    let current = Params { weights: Weights::default(), predict: Predict::default() };
     let (r, n) = ranking(&predictions(engine, &answers, &current), &all);
     println!("current defaults (in-sample): ranking {r}/{n} ({:.1}%)", 100.0 * r as f32 / n as f32);
-    engine.weights = Weights::default();
+    engine.weights = engine.profile.weights.clone();
     Ok(())
 }

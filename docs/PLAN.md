@@ -196,6 +196,20 @@ reads that script natively.
 (`ka`: Cherokee, kana, Yi, …). Prefer the script whose reading Phase 0
 showed to be most reliable.
 
+**Model profiles (v6.2).** Whatever depends on the TTS model lives in a
+`ModelProfile` (`crates/core/src/model.rs`):
+- how each script is read (transliterated, native, unmeasured), its risk,
+  and whether the search uses it by default;
+- the order for picking a character per chunk;
+- the reader's splitting and glued-number constants;
+- the fitted scorer weights.
+
+Target phones, phone distances and the search are the same for every model.
+Only `eleven_flash_v2_5` (which also covers `eleven_turbo_v2_5`) has a
+profile. A new model needs an exp0-style probe and a community-message run
+to get one. Models that read scripts natively (v3, v4) also need reading
+model N.
+
 ## Repo layout
 
 ```
@@ -864,6 +878,32 @@ so v6.1 stays.
 
 Clips: `data/generated/clips-exp8.tsv`, `clips-all8.tsv` (exp1–exp8).
 
+**v6.2: model profiles (refactor, no change in answers).** The user wants to
+support other ElevenLabs models later, so everything calibrated on Flash
+v2.5 moved out of the code paths into a `ModelProfile`:
+- `Script::risk`/`usable`/`allowed_by_default` and the script preference
+  order became the profile's script table;
+- the reader's `SPLIT_*` and `GLUED_NUMBER_DROP` constants became
+  `ReaderParams`;
+- `Weights::FIT` and `Predict::default()` became the profile's `weights` and
+  `predict`.
+
+The CLI takes `--model` (default `eleven_flash_v2_5`). `phono calibrate`
+and `phono fit` now read the clips file's model column and use only that
+model's clips; before, they ignored it. All 544 clips are Flash v2.5.
+
+Checked against v6.1's binary: `phono eval` (with its export), `calibrate`
+(fitted and `--hand`), `fit`, `--all-scripts compress`, and `read`/`score`
+on mixed scripts give byte-identical output.
+
+Not moved, because only Flash v2.5 has been measured: the capital-letter
+rules, plurals and number grouping in `reading.rs`.
+
+Per the ElevenLabs docs (reviewed 2026-11-24), Flash v2.5 doesn't normalize
+text by default. The user believes their TTS setup sends
+`apply_text_normalization: "auto"` and no `language_code`, which matches the
+harness.
+
 Known limitations / next steps (in priority order after exp2; status as of v6):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -899,7 +939,8 @@ phone-to-spelling table from CMUdict alignments.
 ### Phase 3 — WASM
 
 wasm-bindgen API:
-`compress(phrase, { maxCodepoints: 6, topN, allowedScripts }) → [{ text, latin, phones, score }]`.
+`compress(phrase, { model, maxCodepoints: 6, topN, allowedScripts }) → [{ text, latin, phones, score }]`,
+where `model` is an ElevenLabs model id with a profile (default `eleven_flash_v2_5`).
 
 ## Data and licenses
 
