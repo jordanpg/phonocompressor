@@ -104,38 +104,52 @@ pub fn judge(scorer: &Scorer, target: &[TargetWord], cand: &[Word]) -> Vec<WordJ
 /// for the same phrase far better than either.
 ///
 /// Only real words count: a username or coinage has no spelling the listener knows, so it is
-/// judged by sound alone. Each real word is looked for in the candidate's letters (after the
-/// reader's normalization: numbers and symbols spelled out, case and punctuation dropped) by
-/// best-substring edit distance; the letters around it are free, since the phone score
-/// already charges extra sounds.
+/// judged by sound alone. The real words are matched in the candidate's letters (after the
+/// reader's normalization: numbers and symbols spelled out, case and punctuation dropped) in
+/// order and without overlap, each by edit distance to a substring; the letters around and
+/// between them are free, since the phone score already charges extra sounds. (Before v6.1
+/// each word was looked for anywhere, so "doug doug" got full credit from a single "doug":
+/// exp5–exp7 heard `dougdoegdidthat` as "DougDag did that".)
+///
+/// Dictionary homophones are not accepted as spellings. exp4's `dugdug didthat` was heard
+/// "Doug Doug did that", but over exp1–exp7 crediting homophones ordered 3 more answer pairs
+/// wrong than right: "nite", "yu" and "r" (letter R for "are") inside run-together strings
+/// were not heard as the word.
 ///
 /// Returns (letter-weighted mean similarity over real words, share of the target's letters
 /// that belong to real words), or `None` when the phrase has no real words.
 pub fn spelling(target: &[TargetWord], cand: &[Word]) -> Option<(f32, f32)> {
     let letters = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect::<Vec<char>>();
     let hay: Vec<char> = cand.iter().flat_map(|w| letters(&w.text)).collect();
-    let (mut sim, mut real, mut total) = (0f32, 0f32, 0f32);
+    let (mut real, mut total) = (0u32, 0u32);
+    // best[j]: fewest edits for the real words so far, the last one ending at or before hay[j].
+    let mut best = vec![0u32; hay.len() + 1];
     for w in target {
         let word = letters(&w.text);
-        let len = word.len() as f32;
-        total += len;
+        total += word.len() as u32;
         if !w.lexical || word.is_empty() {
             continue;
         }
-        // Semi-global edit distance: free start and end in the candidate.
-        let mut prev = vec![0u32; hay.len() + 1];
-        for (i, &x) in word.iter().enumerate() {
-            let mut cur = vec![i as u32 + 1; hay.len() + 1];
+        real += word.len() as u32;
+        // Edit distance to a substring that starts where the previous word may have ended.
+        let mut prev = best.clone();
+        for &x in &word {
+            let mut cur = vec![prev[0] + 1; hay.len() + 1];
             for (j, &y) in hay.iter().enumerate() {
                 cur[j + 1] = (prev[j] + u32::from(x != y)).min(prev[j + 1] + 1).min(cur[j] + 1);
             }
             prev = cur;
         }
-        let edits = prev.iter().copied().min().unwrap_or(word.len() as u32) as f32;
-        sim += len * (1.0 - edits / len).max(0.0);
-        real += len;
+        // Free letters after the word's end.
+        for j in 1..prev.len() {
+            prev[j] = prev[j].min(prev[j - 1]);
+        }
+        best = prev;
     }
-    (real > 0.0).then(|| (sim / real, real / total))
+    // A word costs at most its length (delete it all), so the letter-weighted mean of the
+    // per-word similarities 1 − edits/len is 1 − total edits / real letters.
+    let edits = best.last().copied().unwrap_or(0);
+    (real > 0).then(|| (1.0 - edits as f32 / real as f32, real as f32 / total as f32))
 }
 
 #[cfg(test)]
@@ -184,6 +198,19 @@ mod tests {
         assert!(sim < 0.7, "{sim}");
         // No real words: nothing to say.
         assert!(spelling(&target[1..], &[cw("xqc", "", Source::Letters)]).is_none());
+    }
+
+    #[test]
+    fn spelling_matches_words_in_order_once() {
+        let target = [tw("doug", "D AH1 G", true), tw("doug", "D AH1 G", true), tw("did", "D IH1 D", true)];
+        // One "doug" can't stand for both: the second is "doeg", one edit.
+        let (sim, _) = spelling(&target, &[cw("dougdoegdid", "", Source::G2p)]).unwrap();
+        assert!((sim - (1.0 - 1.0 / 11.0)).abs() < 1e-6, "{sim}");
+        let (sim, _) = spelling(&target, &[cw("doug", "", Source::Dictionary), cw("doug", "", Source::Dictionary), cw("did", "", Source::Dictionary)]).unwrap();
+        assert!((sim - 1.0).abs() < 1e-6, "{sim}");
+        // Order matters: "did" before both "doug"s can't be used for the last word.
+        let (sim, _) = spelling(&target, &[cw("diddougdoug", "", Source::G2p)]).unwrap();
+        assert!(sim < 1.0, "{sim}");
     }
 
     #[test]

@@ -58,24 +58,55 @@ pub struct Weights {
     pub class_mismatch: f32,
 }
 
+impl Weights {
+    /// The hand-set weights of v1–v5. `phono calibrate` measures truth (what the TTS actually
+    /// said) with these, so its numbers stay comparable across scorer versions.
+    pub const HAND: Weights = Weights {
+        del_primary: 1.0,
+        del_secondary: 0.8,
+        del_unstressed: 0.45,
+        del_schwa: 0.35,
+        del_onset: 0.9,
+        del_cluster: 0.5,
+        del_consonant: 0.7,
+        ins_stressed: 0.7,
+        ins_unstressed: 0.35,
+        ins_consonant: 0.6,
+        sub_scale: 2.0,
+        vowel_sub_scale: 3.0,
+        stress_mismatch: 0.2,
+        class_mismatch: 0.5,
+    };
+
+    /// v6: deletion and insertion costs fitted by `phono fit` on 408 harness clips (exp1–exp6),
+    /// ranking pairs of answers to the same phrase (λ 0.01, substitution scales held at their
+    /// hand-set values). Losing a sound costs more than v1–v5 assumed, most of all an unstressed
+    /// full vowel (0.45 → 0.94), a singleton consonant (0.7 → 1.23) and an onset (0.9 → 1.22).
+    /// Held-out phrases: within-phrase ranking 80.0% → 83.1% (Whisper-only truth: 74.9% →
+    /// 78.8%). Letting the substitution scales move too scored ~86%, mostly by making vowel
+    /// swaps cheap (3.0 → 1.3); the search avoided vowel swaps so far, so the clips can't say
+    /// whether it would exploit them, and that fit is not used.
+    pub const FIT: Weights = Weights {
+        del_primary: 1.0,
+        del_secondary: 0.84,
+        del_unstressed: 0.94,
+        del_schwa: 0.37,
+        del_onset: 1.22,
+        del_cluster: 0.5,
+        del_consonant: 1.23,
+        ins_stressed: 0.62,
+        ins_unstressed: 0.26,
+        ins_consonant: 0.75,
+        sub_scale: 2.0,
+        vowel_sub_scale: 3.0,
+        stress_mismatch: 0.18,
+        class_mismatch: 0.57,
+    };
+}
+
 impl Default for Weights {
     fn default() -> Self {
-        Weights {
-            del_primary: 1.0,
-            del_secondary: 0.8,
-            del_unstressed: 0.45,
-            del_schwa: 0.35,
-            del_onset: 0.9,
-            del_cluster: 0.5,
-            del_consonant: 0.7,
-            ins_stressed: 0.7,
-            ins_unstressed: 0.35,
-            ins_consonant: 0.6,
-            sub_scale: 2.0,
-            vowel_sub_scale: 3.0,
-            stress_mismatch: 0.2,
-            class_mismatch: 0.5,
-        }
+        Weights::FIT
     }
 }
 
@@ -116,6 +147,10 @@ pub struct Scorer<'a> {
 impl<'a> Scorer<'a> {
     pub fn new(dist: &'a PhoneDistance) -> Self {
         Scorer { dist, w: Weights::default() }
+    }
+
+    pub fn with_weights(dist: &'a PhoneDistance, w: Weights) -> Self {
+        Scorer { dist, w }
     }
 
     pub fn del_cost(&self, t: &TargetPhone) -> f32 {

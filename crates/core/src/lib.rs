@@ -22,7 +22,7 @@ use g2p::G2p;
 use lexicon::Lexicon;
 use phone::Phone;
 use reading::{Reader, Source, Word};
-use score::{Alignment, Scorer, TargetPhone, flatten_target};
+use score::{Alignment, Scorer, TargetPhone, Weights, flatten_target};
 
 /// How candidates are scored before we trust them (see [`Engine::predict`]).
 #[derive(Clone, Copy, Debug)]
@@ -32,14 +32,20 @@ pub struct Predict {
     /// Multiplier on the per-script risk penalty ([`chunks::Script::risk`]); 0 disables it.
     pub risk_scale: f32,
     /// Weight of spelling closeness to the phrase's real words ([`words::spelling`]), scaled by
-    /// the share of the phrase that is real words; 0 disables it. Fit on exp1–exp3: ordering
-    /// answers for the same phrase went from 55% to 66% right (exp4, held out: 66% → 68%).
+    /// the share of the phrase that is real words; 0 disables it. Introduced in v4 at 0.4 (fit on
+    /// exp1–exp3); v6 refits it with the scorer weights ([`score::Weights::FIT`]).
     pub spelling: f32,
 }
 
+impl Predict {
+    /// v1–v5's values, for comparison (`phono calibrate --hand`).
+    pub const HAND: Predict = Predict { nbest: true, risk_scale: 1.0, spelling: 0.4 };
+}
+
 impl Default for Predict {
+    /// Fitted with [`score::Weights::FIT`] by `phono fit`.
     fn default() -> Self {
-        Predict { nbest: true, risk_scale: 1.0, spelling: 0.4 }
+        Predict { nbest: true, risk_scale: 1.3, spelling: 0.52 }
     }
 }
 
@@ -57,6 +63,8 @@ pub struct Engine {
     pub g2p: G2p,
     pub translit: Translit,
     pub chunks: ChunkSet,
+    /// Alignment weights for prediction and generation ([`Engine::scorer`]).
+    pub weights: Weights,
 }
 
 impl Engine {
@@ -64,7 +72,15 @@ impl Engine {
         let features = FeatureSpace::new(data.features);
         let dist = PhoneDistance::new(&features)?;
         let chunks = ChunkSet::new(&data.translit, chunks::Script::allowed_by_default);
-        Ok(Engine { features, dist, lexicon: data.lexicon, g2p: G2p::new(data.g2p), translit: data.translit, chunks })
+        Ok(Engine {
+            features,
+            dist,
+            lexicon: data.lexicon,
+            g2p: G2p::new(data.g2p),
+            translit: data.translit,
+            chunks,
+            weights: Weights::default(),
+        })
     }
 
     /// Let the search use every script it can, including the ones off by default
@@ -82,7 +98,7 @@ impl Engine {
     }
 
     pub fn scorer(&self) -> Scorer<'_> {
-        Scorer::new(&self.dist)
+        Scorer::with_weights(&self.dist, self.weights.clone())
     }
 
     /// Target pronunciation of an English phrase, one phone list per word.

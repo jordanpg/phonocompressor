@@ -1,0 +1,19 @@
+name = "exp8"
+description = """
+Phase 1 re-check of phono v6.1's top answer for each community sample phrase. v6.1 changes the
+spelling term only: real words are matched in the candidate's letters in order and without
+overlap (before, "doug doug" got full credit from a single "doug"; exp5–exp7 heard
+`dougdoegdidthat` as "DougDag did that"). Offline (exp1–exp7, 476 clips): within-phrase ranking
+182 → 183 of 211 pairs, pooled r 0.781 → 0.782.
+Only msg14 ("doug doug did that") differs from exp7: `도욱도욱딛핱` ("dougdougdidhat", predicted
+0.943), which spells both "doug"s exactly but reads "that" as "hat". Everything else is cached.
+Same model, voice and seeds as exp1–exp7.
+Cases come from `phono eval --export data/generated/ours-v6b.json` (gitignored: it contains the
+sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 15
+cases_from = "data/generated/ours-v6b.json"

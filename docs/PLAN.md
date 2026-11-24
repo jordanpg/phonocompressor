@@ -704,7 +704,167 @@ Still open after exp6:
 - The phonetic generator still misses natural spellings. The tiler covers
   real words, not near-homophones.
 
-Known limitations / next steps (in priority order after exp2; status as of v5):
+**v6: fitted scorer weights (after exp6, offline only).**
+`mise run phono fit` tunes the scorer's hand-set weights on the 408 clips
+of exp1–exp6. Truth is the same as `phono calibrate`'s and stays measured
+with the hand-set weights (`Weights::HAND`). That keeps truth comparable
+across versions.
+- **Objective:** the decision the search makes. For each pair of recorded
+  answers to the same phrase (156 distinct answers, 243 pairs ≥ 0.02 apart),
+  a logistic loss on the predicted difference, weighted by the truth
+  difference.
+- **Regularization:** an L2 pull towards the hand-set values in log space.
+  `del_primary` stays at 1.0 to anchor the scale.
+- **Optimizer:** coordinate descent in log space, about 2 s per fit.
+- **Validation:**
+  - 5-fold cross-validation by phrase, repeated with 4 different splits, so
+    held-out phrases are never seen in fitting;
+  - fitting without the answers new in exp6, then testing on pairs that
+    involve them.
+
+Held-out within-phrase ranking (pairs ≥ 0.05 apart):
+
+| fit | mean truth | Whisper-only truth | phones-only truth |
+|---|---|---|---|
+| hand-set (v1–v5) | 80.0% | 74.9% | 73.7% |
+| all 15 parameters free | 84.6–86.4% | 79.5–80.2% | 76.1–77.4% |
+| **substitution scales fixed (v6)** | **83.1–83.4%** | **78.8%** | – |
+
+Whisper text similarity doesn't depend on any scorer weight, so the gain
+against it isn't circular.
+
+All three truths agree that losing a sound costs more than v1–v5 assumed:
+
+| weight | hand | v6 |
+|---|---|---|
+| `del_unstressed` (full vowel) | 0.45 | 0.94 |
+| `del_consonant` (singleton) | 0.70 | 1.23 |
+| `del_onset` | 0.90 | 1.22 |
+| `ins_unstressed` | 0.35 | 0.26 |
+| `ins_consonant` | 0.60 | 0.75 |
+| `Predict::spelling` | 0.40 | 0.52 |
+| `Predict::risk_scale` | 1.0 | 1.3 |
+
+The free fit also made vowel-for-vowel swaps much cheaper
+(`vowel_sub_scale` 3.0 → 1.3, `sub_scale` 2.0 → 3.7). Against Whisper-only
+truth that adds only about 1 point. The search has avoided vowel swaps since
+v1, so the clips can't show whether it would exploit cheap ones. v6 keeps
+both substitution scales at their hand-set values.
+
+Offline, all 408 clips (in-sample): within-phrase ranking 80.0% → 86.0%,
+pooled r 0.766 → 0.776. `phono calibrate --hand` reproduces the v5 numbers.
+The predictions for our own picks did not come down (exp6 answers: 0.961
+predicted vs about 0.87 heard). A ranking objective doesn't move the
+offset, and the winner's curse remains.
+
+**The search's answers barely change: 3 of 34 differ from v5.1.**
+- `doug doug did that`: `도욱됙딛t핱` → `도욱듁딛t핱`.
+- `xdx u no toe`: `xdx筽노퇴` → `ꀓꄄu놑회`.
+- `What are thoooose`: `옽 ar숫e` → `옽㌃수읏`.
+
+Each is a near-tie flip: for "xdx u no toe", the top 8 candidates fall within
+0.016 of each other. The fitted weights mostly re-order answers the search
+would not pick anyway. Answers are in `data/generated/ours-v6.json`; exp7
+below tests them.
+
+What the worst exp6 answers show instead is reading-model blind spots on
+short pseudo-words:
+- `쿼` "kweo" was heard "cold" / "Cueo";
+- `퀴` "kwi" was heard "kawaii" (exp5), and `취e` "Kauai" (exp3), where
+  our G2P says K W IY;
+- `됙` "doeg" was heard "Dag" / "Deg".
+
+There is also a generation gap: `f레et何퀴` (fidelity 0.974) is not among
+17k generated candidates for "Free the kwee". But the clips above suggest
+it would be misread as "kawaii".
+
+**exp7 result (real TTS, 2026-11-24, 14 credits; 763/10000 used after):
+level with exp6, as expected from near-tie flips.** Same setup as exp1–exp6.
+Only 6 clips were new: msg91's answer reused exp5's clip.
+
+| run | answers | phone fidelity | Whisper similarity | harness sim (per seed) |
+|---|---|---|---|---|
+| exp1 | community | 0.791 | 0.847 | 0.86 / 0.88 |
+| exp6 | phono v5 | 0.845 | 0.894 | 0.90 / 0.91 |
+| exp7 | phono v6 (+ v5.1 reader) | 0.844 | 0.900 | 0.91 / 0.92 |
+
+| phrase | exp6 → exp7 | truth | heard in exp7 |
+|---|---|---|---|
+| doug doug did that | `도욱됙딛t핱` → `도욱듁딛t핱` | 0.80 → **0.89** | "Doug Doug did that." / "Doug Jug did that." |
+| you're not funny (v5.1 rule) | `ꒆ俄놑ꃚㅥy` → `요레놑ꃚㅥy` | 0.87 → **0.92** | "You're not funny." (both seeds; exp5 clip) |
+| xdx u no toe | `xdx 노퇴` → `ꀓꄄu놑회` | 0.76 → **0.70** | "XIX Sunoto." / "XDX Unotho." |
+| What are thoooose | `옽 ar숫e` → `옽㌃수읏` | 0.39 → 0.40 | "Otaris Wuse." / "Otaresus." |
+
+- **The flips came out as coin flips:** one better, one worse, one the same.
+  The v5.1 trailing-capital rule paid off on msg91.
+- **v6 ordered the new answers better:** fit without exp7, then tested on the
+  11 new within-phrase pairs exp7 adds, v6 got 10 right and the hand-set
+  weights 9. Refit on exp1–exp7 (476 clips), every weight stays within about
+  10% of v6's, and held-out ranking is 84.2–84.6% vs 81.0% hand-set. So
+  v6's weights stay.
+- **Readings:**
+  - `ꀓꄄ` "exdiex" was heard as the letters "XDX" (and "XIX").
+  - `놑회` "nothoe" came out with the /θ/ the reader predicted ("Unotho").
+  - `듁` "dyug" was heard "Doug" once and "Jug" once. The reader says
+    D AY1 AH1 G, but the TTS made /dj/ into /dʒ/. This adds to item 5's
+    short pseudo-word cases.
+  - "thoooose" is still unsolved.
+
+**v6.1: the spelling term matches each word once, in order.** All 24 pairs
+the scorer still mis-orders were listed. "doug doug did that" was
+mis-ordered 4 times, because `words::spelling` looked for each real word
+anywhere in the letters. So "doug doug" got full credit from the single
+"doug" in "dougdoegdidthat" (heard "DougDag did that" in exp5–exp7).
+Real words are now matched in order and without overlap by one DP. The
+letter-weighted mean is unchanged for phrases without repeated or
+reordered words.
+- Effect: ranking 182 → 183 of 211 pairs, pooled r 0.781 → 0.782.
+- One search answer changes: "doug doug did that" → `도욱도욱딛핱`
+  ("dougdougdidhat"; predicted 0.943, untested). It spells both "doug"s
+  exactly but reads "that" as "hat".
+
+Tried and rejected: accepting dictionary homophones as spellings ("dug" for
+"doug", since exp4's `둑둑 딛t핱`, "dugdug didthat", was heard exactly and is
+still the best answer for that phrase). Over exp1–exp7 it fixed 4 pairs and
+broke 7:
+- "nite", "yu" and the letter "r" (for "are") inside run-together strings
+  got full spelling credit but weren't heard as the word;
+- `둑둑딛ᒢ@` got full credit while failing for other reasons (UCAS, `@`).
+
+Clips: `data/generated/clips-exp7.tsv`, `clips-all7.tsv` (exp1–exp7);
+answers `ours-v6b.json` (v6.1).
+
+**exp8 result (real TTS, 2026-11-24, about 6 credits): v6.1's one changed
+answer is worse.** Same setup as exp1–exp7; only msg14's 2 clips were new.
+`도욱도욱딛핱` ("dougdougdidhat") was heard "Dog dog die that." and "Doug
+Doug did hat.":
+
+| answer | run | truth | predicted (v6.1) | heard |
+|---|---|---|---|---|
+| `둑둑 딛t핱` | exp4 | **0.93** | 0.928 | "Doug Doug did that." ×2 |
+| `도욱듁딛t핱` | exp7 | 0.89 | 0.937 | "Doug Doug did that." / "Doug Jug did that." |
+| `도욱됙딛t핱` | exp5, exp6 | 0.80 | 0.935 | "DougDag did that!" / "Doug Deg died that." |
+| `도욱도욱딛핱` | exp8 | 0.78 | **0.943** | "Dog dog die that." / "Doug Doug did hat." |
+
+The scorer still ranks it first of the 7 answers, for two reasons the
+order fix doesn't touch:
+- **A lost word onset is cheap.** "didhat" drops the /ð/ of "that". The
+  scorer charges one onset deletion (about 9% of the phrase), but the
+  listener hears a different word. v4's per-word aggregates didn't help
+  offline. This case is evidence for retrying a "word lost or replaced"
+  penalty.
+- **An exact spelling inside a run is not a guarantee.** "dougdoug" was
+  heard "Dog dog" on one seed, while exp4's "dugdug" was heard "Doug Doug".
+
+Over exp1–exp8 (544 clips, 215 pairs) the ordered and unordered spelling
+matches now tie at 185 pairs. The unordered one picked the better answer
+here only because it credited `도욱듁`'s second "doug" with the first. That
+would also let an answer drop a repeated word for free ("beep am truck"),
+so v6.1 stays.
+
+Clips: `data/generated/clips-exp8.tsv`, `clips-all8.tsv` (exp1–exp8).
+
+Known limitations / next steps (in priority order after exp2; status as of v6):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
    n-best expectation, voicing weight 3, script risk and default scripts,
@@ -716,8 +876,15 @@ Known limitations / next steps (in priority order after exp2; status as of v5):
    near-homophones. Fix: score units with the joint trigram (state = last
    two graphone units) during generation.
 2. ~~Results vary slightly between runs.~~ Deterministic since v5.
-3. The scorer's weights are hand-set. Fit them against harness data
-   (now 408 clips, exp1–exp6, with phone transcriptions).
+3. ~~The scorer's weights are hand-set.~~ Fitted in v6 (`phono fit`):
+   ranking on held-out phrases improves by about 3 points, but the search's
+   answers barely change. Refit after each new harness run (`phono fit
+   data/generated/clips-allN.tsv`).
+5. **Readings of short pseudo-words.** The TTS reads `kwi` like "kawaii",
+   `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
+   read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or
+   learn letter-to-sound corrections from the heard phones in the clips.
+   This now looks like a bigger lever than item 1.
 4. Speed is fine natively (about 2.4 s per phrase); WASM (Phase 3) may need
    a smaller beam or pruning. The data file is 12.5 MB since v3: the G2P
    tables are unpruned u64 keys + f32. Delta-coded keys, u16 log-probs, or

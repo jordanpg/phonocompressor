@@ -1,5 +1,7 @@
 //! `phono`: try the phonocompressor engine from the command line.
 
+mod fit;
+
 use clap::{Parser, Subcommand};
 use phono_core::Engine;
 use phono_core::phone::fmt_phones;
@@ -82,6 +84,28 @@ enum Command {
         /// Write per-clip predictions, outcomes and per-word features as TSV (for fitting).
         #[arg(long)]
         dump: Option<PathBuf>,
+        /// Predict with v1–v5's hand-set weights instead of the fitted defaults (ignores
+        /// --risk-scale and --spelling).
+        #[arg(long)]
+        hand: bool,
+    },
+    /// Fit the scorer's weights to harness clips by within-phrase ranking, with cross-validation.
+    Fit {
+        #[arg(default_value = "data/generated/clips-all6.tsv")]
+        clips: PathBuf,
+        #[arg(long, default_value_t = 5)]
+        folds: usize,
+        #[arg(long, default_value_t = 4)]
+        repeats: usize,
+        /// What to fit against.
+        #[arg(long, value_enum, default_value_t = fit::TruthKind::Mean)]
+        truth: fit::TruthKind,
+        /// Hold these parameters at their hand-set values (comma-separated names).
+        #[arg(long, value_delimiter = ',')]
+        fix: Vec<String>,
+        /// L2 pull towards the hand-set weights (log space); cross-validation picks among these.
+        #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
+        lambdas: Vec<f32>,
     },
     /// Score the community sample messages and compress their phrases.
     Eval {
@@ -174,14 +198,23 @@ fn main() -> Result<(), String> {
                 );
             }
         }
-        Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, spelling, voicing, dump } => {
+        Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, spelling, voicing, dump, hand } => {
             let heard = phono_core::score::Heard { vowel_scale: heard_vowel_scale, rhotic: heard_rhotic };
-            let predict = phono_core::Predict { nbest: !no_nbest, risk_scale, spelling };
+            let mut predict = phono_core::Predict { nbest: !no_nbest, risk_scale, spelling };
             let mut engine = engine;
+            if hand {
+                engine.weights = phono_core::score::Weights::HAND;
+                predict = phono_core::Predict { nbest: !no_nbest, ..phono_core::Predict::HAND };
+            }
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
             calibrate(&engine, &clips, worst, &heard, &predict, dump.as_ref())?
+        }
+        Command::Fit { clips, folds, repeats, truth, fix, lambdas } => {
+            let mut engine = engine;
+            let opts = fit::FitOpts { folds, repeats, lambdas, truth, fix };
+            fit::run(&mut engine, &clips, &phono_core::score::Heard::default(), &opts)?
         }
         Command::Eval { messages, export } => eval(&engine, &messages, export.as_ref())?,
     }
@@ -351,6 +384,15 @@ fn text_sim(a: &str, b: &str) -> f32 {
     1.0 - prev[b.len()] as f32 / a.len().max(b.len()) as f32
 }
 
+/// What the TTS actually produced for a clip: (phone-level fidelity of the recognized phones,
+/// Whisper text similarity). Truth keeps its original definition (phones of the reader's words,
+/// hand-set weights in `scorer`) across versions. `phono calibrate` and `phono fit` use their mean.
+fn clip_truth(engine: &Engine, scorer: &phono_core::score::Scorer, c: &Clip, heard: &phono_core::score::Heard) -> (f32, f32) {
+    let target = phono_core::score::flatten_target(&engine.target(&c.target));
+    let heard_phones: Vec<usize> = c.phones.split_whitespace().flat_map(|t| engine.features.parse_ipa_token(t)).collect();
+    (scorer.fidelity_segments(&engine.features, &target, &heard_phones, heard), text_sim(&c.whisper, &c.target))
+}
+
 /// Truth difference below which two answers count as a tie.
 const RANK_MARGIN: f32 = 0.05;
 
@@ -387,7 +429,8 @@ fn calibrate(
     dump: Option<&PathBuf>,
 ) -> Result<(), String> {
     let clips = load_clips(path)?;
-    let scorer = engine.scorer();
+    // Truth is measured with the hand-set weights whatever the engine predicts with.
+    let scorer = phono_core::score::Scorer::with_weights(&engine.dist, phono_core::score::Weights::HAND);
     struct Row<'a> {
         clip: &'a Clip,
         predicted: f32,
@@ -396,15 +439,8 @@ fn calibrate(
     }
     let mut rows = Vec::new();
     for c in &clips {
-        // Truth keeps its original definition (phones of the reader's words) across versions.
-        let target = phono_core::score::flatten_target(&engine.target(&c.target));
-        let heard_phones: Vec<usize> = c.phones.split_whitespace().flat_map(|t| engine.features.parse_ipa_token(t)).collect();
-        rows.push(Row {
-            clip: c,
-            predicted: engine.predict(&c.text, &engine.target_of(&c.target), predict),
-            actual: scorer.fidelity_segments(&engine.features, &target, &heard_phones, heard),
-            whisper: text_sim(&c.whisper, &c.target),
-        });
+        let (actual, whisper) = clip_truth(engine, &scorer, c, heard);
+        rows.push(Row { clip: c, predicted: engine.predict(&c.text, &engine.target_of(&c.target), predict), actual, whisper });
     }
     let col = |f: fn(&Row) -> f32| rows.iter().map(f).collect::<Vec<f32>>();
     let (pred, act, wh) = (col(|r| r.predicted), col(|r| r.actual), col(|r| r.whisper));

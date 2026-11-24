@@ -11,3 +11,4 @@ __pycache__/
 fnox.toml
 /tools/results/exp5.md
 tools/results/exp6.md
+/tools/results/exp*.md
