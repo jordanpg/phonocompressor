@@ -36,14 +36,59 @@ pub const READING_NBEST: usize = 3;
 
 enum Token {
     Letters(String),
-    Number(String),
+    /// A digit run. `glued`: letters follow with no separator (`3the`), which the TTS's text
+    /// normalizer handles unpredictably (see [`GLUED_NUMBER_DROP`]).
+    Number { text: String, glued: bool },
+    /// A lone `s` right after a number or an initialism (`2s`, `PCs`): a plural ending.
+    Plural,
     Symbol(char),
 }
 
+/// Split a letter run around capitals the TTS reads as their own word:
+/// - a run of two or more capitals inside a mixed-case run (`checkhimPC` → checkhim · PC, as
+///   exp1 heard it);
+/// - a single capital ending a run, after two or more lowercase letters: it is read as its
+///   letter name. `timE` → "Tim A" (exp2), `nexT` → "next to" (exp4), `yurE` → "you're E"
+///   (exp6): 6 of 6 clips. After one letter it stays in the word (`nO` → "no", 4 clips).
+///
+/// A single capital inside a run stays put: exp5 heard `tHe` as "the". Returns
+/// (piece, is_capitals) spans.
+fn split_caps(run: &[char]) -> Vec<(usize, usize, bool)> {
+    let mixed = run.iter().any(|c| c.is_ascii_lowercase()) && run.iter().any(|c| c.is_ascii_uppercase());
+    if !mixed {
+        return vec![(0, run.len(), false)];
+    }
+    let mut out = Vec::new();
+    let (mut i, mut start) = (0, 0);
+    while i < run.len() {
+        if run[i].is_ascii_uppercase() {
+            let j = (i..run.len()).find(|&k| !run[k].is_ascii_uppercase()).unwrap_or(run.len());
+            let trailing_letter = j - i == 1 && j == run.len() && i >= 2;
+            if j - i >= 2 || trailing_letter {
+                if i > start {
+                    out.push((start, i, false));
+                }
+                out.push((i, j, true));
+                start = j;
+            }
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    if start < run.len() {
+        out.push((start, run.len(), false));
+    }
+    out
+}
+
 fn tokenize(latin: &str) -> Vec<Token> {
-    let chars: Vec<char> = latin.chars().collect();
+    // Curly apostrophes read like straight ones (`you’re`).
+    let chars: Vec<char> = latin.chars().map(|c| if matches!(c, '\u{2019}' | '\u{2018}') { '\'' } else { c }).collect();
     let mut out = Vec::new();
     let mut i = 0;
+    // The previous token was a number or capitals and nothing separates it from here.
+    let mut after_count = false;
     while i < chars.len() {
         let c = chars[i];
         if c.is_ascii_alphabetic() || (c == '\'' && i > 0 && chars[i - 1].is_ascii_alphabetic()) {
@@ -51,9 +96,17 @@ fn tokenize(latin: &str) -> Vec<Token> {
             while i < chars.len() && (chars[i].is_ascii_alphabetic() || chars[i] == '\'') {
                 i += 1;
             }
-            // Apostrophes stay for the dictionary lookup (`you're`); `letters` drops them otherwise.
-            let w: String = chars[start..i].iter().collect::<String>().trim_end_matches('\'').to_string();
-            out.push(Token::Letters(w.to_ascii_lowercase()));
+            for (a, b, caps) in split_caps(&chars[start..i]) {
+                let piece: String = chars[start + a..start + b].iter().collect();
+                // Apostrophes stay for the dictionary lookup (`you're`); `letters` drops them otherwise.
+                let w = piece.trim_end_matches('\'').to_ascii_lowercase();
+                if after_count && piece == "s" {
+                    out.push(Token::Plural);
+                } else if !w.is_empty() {
+                    out.push(Token::Letters(w));
+                }
+                after_count = caps;
+            }
         } else if c.is_ascii_digit() {
             let start = i;
             while i < chars.len()
@@ -62,11 +115,15 @@ fn tokenize(latin: &str) -> Vec<Token> {
             {
                 i += 1;
             }
-            out.push(Token::Number(chars[start..i].iter().collect()));
+            let plural = chars.get(i) == Some(&'s') && !chars.get(i + 1).is_some_and(|c| c.is_ascii_alphabetic());
+            let glued = chars.get(i).is_some_and(|c| c.is_ascii_alphabetic()) && !plural;
+            out.push(Token::Number { text: chars[start..i].iter().collect(), glued });
+            after_count = true;
         } else {
             if symbol_word(c).is_some() {
                 out.push(Token::Symbol(c));
             }
+            after_count = false;
             i += 1;
         }
     }
@@ -149,6 +206,16 @@ pub struct Reader<'a> {
 const SPLIT_SHORT_WORD: f32 = 0.5;
 const SPLIT_G2P_LETTER: f32 = 0.3;
 const SPLIT_LONE_LETTER: f32 = 0.7;
+/// A split between a consonant letter and a vowel letter (`mold|ifrog`, `is|epic`) costs as
+/// much as an extra piece. Readers carry the consonant over to the vowel (maximal onset): the
+/// TTS read "varymoldifrog" as "very moldy frog" (exp1), "thisisepicswang" as "this is Sepik
+/// swang" (exp2) and "biepbiepamtruck" as "beep beep'em truck" (exp5). 0.3–1.0 all help
+/// offline; 1.0 also keeps `gigamaxdong` from splitting as gig|amax|dong.
+const SPLIT_ONSET: f32 = 1.0;
+
+/// How often a number glued to following letters (`3the`, `2eut`) is dropped, relative to being
+/// read: exp2–exp5 heard the digit in 5 of 10 such clips. Plural `2s` was read both times.
+const GLUED_NUMBER_DROP: f32 = 1.0;
 
 fn has_vowel(w: &str) -> bool {
     w.bytes().any(|b| b"aeiouy".contains(&b))
@@ -170,19 +237,25 @@ impl Reader<'_> {
     /// Returns (piece, is_dictionary_word).
     pub fn segment<'w>(&self, w: &'w str) -> Vec<(&'w str, bool)> {
         let n = w.len();
+        let bytes = w.as_bytes();
         let mut best: Vec<(f32, usize, bool)> = vec![(f32::INFINITY, 0, false); n + 1];
         best[0].0 = 0.0;
         for i in 0..n {
             if best[i].0.is_infinite() {
                 continue;
             }
+            let onset = if i > 0 && !b"aeiouy".contains(&bytes[i - 1]) && b"aeiou".contains(&bytes[i]) {
+                SPLIT_ONSET
+            } else {
+                0.0
+            };
             for j in i + 1..=n {
                 let piece = &w[i..j];
                 // A lone leftover letter ("d" + "isis") is rarely how a reader splits a word.
                 let lone = if piece.len() == 1 && n > 1 { SPLIT_LONE_LETTER } else { 0.0 };
-                let g2p_cost = 1.0 + SPLIT_G2P_LETTER * piece.len() as f32 + lone;
+                let g2p_cost = 1.0 + SPLIT_G2P_LETTER * piece.len() as f32 + lone + onset;
                 let dict_cost = (piece.len() >= 3 && has_vowel(piece) && self.lexicon.first(piece).is_some())
-                    .then_some(1.0 + if piece.len() == 3 { SPLIT_SHORT_WORD } else { 0.0 });
+                    .then_some(1.0 + if piece.len() == 3 { SPLIT_SHORT_WORD } else { 0.0 } + onset);
                 let (cost, dict) = match dict_cost {
                     Some(d) if d <= g2p_cost => (d, true),
                     _ => (g2p_cost, false),
@@ -241,14 +314,26 @@ impl Reader<'_> {
 
     /// Read a Latin string as English words.
     pub fn read(&self, latin: &str) -> Vec<Word> {
-        let mut out = Vec::new();
+        let mut out: Vec<Word> = Vec::new();
         for tok in tokenize(latin) {
             match tok {
                 Token::Letters(w) => self.letters(&w, &mut out),
-                Token::Number(n) => {
-                    for w in number_token_words(&n) {
-                        out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
+                Token::Number { text, glued } => {
+                    let words = number_token_words(&text);
+                    if glued {
+                        // One word, so the n-best expectation can drop it as a whole.
+                        let phones = words.iter().flat_map(|w| self.word(w)).collect();
+                        let text = words.join(" ");
+                        out.push(Word { text, phones, source: Source::Dictionary, alternatives: vec![(vec![], GLUED_NUMBER_DROP)] });
+                    } else {
+                        for w in words {
+                            out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
+                        }
                     }
+                }
+                Token::Plural => {
+                    let last = out.last().and_then(|w| w.phones.last().copied());
+                    out.push(Word { text: "s".into(), phones: plural_ending(last), source: Source::Dictionary, alternatives: vec![] });
                 }
                 Token::Symbol(c) => {
                     let w = symbol_word(c).unwrap_or_default();
@@ -258,6 +343,17 @@ impl Reader<'_> {
         }
         out.retain(|w| !w.phones.is_empty());
         out
+    }
+}
+
+/// English plural ending after a word ending in `last`: /ɪz/ after sibilants, /s/ after other
+/// voiceless consonants, /z/ otherwise.
+fn plural_ending(last: Option<Phone>) -> Vec<Phone> {
+    let p = |s: &str| Phone::parse(s).expect("ARPAbet");
+    match last.map(|l| crate::phone::ARPABET[l.base() as usize]) {
+        Some("S" | "Z" | "SH" | "ZH" | "CH" | "JH") => vec![p("IH0"), p("Z")],
+        Some("P" | "T" | "K" | "F" | "TH") => vec![p("S")],
+        _ => vec![p("Z")],
     }
 }
 
@@ -274,16 +370,30 @@ mod tests {
         assert_eq!(number_token_words("3.14").join(" "), "three point one four");
     }
 
-    #[test]
-    fn tokenizes() {
-        let toks: Vec<String> = tokenize("*100.000*apartment's @ x-y")
+    fn toks(s: &str) -> Vec<String> {
+        tokenize(s)
             .into_iter()
             .map(|t| match t {
                 Token::Letters(w) => format!("L:{w}"),
-                Token::Number(n) => format!("N:{n}"),
+                Token::Number { text, glued } => format!("N:{text}{}", if glued { "+" } else { "" }),
+                Token::Plural => "P".into(),
                 Token::Symbol(c) => format!("S:{c}"),
             })
-            .collect();
-        assert_eq!(toks, ["N:100.000", "L:apartment's", "S:@", "L:x", "L:y"]);
+            .collect()
+    }
+
+    #[test]
+    fn tokenizes() {
+        assert_eq!(toks("*100.000*apartment's @ x-y"), ["N:100.000", "L:apartment's", "S:@", "L:x", "L:y"]);
+    }
+
+    #[test]
+    fn capitals_and_glued_numbers() {
+        assert_eq!(toks("checkhimPC"), ["L:checkhim", "L:pc"]);
+        assert_eq!(toks("tHe PCs"), ["L:the", "L:pc", "P"]);
+        assert_eq!(toks("CHECK"), ["L:check"]);
+        assert_eq!(toks("yurE nexT nO aM"), ["L:yur", "L:e", "L:nex", "L:t", "L:no", "L:am"]);
+        assert_eq!(toks("are2s"), ["L:are", "N:2", "P"]);
+        assert_eq!(toks("3the 2sa no2"), ["N:3+", "L:the", "N:2+", "L:sa", "L:no", "N:2"]);
     }
 }

@@ -133,6 +133,8 @@ fn main() -> Result<(), String> {
             println!("reads:    {}", words_str(&words));
             println!("target:   {}", engine.target(&phrase).iter().map(|w| fmt_phones(w)).collect::<Vec<_>>().join(" | "));
             println!("fidelity: {:.3} (cost {:.2} / {:.2})", a.fidelity, a.cost, a.max_cost);
+            let predicted = engine.predict(&text, &engine.target_of(&phrase), &phono_core::Predict::default());
+            println!("predict:  {predicted:.3} (n-best expectation, script risk, spelling: what the search ranks by)");
             let ops: Vec<String> = a
                 .ops
                 .iter()
@@ -246,7 +248,7 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         }
         println!("{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}", truncate(spoken, 28));
         exported.push(format!(
-            "  {{\"{id}\": {{\"unicode\": {}, \"spoken\": {}, \"notes\": \"phono v2 top-1, predicted {our:.3} (community {their:.3})\"}}}}",
+            "  {{\"{id}\": {{\"unicode\": {}, \"spoken\": {}, \"notes\": \"phono top-1, predicted {our:.3} (community {their:.3})\"}}}}",
             json_quote(&our_text),
             json_quote(spoken)
         ));

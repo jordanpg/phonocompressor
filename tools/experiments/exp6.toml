@@ -1,0 +1,26 @@
+name = "exp6"
+description = """
+Phase 1 re-check of phono v5's top answer for each community sample phrase. v5 changes v4's
+reader and candidate generation; prediction weights are unchanged:
+- Reader: a run of capitals inside a word is its own word (`checkhimPC` → check him P C);
+  `2s` is a plural ("twos"); a number glued to following letters (`3the`) may be dropped
+  (exp2–exp5 dropped it in 5 of 10 clips); splitting a run between a consonant and a vowel
+  (`mold|ifrog`) costs as much as an extra word, since readers carry the consonant over.
+- Tiler: chunks ending in a word boundary (CJK `嬶` "Kaka ") can end a word; `x` spells
+  ks/cks/cs; "at"/"and" may be spelled `@`/`&`; punctuation tokens are skipped (v4 forced an
+  `@` into "joe mama - ha ha"); tilings are deduplicated by spelling and ranked by edits,
+  script risk and length before the rerank.
+- Ranking: 0.005 per codepoint, so near-ties go to the shorter answer.
+- Search is deterministic.
+Offline (exp1–exp5, 340 clips): within-phrase ranking 75.2% → 77.1% (157 pairs), pooled r
+0.718 → 0.764; on the 27 phrases that motivated no change, 80.7% → 81.6%, r 0.726 → 0.735.
+Same model, voice and seeds as exp1–exp5.
+Cases come from `phono eval --export data/generated/ours-v5.json` (gitignored: it contains the
+sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 150
+cases_from = "data/generated/ours-v5.json"

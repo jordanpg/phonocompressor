@@ -283,7 +283,7 @@ impl G2p {
                     cost: -((total as f64 / sum).ln()) as f32,
                 })
                 .collect();
-            spellings.sort_by(|a, b| a.cost.total_cmp(&b.cost));
+            spellings.sort_by(|a, b| a.cost.total_cmp(&b.cost).then_with(|| a.letters.cmp(&b.letters)));
             p2g.insert(key, spellings);
         }
         let max_phones = model.units.iter().map(|u| u.phones.len()).max().unwrap_or(1);

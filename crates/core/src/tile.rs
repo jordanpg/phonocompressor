@@ -7,21 +7,38 @@
 //! read it exactly as it would read the name itself.
 //!
 //! This tiles the phrase's letters with chunks within the codepoint budget. A space between
-//! words is optional (it costs a codepoint). Up to `max_edits` letter edits are allowed:
-//! dropping a target letter (silent or doubled letters: `doug` → `dug`) or swapping it for a
-//! similar letter (vowels for vowels, c/k/q, s/z, f/v, g/j). Number tokens are matched by
-//! number chunks with the same digits (`100,000` → `҈` "*100.000*"). The reranker decides
-//! which tilings actually sound right.
+//! words is optional (it costs a codepoint), and a chunk that ends in a word boundary (CJK
+//! `嬶` "Kaka ") can end a word and supply that space itself. Up to `max_edits` letter edits are
+//! allowed: dropping a target letter (silent or doubled letters: `doug` → `dug`), swapping it
+//! for a similar letter (vowels for vowels, c/k/q, s/z, f/v, g/j), or spelling `ks`/`cks`/`cs`
+//! as `x` (`chucks` → `chux`). Number tokens are matched by number chunks with the same digits
+//! (`100,000` → `҈` "*100.000*"), and the words `at`, `and`, `plus`, `percent` may be spelled
+//! by their symbol. The reranker decides which tilings actually sound right.
 
-use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet};
+use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet, Script, symbol_word};
 use std::collections::HashMap;
 
 /// One piece of the phrase to cover.
 enum Seg {
-    /// Lowercase letters of a word.
-    Letters(Vec<u8>),
+    /// Lowercase letters of a word, and chunks that may stand for the whole word (`@` for "at").
+    Letters(Vec<u8>, Vec<u32>),
     /// A number or symbol token: the chunks whose digits/symbols match it.
     Fixed(Vec<u32>),
+}
+
+/// Tilings enumerated per tiling kept, before ranking.
+const POOL_FACTOR: usize = 25;
+
+/// Letter clusters that `x` spells, at the cost of one edit.
+const X_CLUSTERS: [&[u8]; 3] = [b"cks", b"ks", b"cs"];
+
+/// A chunk that covers `len` letters from the current offset with `edits` edits. `spaced`: it
+/// also ends with a word boundary, so it closes the word (`kaka ` for "kaka").
+struct Found {
+    len: usize,
+    chunk: u32,
+    edits: usize,
+    spaced: bool,
 }
 
 /// Letters that can stand in for each other at the cost of one edit.
@@ -40,7 +57,8 @@ struct Tiler<'a> {
     max_cp: usize,
     max_edits: usize,
     limit: usize,
-    out: Vec<(String, usize)>,
+    /// (text, edits, letters spelled with boundaries as spaces).
+    out: Vec<(String, usize, String)>,
     /// Longest chunk, in letters (for pruning).
     max_letters: usize,
 }
@@ -52,7 +70,7 @@ impl Tiler<'_> {
             .iter()
             .enumerate()
             .map(|(k, s)| match s {
-                Seg::Letters(l) => l.len() - if k == 0 { off.min(l.len()) } else { 0 },
+                Seg::Letters(l, _) => l.len() - if k == 0 { off.min(l.len()) } else { 0 },
                 Seg::Fixed(_) => 1,
             })
             .sum()
@@ -64,7 +82,8 @@ impl Tiler<'_> {
         }
         if seg == self.segs.len() {
             let text: String = path.iter().map(|&c| self.chunks.get(c).ch).collect();
-            self.out.push((text, edits));
+            let spelled: String = path.iter().map(|&c| self.chunks.get(c).latin.as_str()).collect();
+            self.out.push((text, edits, spelled.trim_end().to_string()));
             return;
         }
         let left = self.max_cp - path.len();
@@ -82,18 +101,29 @@ impl Tiler<'_> {
                     }
                 }
             }
-            Seg::Letters(letters) => {
+            Seg::Letters(letters, whole) => {
                 if off == letters.len() {
                     return self.boundary(seg + 1, path, edits);
                 }
-                let letters = letters.clone();
+                let (letters, whole) = (letters.clone(), whole.clone());
+                if off == 0 && path.len() < self.max_cp {
+                    for c in whole {
+                        path.push(c);
+                        self.boundary(seg + 1, path, edits);
+                        path.pop();
+                    }
+                }
                 // Longest chunks first: fewer codepoints.
-                let mut found: Vec<(usize, u32, usize)> = Vec::new();
+                let mut found: Vec<Found> = Vec::new();
                 self.walk(&letters, off, (0, 0, 0), self.max_edits - edits, &mut found);
-                found.sort_by_key(|&(len, _, e)| (e, std::cmp::Reverse(len)));
-                for (len, chunk, e) in found {
-                    path.push(chunk);
-                    self.go(seg, off + len, path, edits + e);
+                found.sort_by_key(|f| (f.edits, std::cmp::Reverse(f.len), f.spaced));
+                for f in found {
+                    path.push(f.chunk);
+                    if f.spaced {
+                        self.go(seg + 1, 0, path, edits + f.edits);
+                    } else {
+                        self.go(seg, off + f.len, path, edits + f.edits);
+                    }
                     path.pop();
                 }
                 // Drop this letter.
@@ -104,22 +134,34 @@ impl Tiler<'_> {
         }
     }
 
-    /// Chunks matching `letters[start..]`, found by walking the trie from `node` (`depth`
-    /// letters in), as (letters covered, chunk, similar-letter swaps ≤ `budget`).
-    fn walk(&self, letters: &[u8], start: usize, (node, depth, swaps): (u32, usize, usize), budget: usize, found: &mut Vec<(usize, u32, usize)>) {
-        if depth > 0
-            && let Some(c) = self.chunks.trie.chunk_at(node)
-        {
-            found.push((depth, c, swaps));
+    /// Chunks matching `letters[start..]`, found by walking the trie from `node` with `used`
+    /// letters covered and `edits` ≤ `budget` edits so far.
+    fn walk(&self, letters: &[u8], start: usize, (node, used, edits): (u32, usize, usize), budget: usize, found: &mut Vec<Found>) {
+        let trie = &self.chunks.trie;
+        if used > 0 {
+            if let Some(chunk) = trie.chunk_at(node) {
+                found.push(Found { len: used, chunk, edits, spaced: false });
+            }
+            if start + used == letters.len()
+                && let Some(chunk) = trie.step(node, BOUNDARY).and_then(|n| trie.chunk_at(n))
+            {
+                found.push(Found { len: used, chunk, edits, spaced: true });
+            }
         }
-        let Some(&want) = letters.get(start + depth) else { return };
-        if let Some(next) = self.chunks.trie.step(node, want) {
-            self.walk(letters, start, (next, depth + 1, swaps), budget, found);
+        let rest = &letters[start + used..];
+        let Some(&want) = rest.first() else { return };
+        if let Some(next) = trie.step(node, want) {
+            self.walk(letters, start, (next, used + 1, edits), budget, found);
         }
-        if swaps < budget {
+        if edits < budget {
             for alt in (b'a'..=b'z').filter(|&alt| similar(want, alt)) {
-                if let Some(next) = self.chunks.trie.step(node, alt) {
-                    self.walk(letters, start, (next, depth + 1, swaps + 1), budget, found);
+                if let Some(next) = trie.step(node, alt) {
+                    self.walk(letters, start, (next, used + 1, edits + 1), budget, found);
+                }
+            }
+            if let Some(next) = trie.step(node, b'x') {
+                for cluster in X_CLUSTERS.iter().filter(|c| rest.starts_with(c)) {
+                    self.walk(letters, start, (next, used + cluster.len(), edits + 1), budget, found);
                 }
             }
         }
@@ -144,19 +186,30 @@ impl Tiler<'_> {
 /// fewest edits first (at most `limit`). Returns (text, edits).
 pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, limit: usize) -> Vec<(String, usize)> {
     let mut fixed: HashMap<String, Vec<u32>> = HashMap::new();
+    let mut symbols: HashMap<&str, Vec<u32>> = HashMap::new();
     for (i, c) in chunks.chunks.iter().enumerate() {
         if c.kind == ChunkKind::Phonetic {
             fixed.entry(alnum(&c.latin)).or_default().push(i as u32);
+            let mut it = c.latin.trim().chars();
+            if let (Some(sym), None) = (it.next(), it.next())
+                && let Some(word) = symbol_word(sym)
+            {
+                symbols.entry(word).or_default().push(i as u32);
+            }
         }
     }
     let mut segs = Vec::new();
     for token in phrase.split_whitespace() {
         let letters: Vec<u8> = token.bytes().filter(u8::is_ascii_alphabetic).map(|b| b.to_ascii_lowercase()).collect();
         if !letters.is_empty() {
-            segs.push(Seg::Letters(letters));
+            let whole = std::str::from_utf8(&letters).ok().and_then(|w| symbols.get(w)).cloned().unwrap_or_default();
+            segs.push(Seg::Letters(letters, whole));
+        } else if alnum(token).is_empty() {
+            // Punctuation (`-`, `!`): nothing to say. (v4 matched it with every symbol chunk,
+            // so "joe mama - ha ha" came out with an `@` that the TTS read as "at".)
         } else if let Some(options) = fixed.get(&alnum(token)) {
             segs.push(Seg::Fixed(options.clone()));
-        } else if !alnum(token).is_empty() {
+        } else {
             return Vec::new(); // A number or symbol we have no chunk for.
         }
     }
@@ -164,15 +217,24 @@ pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, li
         return Vec::new();
     }
     let max_letters = chunks.chunks.iter().map(|c| c.latin.trim().len()).max().unwrap_or(1);
-    let mut t = Tiler { chunks, segs, max_cp, max_edits, limit, out: Vec::new(), max_letters };
-    // Exact tilings first, then one edit, then two: the cap keeps the closest spellings.
+    // Enumerate a wide pool, then keep the best `limit`. Depth-first order alone would fill the
+    // cap with variants of whatever prefix it tries first (`푼Ճ…` before `푼ch…`).
+    let pool = limit.saturating_mul(POOL_FACTOR);
+    let mut t = Tiler { chunks, segs, max_cp, max_edits, limit: pool, out: Vec::new(), max_letters };
+    // Exact tilings first, then one edit, then two: if the pool fills, it holds the closest.
     for budget in 0..=max_edits {
         t.max_edits = budget;
         t.go(0, 0, &mut Vec::new(), 0);
     }
+    // Fewest edits, then the most reliable scripts, then the fewest codepoints.
+    let risk = |s: &str| s.chars().map(|c| (Script::of(c).risk() * 1000.0).round() as u32).sum::<u32>();
+    let mut all: Vec<(String, usize, String)> = t.out;
+    all.sort_by_cached_key(|(s, e, _)| (*e, risk(s), s.chars().count(), s.clone()));
+    // Tilings that spell the same letters read alike: keep the best of each, so the rerank
+    // budget goes to distinct spellings rather than re-chunkings of one.
     let mut seen = std::collections::HashSet::new();
-    let mut out: Vec<(String, usize)> = t.out.into_iter().filter(|(s, _)| seen.insert(s.clone())).collect();
-    out.sort_by_key(|(s, e)| (*e, s.chars().count()));
+    let mut out: Vec<(String, usize)> =
+        all.into_iter().filter(|(_, _, spelled)| seen.insert(spelled.clone())).map(|(s, e, _)| (s, e)).collect();
     out.truncate(limit);
     out
 }
@@ -180,7 +242,7 @@ pub fn tile(chunks: &ChunkSet, phrase: &str, max_cp: usize, max_edits: usize, li
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chunks::{Script, Translit};
+    use crate::chunks::Translit;
 
     fn set() -> ChunkSet {
         let pairs = [
@@ -197,6 +259,9 @@ mod tests {
             ('ꏒ', "re"),
             ('҈', "*100.000*"),
             (' ', " "),
+            ('嬶', "Kaka "),
+            ('ꍱ', "chux"),
+            ('@', "@"),
         ];
         let t = Translit { map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect() };
         ChunkSet::new(&t, Script::allowed_by_default)
@@ -210,6 +275,20 @@ mod tests {
         let texts: Vec<&str> = out.iter().map(|(t, _)| t.as_str()).collect();
         assert!(texts.contains(&"바ddream") || texts.contains(&"바d dream") || texts.iter().any(|t| t.starts_with('바')), "{texts:?}");
         assert!(out.iter().all(|(t, _)| t.chars().count() <= 6));
+    }
+
+    #[test]
+    fn spaced_chunks_x_and_symbols() {
+        let out = tile(&set(), "kaka chucks at bad", 6, 1, 1000);
+        let texts: Vec<&str> = out.iter().map(|(t, _)| t.as_str()).collect();
+        assert!(texts.contains(&"嬶ꍱ@바d"), "{texts:?}");
+        assert!(out.iter().any(|(t, e)| t == "嬶ꍱ@바d" && *e == 1));
+    }
+
+    #[test]
+    fn punctuation_is_skipped() {
+        let out = tile(&set(), "bad - bad", 6, 0, 100);
+        assert!(!out.is_empty() && out.iter().all(|(t, _)| !t.contains('@')), "{out:?}");
     }
 
     #[test]

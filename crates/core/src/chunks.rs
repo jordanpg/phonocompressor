@@ -275,8 +275,10 @@ impl ChunkSet {
             }
             let Some((latin, kind)) = normalize(raw) else { continue };
             let cand = Chunk { ch, latin: latin.clone(), script, kind };
+            // Prefer reliable scripts, then lowercase forms (Armenian `ճ` "ch" over `Ճ` "Ch").
+            let caps = |c: char| translit.get(c).chars().any(|x| x.is_ascii_uppercase());
             match best.get(&latin) {
-                Some(cur) if (cur.script, cur.ch) <= (script, ch) => {}
+                Some(cur) if (cur.script, caps(cur.ch), cur.ch) <= (script, caps(ch), ch) => {}
                 _ => {
                     best.insert(latin, cand);
                 }

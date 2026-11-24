@@ -38,6 +38,10 @@ pub struct SearchConfig {
     /// and the letter edits they may make.
     pub spelled: usize,
     pub spelled_edits: usize,
+    /// Ranking cost per codepoint, so near-ties go to the shorter answer. Predictions are
+    /// nowhere near precise to 0.005, and filler letters the scorer finds almost free (`e` in
+    /// `gigamaxedong`) are still heard (exp3/exp5: "gigamaxidong"). Not part of `fidelity`.
+    pub codepoint_cost: f32,
     pub predict: crate::Predict,
 }
 
@@ -53,6 +57,7 @@ impl Default for SearchConfig {
             rerank: 600,
             spelled: 400,
             spelled_edits: 2,
+            codepoint_cost: 0.005,
             predict: crate::Predict::default(),
         }
     }
@@ -175,7 +180,8 @@ impl Layer {
 
     fn drain_sorted(&mut self, beam: usize) -> Vec<Entry> {
         let mut all: Vec<Entry> = self.states.drain().flat_map(|(_, v)| v).collect();
-        all.sort_by(|a, b| a.cost.total_cmp(&b.cost));
+        // Full tie-break: HashMap order must not decide what survives the beam.
+        all.sort_by(|a, b| a.cost.total_cmp(&b.cost).then_with(|| (a.node, a.k, a.flags, a.path).cmp(&(b.node, b.k, b.flags, b.path))));
         all.truncate(beam);
         all
     }
@@ -416,7 +422,7 @@ impl<'a> Searcher<'a> {
             }
         }
 
-        goals.sort_by(|a, b| a.cost.total_cmp(&b.cost));
+        goals.sort_by(|a, b| a.cost.total_cmp(&b.cost).then_with(|| a.path.cmp(&b.path)));
         // Many tilings spell the same Latin string; they read identically, so keep the one with
         // the fewest codepoints and spend the re-ranking budget on distinct spellings.
         let mut by_latin: HashMap<String, usize> = HashMap::new();
@@ -476,8 +482,13 @@ impl<'a> Searcher<'a> {
             let fidelity = self.engine.predict_read(&text, &words, target, &cfg.predict);
             out.push(Candidate { codepoints: text.chars().count(), text, latin, words, fidelity, gen_cost });
         }
+        let rank = |c: &Candidate| c.fidelity - cfg.codepoint_cost * c.codepoints as f32;
         out.sort_by(|a, b| {
-            b.fidelity.total_cmp(&a.fidelity).then(a.codepoints.cmp(&b.codepoints)).then(a.gen_cost.total_cmp(&b.gen_cost))
+            rank(b)
+                .total_cmp(&rank(a))
+                .then(a.codepoints.cmp(&b.codepoints))
+                .then(a.gen_cost.total_cmp(&b.gen_cost))
+                .then_with(|| a.text.cmp(&b.text))
         });
         // Strings with the same transliteration read identically; keep the shortest.
         let mut readings = std::collections::HashSet::new();

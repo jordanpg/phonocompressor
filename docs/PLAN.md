@@ -538,7 +538,7 @@ v4 beats the community for the first time, on both measures.**
 
 Clips: `data/generated/clips-exp5.tsv`, `clips-all5.tsv` (exp1–exp5).
 
-Known gaps (from v4's analysis and exp5):
+Known gaps after exp5 (addressed in v5 below):
 - **Digits inside a word** (`2s`) are read as digits, and so are uppercase
   CJK readings (`Sho `). Penalize or skip both.
 - **Ties in reader segmentation.** The community's "varymoldifrog" splits
@@ -547,31 +547,181 @@ Known gaps (from v4's analysis and exp5):
 - The phonetic generator still misses natural spellings. The tiler covers
   real words, not near-homophones.
 
-Known limitations / next steps (in priority order after exp2):
+**v5: reader fixes and a wider tiler (2026-11-24; exp6 below).**
 
-0. **Make re-ranking robust to reading uncertainty.**
-   - Score the expected fidelity over the G2P n-best (ambiguous spellings
-     score lower).
-   - Raise the voicing weight.
-   - Default to the scripts exp0–exp2 showed are reliable (Latin, Hangul, Yi,
-     CJK Compatibility words, Cyrillic number signs); others opt-in or
-     penalized.
-   - Then measure against a **phone-level** harness metric (wav2vec2 IPA vs.
-     target, via Phoible distances) instead of Whisper text, and fit the
-     scorer weights to exp0–exp2 clips.
+Reader (`reading.rs`). Each rule comes from what the TTS did in exp1–exp5:
+- **Capitals.** A run of two or more capitals inside a mixed-case word is
+  its own word: `checkhimPC` → check · him · P C, heard that way in exp1.
+  A single capital stays put: exp5 heard `tHe` as "the".
+- **Numbers glued to letters.**
+  - `2s` is a plural ("twos"); exp5 heard "t uː z" on both seeds.
+  - A digit run followed directly by other letters (`3the`, `2eut`) gets a
+    second reading in which it is dropped, weighted 50/50. It was dropped
+    in 5 of the 10 such clips from exp2–exp5. The n-best expectation then
+    prices the risk, so no new penalty term is needed.
+- **Maximal onset.** Splitting a letter run between a consonant and a vowel
+  costs as much as an extra word (`SPLIT_ONSET` = 1.0), because readers
+  carry the consonant over to the vowel. Evidence:
+  - "varymoldifrog" → "very moldy frog" (now vary|moldi|frog, was mold|ifrog);
+  - "thisisepicswang" → "this is Sepik swang";
+  - "biepbiepamtruck" → "beep beep'em truck".
+
+  Any value from 0.3 to 1.0 helps offline. 1.0 also stops `gigamaxdong`
+  from splitting as gig|amax|dong (AMAX is in CMUdict).
+- **Curly apostrophes** count as apostrophes, so `you’re` is one word. Only
+  `Engine::target` was affected: `phono score` and calibrate's truth. Search
+  targets already normalized them. The v4 numbers below are recomputed with
+  this fix so the comparison is fair.
+- **`Sho `:** the reader already predicted what the TTS said ("show,
+  ma'am"), and v4 scored that answer only 0.719. The real miss was
+  generation, fixed next.
+
+Tiler (`tile.rs`):
+- A chunk that ends in a word boundary (CJK `嬶` "Kaka ", `墹` "Mama ")
+  can end a word and supply the space. Before, CJK word chunks never
+  appeared in spelled candidates.
+- `x` spells `ks`/`cks`/`cs` as one edit (`chucks` → `ꍱ` chux), and the
+  words "at", "and", "plus", "percent" may be spelled by their symbol.
+- **Bug fix:** a punctuation token (`-` in "Joe mama - HA HA") was matched
+  by every symbol chunk. That forced v4's `죄맘a@a하`, which exp5 heard as
+  "Joe Mama at Aha".
+- Tilings are enumerated into a pool 25× the budget. They are deduplicated
+  by the letters they spell, then ranked by edits, script risk and
+  codepoints. Depth-first order had filled the 400 slots with re-chunkings
+  of whatever prefix came first: `푼Ճ…` (Armenian) crowded out v4's
+  `푼ch간ym`.
+- Chunk representatives prefer lowercase forms (Armenian `ճ` "ch" over `Ճ`
+  "Ch").
+
+Ranking and determinism:
+- **Shorter answers win near-ties** (`SearchConfig::codepoint_cost` =
+  0.005 per codepoint, used for ranking only, not part of `fidelity`).
+  v4 chose `҈㌖㌐ꂶe동` over the community's 5-codepoint `҈㌖㌐ꂶ동` by about
+  0.0005. Its filler `e` was heard as "gigamaxidong".
+- **Search is deterministic.** Ties in G2P spelling costs, beam layers,
+  goals and the rerank were broken in hash-map order. Three runs now give
+  byte-identical output.
+
+`phono score` now also prints `predict`, the value the search ranks by.
+
+Offline (`phono calibrate`, exp1–exp5, 340 clips):
+
+| | v4 | v5 |
+|---|---|---|
+| pooled r vs truth | 0.718 | 0.764 |
+| pooled Spearman | 0.726 | 0.767 |
+| within-phrase ranking (157 pairs) | 75.2% | 77.1% |
+| same, 27 phrases that motivated no change (114 pairs) | 80.7% | 81.6% |
+| pooled r on those 27 phrases | 0.726 | 0.735 |
+
+Ablations (v5 minus one rule, pooled r / ranking): no onset 0.753 / 75.2%;
+no glued-number drop 0.734 / 77.1%; no capitals split 0.756 / 77.1%. So the
+onset rule carries the ranking gain, and the other two carry pooled r. All
+three rules came from the clips they are tested on, so most of the gain is
+in-sample. On the untouched phrases it is small but not negative.
+
+By our own scorer, v5 beats the community on 33 of 34 phrases (0.960 vs
+0.827). 16 of 34 answers changed from v4. Search takes about 2.4 s per
+phrase.
+
+| phrase | v4 (exp5) | v5 |
+|---|---|---|
+| kaka chucks dung at joe mama | `찿ꍱ둥@墸맘` | `嬶ꍱ둥@죄墹` (community-style) |
+| Joe mama - HA HA | `죄맘a@a하` | `죄墹하 하` |
+| Free the kwee | `3t何퀴` | `f레et何쿼` |
+| very moldy frog | `ヹꏜ몰df록` | `ヹꏜ몰디f록` (community's spelling) |
+| 100,000 Kilometer Giga max dong | `҈㌖㌐ꂶe동` | `҈㌖㌐ꂶ동` (= community) |
+| What are thoooose | `ot ㌃2s` | `옽 ar숫e` |
+| you’re not funny | `요레놑ꃚㅥy` (heard right) | `ꒆ俄놑ꃚㅥy` (a CJK `E ` gamble) |
+
+**exp6 result (real TTS, 2026-11-24, 84 credits; 749/10000 used after):
+v5 improves on v4 and leads the community further.** Same setup as exp1–exp5.
+Only the 15 changed answers needed new clips; `҈㌖㌐ꂶ동` reused exp1's.
+
+| run | answers | phone fidelity | Whisper similarity |
+|---|---|---|---|
+| exp1 | community | 0.791 | 0.847 |
+| exp5 | phono v4 | 0.832 | 0.872 |
+| exp6 | **phono v5** | **0.845** | **0.894** |
+
+(Phone fidelity uses v5's truth, with `you’re` read as one word, so exp1
+and exp5 differ from the earlier tables by ≤ 0.002.)
+
+- **Per phrase** (mean of both truths, 0.05 margin):
+  - vs v4: better on 4, worse on 0, about the same on 30;
+  - vs the community: better on 11, worse on 2, about the same on 21;
+  - heard exactly on both seeds: 14 of 34 (v4: 12).
+- **Gains:**
+  - "this is epic swag": `t힛잇엪잋솩` heard exactly, "This is Epic Swag",
+    on both seeds. So the run-together string was fine; v4's `es` was the
+    problem.
+  - "kaka chucks dung at joe mama": `嬶ꍱ둥@죄墹` heard "Cock-a-chucks-dung
+    at Joe Mama", like the community's message (0.58 → 0.80).
+  - "Joe mama - HA HA": no more stray `@` ("Joe Mama, haha", 0.73 → 0.81).
+  - "Free the kwee": "Free the cold" / "Frita Cueo" (0.38 → 0.62).
+- **The CJK `E ` gamble failed.** `ꒆ俄놑ꃚㅥy` ("yurE notfunny") was heard
+  "You're **E** not funny" on both seeds (0.92 → 0.87).
+- **Still losing to the community:**
+  - "very moldy frog": `ヹꏜ몰디f록` was heard "Very mold-a-frog" (0.89 vs
+    0.96). The community's identical-sounding `ꃬꏜ몰ꄂf록` ("varymoldifrog")
+    was heard "moldy".
+  - "What are thoooose": "Adarsus" (0.39 vs 0.54).
+- **Prediction on the unseen clips:** Pearson 0.798 / Spearman 0.736.
+  Over all 408 clips (exp1–exp6): pooled r 0.772, within-phrase ranking
+  80.0% of 200 pairs. Predicted 0.960 for its own picks vs about 0.87
+  truth, so it still over-predicts its own picks.
+
+Clips: `data/generated/clips-exp6.tsv`, `clips-all6.tsv` (exp1–exp6).
+
+**v5.1: a trailing capital is a letter (after exp6, offline only).**
+`split_caps` also splits off a single capital that ends a letter run after
+two or more lowercase letters, and reads it as its letter name:
+- `timE` → "Tim A" (exp2), `nexT` → "next to" (exp4), `yurE` → "you're E"
+  (exp6): 6 of 6 clips;
+- after one letter it stays in the word: `nO` → "no", `aM` → "um", 6 clips.
+
+Offline effect on 408 clips: ranking unchanged (80.0%), pooled r 0.772 →
+0.766. The three affected answers each had an audible extra letter, but
+the scorer charges a full stressed vowel for a letter the TTS says
+lightly, so they are now under-predicted. The rule matters for the
+search: msg91 goes back to v4's `요레놑ꃚㅥy` (heard exactly in exp5).
+msg171 now spells "u" with `筽` "O " read as the letter O (`xdx筽노퇴`,
+0.830 vs 0.819), which is untested. Answers in
+`data/generated/ours-v5b.json`.
+
+Still open after exp6:
+- **"very moldy frog".** Two spellings the reader treats the same were
+  heard differently: "verymoldifrog" → "mold-a-frog", "varymoldifrog" →
+  "moldy frog". Nothing here models that yet.
+- **"what are thoooose"** is still weak: nothing spells /ð/ + long /uː/
+  cheaply.
+- **Capitalized CJK one-letter chunks** (`E `, `O `, `He `) are now read
+  as letters at the end of a run. Inside a run (`tHe`), the only evidence
+  is one exp5 clip.
+- **Over-prediction of our own picks** (0.96 predicted vs about 0.87
+  heard) persists. Fitting the scorer weights (item 3 below) on the 408
+  clips is the next offline lever.
+- The phonetic generator still misses natural spellings. The tiler covers
+  real words, not near-homophones.
+
+Known limitations / next steps (in priority order after exp2; status as of v5):
+
+0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
+   n-best expectation, voicing weight 3, script risk and default scripts,
+   phone-level truth in `phono calibrate`.
 1. **Generation spells without context.** Spelling costs ignore neighbouring
    letters, so mid-search `to|c…` beats `toe|c…`. The better spelling then
-   loses its state slot before re-ranking sees it ("toe cancer", "time
-   loop", "iowa sucks" still miss the community's exact solution, though
-   close alternatives score ≥ 0.95). Fix: score units with the joint trigram
-   (state = last two graphone units) during generation.
-2. Results vary slightly between runs (ties broken in hash-map order). Make
-   ordering deterministic.
+   loses its state slot before re-ranking sees it. Since v4 the tiler
+   covers real words, so this now matters mainly for names and
+   near-homophones. Fix: score units with the joint trigram (state = last
+   two graphone units) during generation.
+2. ~~Results vary slightly between runs.~~ Deterministic since v5.
 3. The scorer's weights are hand-set. Fit them against harness data
-   (exp1 + exp2: real TTS clips with phone transcriptions).
-4. Speed is fine natively; WASM (Phase 3) may need a smaller beam or pruning.
-   The data file is 12.5 MB since v3: the G2P tables are unpruned u64 keys +
-   f32. Delta-coded keys, u16 log-probs, or entropy pruning would shrink it.
+   (now 408 clips, exp1–exp6, with phone transcriptions).
+4. Speed is fine natively (about 2.4 s per phrase); WASM (Phase 3) may need
+   a smaller beam or pruning. The data file is 12.5 MB since v3: the G2P
+   tables are unpruned u64 keys + f32. Delta-coded keys, u16 log-probs, or
+   entropy pruning would shrink it.
 
 ### Phase 2 — better re-ranking and native readings
 
