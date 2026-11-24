@@ -1,0 +1,12 @@
+name = "exp1"
+description = """
+Baseline: the community sample messages (sample/messages.json, gitignored) on the target model,
+two seeds. Measures how close real community messages come to their intended phrase, and how
+much the same text varies between runs. See docs/PLAN.md, Phase 0.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 220
+cases_from = "sample/messages.json"

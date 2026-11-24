@@ -1,0 +1,6 @@
+[submodule "phoible"]
+	path = phoible
+	url = https://github.com/phoible/dev.git
+[submodule "cmudict"]
+	path = cmudict
+	url = https://github.com/cmusphinx/cmudict.git

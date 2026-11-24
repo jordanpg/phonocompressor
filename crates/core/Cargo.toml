@@ -1,0 +1,9 @@
+[package]
+name = "phono-core"
+description = "Phonetic compression core: phone features, English G2P, transliteration chunks, scoring and search"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+postcard.workspace = true

@@ -1,0 +1,13 @@
+name = "exp2"
+description = """
+Phase 1 check: phono v1's top answer for each community sample phrase, on the target model with
+two seeds, so it can be compared with exp1 (the community's own messages, same voice, seeds and
+model). Cases come from `phono eval --export data/generated/ours-v1.json` (gitignored: it
+contains the sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 220
+cases_from = "data/generated/ours-v1.json"

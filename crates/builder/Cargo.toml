@@ -1,0 +1,13 @@
+[package]
+name = "phono-builder"
+description = "Compiles Phoible, CMUdict and the transliteration table into the phono-core data file"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "phono-build"
+path = "src/main.rs"
+
+[dependencies]
+phono-core.workspace = true
+clap.workspace = true

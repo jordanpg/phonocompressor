@@ -1,0 +1,13 @@
+[package]
+name = "phono-cli"
+description = "Command-line interface for phonocompressor"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "phono"
+path = "src/main.rs"
+
+[dependencies]
+phono-core.workspace = true
+clap.workspace = true

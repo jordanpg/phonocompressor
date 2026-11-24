@@ -1,0 +1,72 @@
+min_version = "2026.10.4"   # older mise rejects `secrets` on a task
+
+[tools]
+fnox = "latest"
+rust = "stable"
+uv = "latest"
+
+[settings]
+experimental = true         # mise secrets is experimental
+
+[secrets.fnox]
+
+[env]
+# The tools/ venv lives on the Linux filesystem: /mnt/v is a slow 9p mount and torch is thousands of files.
+UV_PROJECT_ENVIRONMENT = "{{env.HOME}}/.cache/phonocompressor/tools-venv"
+
+# --- Data file for the Rust engine (data/generated/, not committed) ---
+
+[tasks."data:translit"]
+description = "Export unidecode's transliteration table (GPL tool output; generated, not committed)"
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness translit-table ../data/generated/translit.tsv"
+
+[tasks.data]
+description = "Build data/generated/phono.bin: Phoible features, CMUdict, G2P model, transliteration"
+depends = ["data:translit"]
+run = "cargo run --release -p phono-builder"
+
+[tasks.phono]
+description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"
+run = "cargo run --release -q -p phono-cli --"
+
+# --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
+
+[tasks."harness:credits"]
+description = "Show ElevenLabs credit usage this period (free API call)"
+secrets = ["ELEVENLABS_API_KEY"]
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness credits"
+
+[tasks."harness:models"]
+description = "List ElevenLabs TTS models and cost multipliers (free API call)"
+secrets = ["ELEVENLABS_API_KEY"]
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness models"
+
+[tasks."harness:voices"]
+description = "List voices this account can use (free API call)"
+secrets = ["ELEVENLABS_API_KEY"]
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness voices"
+
+[tasks."harness:synth"]
+description = "Synthesize an experiment's uncached clips: dry run unless --spend"
+secrets = ["ELEVENLABS_API_KEY"]
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness synth"
+
+[tasks."harness:transcribe"]
+description = "Run local ASR (Whisper + wav2vec2 phones) on an experiment's cached clips"
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness transcribe"
+
+[tasks."harness:export"]
+description = "Export transcribed clips with targets for `phono calibrate` (gitignored output)"
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness export-clips exp1 exp2 --out ../data/generated/clips.tsv"
+
+[tasks."harness:report"]
+description = "Write a markdown report for an experiment to tools/results/"
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness report"

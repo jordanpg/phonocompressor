@@ -1,0 +1,153 @@
+name = "exp0"
+description = """
+Reading-model experiment. Each case is chosen so that reading model T (transliterate with a
+unidecode-like table, then read the Latin string as English) and reading model N (read the
+character natively in its own language) predict different audio. See docs/PLAN.md, Phase 0.
+"""
+# Target voice is "weeb" (Edward, zYcjlYFOd3taleS0gkk3), but free accounts can't use Voice Library
+# voices via the API. Adam is the closest premade voice (en, american, male, middle-aged).
+voice_id = "pNInz6obpgDQGcFmaJgB"
+# turbo_v2_5 and v3 are what the community notes mention; flash_v2 is English-only (a pure test of T).
+models = [
+    "eleven_turbo_v2_5",
+    "eleven_flash_v2_5",
+    "eleven_flash_v2",
+    "eleven_multilingual_v2",
+    "eleven_v3",
+    "eleven_v4_turbo",
+    "eleven_v4",
+]
+seeds = [1]
+max_credits = 400
+
+# --- Hangul: is it read as Korean, or as its romanization? ---
+
+[[cases]]
+id = "dis_is"
+text = "딧잇"
+t = "dis is /dɪs ɪz/"
+n = "Korean [디싣] /tisit̚/"
+note = "Sample 'this is epic swag' relies on ㅅ coda = s."
+
+[[cases]]
+id = "check_him"
+text = "ㅊ헻ㅋ힘"
+t = "c·hec·k·him → 'check him'"
+n = "chieut het kieuk him (compatibility jamo read by name)"
+
+[[cases]]
+id = "geo"
+text = "거"
+t = "geo /dʒioʊ/"
+n = "Korean /kʌ/"
+note = "Strongest single-syllable discriminator: English 'eo' vs Korean ㅓ."
+
+[[cases]]
+id = "beos"
+text = "벗"
+t = "beos /bioʊs/ or /boʊs/"
+n = "Korean [벋] /pʌt̚/"
+
+[[cases]]
+id = "swagg"
+text = "솪"
+t = "swagg /swæɡ/"
+n = "Korean [솩] /swak̚/"
+
+# --- Yi (no ElevenLabs language): transliterated? and does it change its neighbours? ---
+
+[[cases]]
+id = "yi_sux"
+text = "ꌟ"
+t = "sux /sʌks/"
+n = "— (no Yi support; silence or garbage)"
+
+[[cases]]
+id = "yi_baddream"
+text = "ꀠddꏒꀊm"
+t = "ba·d·d·re·a·m → 'bad dream'"
+n = "—"
+note = "Sample message, verbatim."
+
+[[cases]]
+id = "mix_hangul_yi"
+text = "딧잇ꌟ"
+t = "disissux → 'this is sucks'"
+n = "Korean 디싣 + ?"
+note = "Compare with dis_is: does a Yi neighbour flip Hangul to T, or the reverse?"
+
+# --- Long transliterations: the big compression wins if T holds ---
+
+[[cases]]
+id = "hundred_k"
+text = "҈"
+t = "*100.000* → 'one hundred thousand'"
+n = "— (combining mark, probably silent)"
+
+[[cases]]
+id = "apartments"
+text = "҈㌀s"
+t = "'hundred thousand apartments'"
+n = "?"
+
+[[cases]]
+id = "apaato"
+text = "㌀"
+t = "apartment"
+n = "Japanese アパート /apaːto/"
+
+[[cases]]
+id = "kaka"
+text = "嬶"
+t = "Kaka"
+n = "Mandarin bì? / Japanese kakā"
+
+[[cases]]
+id = "kutabireru"
+text = "萙"
+t = "Kutabireru (10 letters, 1 codepoint)"
+n = "Mandarin ?"
+
+[[cases]]
+id = "kana_huri"
+text = "フリ"
+t = "huri /hʊɹi/"
+n = "Japanese furi /ɸɯɾi/"
+
+# --- Other listed scripts ---
+
+[[cases]]
+id = "deva_ka"
+text = "क"
+t = "k"
+n = "Hindi /kə/"
+
+[[cases]]
+id = "runic_f"
+text = "ᚠ"
+t = "f"
+n = "rune name 'fehu' / 'feoh'?"
+
+[[cases]]
+id = "cherokee"
+text = "ᏃᎧ"
+t = "noka"
+n = "— (no Cherokee support)"
+
+[[cases]]
+id = "cyr_zh"
+text = "Ж"
+t = "Zh"
+n = "Russian letter name /ʐɛ/"
+
+[[cases]]
+id = "tm"
+text = "™"
+t = "(tm) → 'TM' or 'trademark'"
+n = "—"
+
+[[cases]]
+id = "km"
+text = "㎞"
+t = "km → 'kilometer(s)' or 'K M'"
+n = "Japanese キロメートル?"

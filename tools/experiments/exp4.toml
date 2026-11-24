@@ -1,0 +1,17 @@
+name = "exp4"
+description = """
+Phase 1 re-check after the G2P upgrade: phono v3's top answer for each community sample phrase.
+v3 replaces the Witten-Bell trigram letter-to-sound model with an order-5 modified Kneser-Ney
+n-gram (the pair n-gram recipe of wikipron-modeling / Phonetisaurus): CMUdict word error
+34.0% → ~26.5%, offline calibration r 0.594 → 0.644. Everything else as in v2 (n-best
+expectation, script risk, voicing ×3). Same model, voice and seeds as exp1–exp3; answers that
+did not change since exp3 are already cached and cost nothing.
+Cases come from `phono eval --export data/generated/ours-v3.json` (gitignored: it contains the
+sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 150
+cases_from = "data/generated/ours-v3.json"
