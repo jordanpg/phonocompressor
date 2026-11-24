@@ -52,7 +52,7 @@ fn main() -> Result<(), String> {
     println!("cmudict: {} words", lexicon.len());
 
     let translit = Translit::parse_tsv(&read(&args.translit)?)?;
-    let chunks = ChunkSet::new(&translit);
+    let chunks = ChunkSet::new(&translit, phono_core::chunks::Script::allowed_by_default);
     let spelling = chunks.chunks.iter().filter(|c| c.kind == ChunkKind::Spelling).count();
     println!(
         "translit: {} codepoints → {} chunks ({} spelling, {} phonetic), trie {} nodes",

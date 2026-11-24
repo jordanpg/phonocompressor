@@ -1,0 +1,19 @@
+name = "exp5"
+description = """
+Phase 1 re-check after the word-intelligibility work: phono v4's top answer for each community
+sample phrase. v4 adds three things to v3:
+- Prediction blends phone fidelity with how closely the reading is spelled like the phrase's
+  real words (usernames and coinages are judged by sound only).
+- A second candidate source tiles the phrase's real spelling with chunks.
+- Ethiopic, Canadian syllabics, conjoining Hangul jamo and Runic are off by default.
+Offline, ordering answers for the same phrase went from 63% to 68% right on 94 pairs.
+Same model, voice and seeds as exp1–exp4.
+Cases come from `phono eval --export data/generated/ours-v4.json` (gitignored: it contains the
+sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 200
+cases_from = "data/generated/ours-v4.json"

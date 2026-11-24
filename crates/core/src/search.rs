@@ -15,7 +15,7 @@ use crate::Engine;
 use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet, Trie};
 use crate::phone::{PHONE_CODES, Phone};
 use crate::reading::Word;
-use crate::score::{Scorer, TargetPhone, flatten_target};
+use crate::score::{Scorer, TargetPhone};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -34,12 +34,27 @@ pub struct SearchConfig {
     pub spellings_per_phone: usize,
     /// Finished candidates re-read and scored.
     pub rerank: usize,
+    /// Candidates that tile the phrase's real spelling ([`crate::tile`]), added to the rerank,
+    /// and the letter edits they may make.
+    pub spelled: usize,
+    pub spelled_edits: usize,
     pub predict: crate::Predict,
 }
 
 impl Default for SearchConfig {
     fn default() -> Self {
-        SearchConfig { max_codepoints: 6, top_n: 10, beam: 20000, per_state: 2, per_root: 16, spellings_per_phone: 10, rerank: 600, predict: crate::Predict::default() }
+        SearchConfig {
+            max_codepoints: 6,
+            top_n: 10,
+            beam: 20000,
+            per_state: 2,
+            per_root: 16,
+            spellings_per_phone: 10,
+            rerank: 600,
+            spelled: 400,
+            spelled_edits: 2,
+            predict: crate::Predict::default(),
+        }
     }
 }
 
@@ -249,17 +264,25 @@ impl<'a> Searcher<'a> {
 
     /// Find the best-sounding codepoint strings for a phrase.
     pub fn search(&self, phrase: &str, cfg: &SearchConfig) -> Vec<Candidate> {
-        let target = flatten_target(&self.engine.target(phrase));
-        let generated = self.generate(&target, cfg);
-        self.rerank(&target, generated.into_iter().take(cfg.rerank), cfg)
+        let target = self.engine.target_of(phrase);
+        let generated = self.generate(&target.phones, cfg);
+        let spelled = crate::tile::tile(&self.engine.chunks, phrase, cfg.max_codepoints, cfg.spelled_edits, cfg.spelled);
+        // Phonetic candidates first, then spelled ones not already among them.
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let all = generated
+            .into_iter()
+            .take(cfg.rerank)
+            .chain(spelled.into_iter().map(|(t, e)| (t, 1e6 + e as f32)))
+            .filter(|(t, _)| seen.insert(t.clone()));
+        self.rerank(&target, all, cfg)
     }
 
     /// Debugging aid: generation rank (0-based) of the candidate whose transliteration matches
     /// `text`'s, and the number of distinct candidates generated.
     pub fn generation_rank(&self, phrase: &str, text: &str, cfg: &SearchConfig) -> (Option<usize>, usize) {
-        let target = flatten_target(&self.engine.target(phrase));
+        let target = self.engine.target_of(phrase);
         let want = self.engine.translit.latin(text).to_lowercase();
-        let generated = self.generate_traced(&target, cfg, Some(&want));
+        let generated = self.generate_traced(&target.phones, cfg, Some(&want));
         let rank = generated.iter().position(|(t, _)| self.engine.translit.latin(t).to_lowercase() == want);
         (rank, generated.len())
     }
@@ -446,7 +469,7 @@ impl<'a> Searcher<'a> {
     }
 
     /// Stage 2: read each candidate the way the TTS would and score it against the target.
-    fn rerank(&self, target: &[TargetPhone], generated: impl Iterator<Item = (String, f32)>, cfg: &SearchConfig) -> Vec<Candidate> {
+    fn rerank(&self, target: &crate::Target, generated: impl Iterator<Item = (String, f32)>, cfg: &SearchConfig) -> Vec<Candidate> {
         let mut out: Vec<Candidate> = Vec::new();
         for (text, gen_cost) in generated {
             let (latin, words) = self.engine.read(&text);

@@ -9,10 +9,22 @@ use crate::g2p::G2p;
 use crate::lexicon::Lexicon;
 use crate::phone::Phone;
 
+/// Where a word's pronunciation came from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    /// A dictionary word (CMUdict), including number words and symbols read as words.
+    Dictionary,
+    /// A vowel-less run spelled out letter by letter (`tm` → T M).
+    Letters,
+    /// Letter-to-sound for a string that is not a dictionary word.
+    G2p,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Word {
     pub text: String,
     pub phones: Vec<Phone>,
+    pub source: Source,
     /// Other plausible readings with their probability relative to `phones` (G2P n-best, only
     /// for words not in the dictionary). Used to score how much a candidate depends on the
     /// TTS reading an ambiguous spelling our way (`ge`: G or JH?).
@@ -39,7 +51,8 @@ fn tokenize(latin: &str) -> Vec<Token> {
             while i < chars.len() && (chars[i].is_ascii_alphabetic() || chars[i] == '\'') {
                 i += 1;
             }
-            let w: String = chars[start..i].iter().filter(|c| c.is_ascii_alphabetic()).collect();
+            // Apostrophes stay for the dictionary lookup (`you're`); `letters` drops them otherwise.
+            let w: String = chars[start..i].iter().collect::<String>().trim_end_matches('\'').to_string();
             out.push(Token::Letters(w.to_ascii_lowercase()));
         } else if c.is_ascii_digit() {
             let start = i;
@@ -149,7 +162,7 @@ impl Reader<'_> {
         let mut it = nbest.into_iter();
         let phones = it.next().map(|(p, _)| p).unwrap_or_default();
         let alternatives = it.map(|(p, lp)| (p, (lp - best_lp).exp() as f32)).collect();
-        Word { text: w.to_string(), phones, alternatives }
+        Word { text: w.to_string(), phones, source: Source::G2p, alternatives }
     }
 
     /// Split a letter run into dictionary words where that covers it better than reading it
@@ -191,20 +204,28 @@ impl Reader<'_> {
     }
 
     fn letters(&self, w: &str, out: &mut Vec<Word>) {
+        if w.contains('\'') {
+            if let Some(p) = self.lexicon.first(w) {
+                out.push(Word { text: w.to_string(), phones: p.to_vec(), source: Source::Dictionary, alternatives: vec![] });
+                return;
+            }
+            let bare: String = w.chars().filter(|&c| c != '\'').collect();
+            return self.letters(&bare, out);
+        }
         if let Some(p) = self.lexicon.first(w) {
-            out.push(Word { text: w.to_string(), phones: p.to_vec(), alternatives: vec![] });
+            out.push(Word { text: w.to_string(), phones: p.to_vec(), source: Source::Dictionary, alternatives: vec![] });
         } else if !has_vowel(w) {
             // No vowel letters: read as an initialism (`tm` → T M).
             let phones = w
                 .chars()
                 .flat_map(|c| self.lexicon.first(&c.to_string()).map(|p| p.to_vec()).unwrap_or_default())
                 .collect();
-            out.push(Word { text: w.to_string(), phones, alternatives: vec![] });
+            out.push(Word { text: w.to_string(), phones, source: Source::Letters, alternatives: vec![] });
         } else {
             for (piece, dict) in self.segment(w) {
                 if dict {
                     let phones = self.lexicon.first(piece).unwrap_or_default().to_vec();
-                    out.push(Word { text: piece.to_string(), phones, alternatives: vec![] });
+                    out.push(Word { text: piece.to_string(), phones, source: Source::Dictionary, alternatives: vec![] });
                 } else {
                     out.push(self.g2p_word_nbest(piece));
                 }
@@ -226,12 +247,12 @@ impl Reader<'_> {
                 Token::Letters(w) => self.letters(&w, &mut out),
                 Token::Number(n) => {
                     for w in number_token_words(&n) {
-                        out.push(Word { text: w.to_string(), phones: self.word(w), alternatives: vec![] });
+                        out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
                     }
                 }
                 Token::Symbol(c) => {
                     let w = symbol_word(c).unwrap_or_default();
-                    out.push(Word { text: w.to_string(), phones: self.word(w), alternatives: vec![] });
+                    out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
                 }
             }
         }
@@ -263,6 +284,6 @@ mod tests {
                 Token::Symbol(c) => format!("S:{c}"),
             })
             .collect();
-        assert_eq!(toks, ["N:100.000", "L:apartments", "S:@", "L:x", "L:y"]);
+        assert_eq!(toks, ["N:100.000", "L:apartment's", "S:@", "L:x", "L:y"]);
     }
 }

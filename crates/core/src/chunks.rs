@@ -128,9 +128,19 @@ impl Script {
         }
     }
 
-    /// May the search emit characters of this script?
+    /// Can the search emit characters of this script at all? (Devanagari and Cyrillic are
+    /// read natively, not transliterated.)
     pub fn usable(self) -> bool {
         !matches!(self, Script::Devanagari | Script::Cyrillic | Script::Other)
+    }
+
+    /// Does the search use this script unless told otherwise? Off by default, on the evidence
+    /// of exp0–exp4 (Flash v2.5):
+    /// - Ethiopic, Canadian syllabics and conjoining Hangul jamo were misread often (mean
+    ///   outcome 0.59, 0.69 and 0.64 across clips vs 0.76–0.80 for Hangul, Latin, Yi).
+    /// - Runic came out silent or as "Yeah." (exp0 `ᚠ`).
+    pub fn allowed_by_default(self) -> bool {
+        self.usable() && !matches!(self, Script::Ethiopic | Script::Ucas | Script::HangulJamo | Script::Runic)
     }
 }
 
@@ -255,11 +265,12 @@ pub struct ChunkSet {
 }
 
 impl ChunkSet {
-    pub fn new(translit: &Translit) -> Self {
+    /// Chunks from the scripts `allowed` accepts (see [`Script::allowed_by_default`]).
+    pub fn new(translit: &Translit, allowed: impl Fn(Script) -> bool) -> Self {
         let mut best: HashMap<String, Chunk> = HashMap::new();
         for (&ch, raw) in &translit.map {
             let script = Script::of(ch);
-            if !script.usable() || ch.is_ascii_uppercase() {
+            if !script.usable() || !allowed(script) || ch.is_ascii_uppercase() {
                 continue;
             }
             let Some((latin, kind)) = normalize(raw) else { continue };
@@ -316,7 +327,7 @@ mod tests {
             (' ', " "),
             (',', ","),
         ]);
-        let set = ChunkSet::new(&t);
+        let set = ChunkSet::new(&t, Script::allowed_by_default);
         let by_latin: HashMap<&str, char> = set.chunks.iter().map(|c| (c.latin.as_str(), c.ch)).collect();
         assert_eq!(by_latin["a"], 'a', "lowercase Latin, never uppercase");
         assert_eq!(by_latin["ba"], '바', "Hangul preferred over Yi");

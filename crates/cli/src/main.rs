@@ -15,6 +15,10 @@ struct Cli {
     /// Data file from `mise run data`.
     #[arg(long, global = true, default_value = "data/generated/phono.bin")]
     data: PathBuf,
+    /// Also search scripts that are off by default (Ethiopic, Canadian syllabics, conjoining
+    /// Hangul jamo, Runic), which exp0–exp4 found unreliable.
+    #[arg(long, global = true)]
+    all_scripts: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -69,9 +73,15 @@ enum Command {
         no_nbest: bool,
         #[arg(long, default_value_t = phono_core::Predict::default().risk_scale)]
         risk_scale: f32,
+        /// Weight of spelling closeness to the phrase's real words (0 = sound only).
+        #[arg(long, default_value_t = phono_core::Predict::default().spelling)]
+        spelling: f32,
         /// Override the Phoible voicing weight (periodicGlottalSource).
         #[arg(long)]
         voicing: Option<f32>,
+        /// Write per-clip predictions, outcomes and per-word features as TSV (for fitting).
+        #[arg(long)]
+        dump: Option<PathBuf>,
     },
     /// Score the community sample messages and compress their phrases.
     Eval {
@@ -92,13 +102,17 @@ fn main() -> Result<(), String> {
     let cli = Cli::parse();
     let t = Instant::now();
     let bytes = std::fs::read(&cli.data).map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
-    let engine = Engine::from_bytes(&bytes)?;
+    let mut engine = Engine::from_bytes(&bytes)?;
+    if cli.all_scripts {
+        engine.allow_all_scripts();
+    }
     eprintln!("loaded {} in {:.2}s", cli.data.display(), t.elapsed().as_secs_f32());
 
     match cli.command {
         Command::Phones { phrase } => {
-            for (w, p) in phrase.split_whitespace().zip(engine.target(&phrase)) {
-                println!("{w:16} {}", fmt_phones(&p));
+            for w in engine.target_words(&phrase) {
+                let kind = if w.lexical { "word" } else { "name" };
+                println!("{:16} {kind}  {}", w.text, fmt_phones(&w.phones));
             }
         }
         Command::Spell { phones, top } => {
@@ -158,14 +172,14 @@ fn main() -> Result<(), String> {
                 );
             }
         }
-        Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, voicing } => {
+        Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, spelling, voicing, dump } => {
             let heard = phono_core::score::Heard { vowel_scale: heard_vowel_scale, rhotic: heard_rhotic };
-            let predict = phono_core::Predict { nbest: !no_nbest, risk_scale };
+            let predict = phono_core::Predict { nbest: !no_nbest, risk_scale, spelling };
             let mut engine = engine;
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
-            calibrate(&engine, &clips, worst, &heard, &predict)?
+            calibrate(&engine, &clips, worst, &heard, &predict, dump.as_ref())?
         }
         Command::Eval { messages, export } => eval(&engine, &messages, export.as_ref())?,
     }
@@ -221,7 +235,7 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
     let mut exported = Vec::new();
     println!("{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}", "id", "phrase", "theirs", "", "ours", "");
     for (id, unicode, spoken) in &messages {
-        let target = phono_core::score::flatten_target(&engine.target(spoken));
+        let target = engine.target_of(spoken);
         let their = engine.predict(unicode, &target, &cfg.predict);
         let best = searcher.search(spoken, &cfg);
         let (our_text, our) = best.first().map(|c| (c.text.clone(), c.fidelity)).unwrap_or_default();
@@ -335,12 +349,40 @@ fn text_sim(a: &str, b: &str) -> f32 {
     1.0 - prev[b.len()] as f32 / a.len().max(b.len()) as f32
 }
 
+/// Truth difference below which two answers count as a tie.
+const RANK_MARGIN: f32 = 0.05;
+
+/// The decision the search makes: of two answers for the same phrase, which is better? Clips
+/// are averaged per (phrase, text) over seeds; pairs closer than [`RANK_MARGIN`] are skipped.
+/// Returns (pairs ordered right, pairs).
+fn within_phrase_ranking(rows: &[(&Clip, f32)], truth: &[f32]) -> (usize, usize) {
+    let mut by_text: std::collections::BTreeMap<(&str, &str), (f32, f32, f32)> = Default::default();
+    for ((clip, pred), &t) in rows.iter().zip(truth) {
+        let e = by_text.entry((clip.target.as_str(), clip.text.as_str())).or_default();
+        e.0 += pred;
+        e.1 += t;
+        e.2 += 1.0;
+    }
+    let answers: Vec<(&str, f32, f32)> = by_text.iter().map(|(&(target, _), &(p, t, n))| (target, p / n, t / n)).collect();
+    let (mut right, mut pairs) = (0, 0);
+    for (i, a) in answers.iter().enumerate() {
+        for b in &answers[i + 1..] {
+            if a.0 == b.0 && (a.2 - b.2).abs() >= RANK_MARGIN {
+                pairs += 1;
+                right += usize::from((a.1 - b.1) * (a.2 - b.2) > 0.0);
+            }
+        }
+    }
+    (right, pairs)
+}
+
 fn calibrate(
     engine: &Engine,
     path: &PathBuf,
     worst: usize,
     heard: &phono_core::score::Heard,
     predict: &phono_core::Predict,
+    dump: Option<&PathBuf>,
 ) -> Result<(), String> {
     let clips = load_clips(path)?;
     let scorer = engine.scorer();
@@ -352,11 +394,12 @@ fn calibrate(
     }
     let mut rows = Vec::new();
     for c in &clips {
+        // Truth keeps its original definition (phones of the reader's words) across versions.
         let target = phono_core::score::flatten_target(&engine.target(&c.target));
         let heard_phones: Vec<usize> = c.phones.split_whitespace().flat_map(|t| engine.features.parse_ipa_token(t)).collect();
         rows.push(Row {
             clip: c,
-            predicted: engine.predict(&c.text, &target, predict),
+            predicted: engine.predict(&c.text, &engine.target_of(&c.target), predict),
             actual: scorer.fidelity_segments(&engine.features, &target, &heard_phones, heard),
             whisper: text_sim(&c.whisper, &c.target),
         });
@@ -365,6 +408,34 @@ fn calibrate(
     let (pred, act, wh) = (col(|r| r.predicted), col(|r| r.actual), col(|r| r.whisper));
     // Ground truth: mean of the phone-level and Whisper-text measures (independent errors).
     let truth: Vec<f32> = act.iter().zip(&wh).map(|(a, w)| (a + w) / 2.0).collect();
+    if let Some(path) = dump {
+        let mut out = String::from("exp\tcase\ttext\ttarget\tpredicted\tactual\twhisper\trisk\twords\tspell\tshare\n");
+        for r in &rows {
+            let target = engine.target_words(&r.clip.target);
+            let (_, read) = engine.read(&r.clip.text);
+            let words: Vec<String> = phono_core::words::judge(&scorer, &target, &read)
+                .iter()
+                .map(|j| {
+                    let flag = |b: bool, c: char| if b { c } else { '-' };
+                    format!(
+                        "{:.3}{}{}{}{}",
+                        j.fidelity,
+                        flag(j.lexical, 'L'),
+                        flag(j.joined_prev, 'P'),
+                        flag(j.joined_next, 'N'),
+                        flag(j.dictionary_hit, 'H')
+                    )
+                })
+                .collect();
+            let risk: f32 = r.clip.text.chars().map(|c| phono_core::chunks::Script::of(c).risk()).sum();
+            let (spell, share) = phono_core::words::spelling(&target, &read).unwrap_or((0.0, 0.0));
+            out += &format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                r.clip.exp, r.clip.case, r.clip.text, r.clip.target, r.predicted, r.actual, r.whisper, risk, words.join(" "), spell, share
+            );
+        }
+        std::fs::write(path, out).map_err(|e| format!("{}: {e}", path.display()))?;
+    }
     println!("{} clips", rows.len());
     println!(
         "predicted vs truth (mean of both): pearson {:.3}  spearman {:.3}",
@@ -374,6 +445,11 @@ fn calibrate(
     println!("predicted vs actual phones:  pearson {:.3}  spearman {:.3}", pearson(&pred, &act), pearson(&ranks(&pred), &ranks(&act)));
     println!("predicted vs whisper text:   pearson {:.3}", pearson(&pred, &wh));
     println!("actual phones vs whisper:    pearson {:.3}  (do the two ground truths agree?)", pearson(&act, &wh));
+    let (right, pairs) = within_phrase_ranking(&rows.iter().map(|r| (r.clip, r.predicted)).collect::<Vec<_>>(), &truth);
+    println!(
+        "within-phrase ranking: {right}/{pairs} pairs of different answers ({:.1}%) ordered like truth (|Δ| ≥ {RANK_MARGIN})",
+        100.0 * right as f32 / pairs.max(1) as f32
+    );
     let mut exps: Vec<&str> = clips.iter().map(|c| c.exp.as_str()).collect();
     exps.dedup();
     for e in exps {

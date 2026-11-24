@@ -444,6 +444,109 @@ unchanged ones reused exp3's cached clips.
 Clips: `data/generated/clips-exp4.tsv` and `clips-all4.tsv` (exp1–exp4;
 `harness:export` still writes only exp1+exp2).
 
+**v4: real spellings and script choice (2026-11-24; exp5 below).**
+
+The metric that matters is **within-phrase ranking**: of two recorded answers
+for the same phrase whose outcomes differ by ≥ 0.05, does the scorer prefer
+the better one? `phono calibrate` now prints it. v3 got only 57 of 94 pairs
+right (61%). The pooled r of 0.63 mostly reflected which phrases are hard.
+
+What didn't help (`calibrate --dump` + fitting on exp1–exp3, testing on
+exp4):
+- Judging each word separately (mean, min, or sigmoid of per-word fidelity).
+- Penalizing pseudo-words that run across word boundaries. Such clips do
+  fare worse, but v3 already predicts them lower.
+
+What did help: **spelling**. An English TTS says a word the way it says that
+spelling.
+- `ꍰ힘피시` ("chephimpisi") was heard as "Shefim PC";
+  `ㅊ헻ㅋ힘PC` ("checkhimPC") was heard right.
+- On its own, the candidate reading's spelling similarity to the target
+  predicted the outcome better than phone fidelity (r 0.69 vs 0.64).
+
+Changes:
+- **Real words vs names** (`Engine::target_words`). A word counts as real if
+  it is a whole-token dictionary word, a number or a symbol. Usernames and
+  coinages (`xqc`, `pokimane`, `chungus`) are judged by sound only: no
+  spelling bonus, no penalty.
+- **Spelling term** (`words::spelling`, `Predict::spelling` = 0.4). Each real
+  word is looked for in the reading's letters by best-substring edit
+  distance. The result is blended in by the share of the phrase that is real
+  words.
+
+  | | v3 | v4 |
+  |---|---|---|
+  | pooled r vs truth (272 clips) | 0.631 | 0.707 |
+  | pooled r vs wav2vec2 phones only | 0.519 | 0.538 |
+  | within-phrase ranking | 62.8% | 68.1% |
+  | exp4 Pearson / Spearman | 0.741 / 0.756 | 0.729 / 0.779 |
+
+  The v3 column already includes v4's grouping of split names into one word
+  (pooled r 0.629 → 0.631).
+- **Spelled candidates** (`tile.rs`). Generation spelled phone by phone and
+  never produced real spellings. `왜r 오바마` (fidelity 0.909) was not among
+  11k generated candidates, so the search returned "erobamas" (0.718). v4
+  also tiles the phrase's actual letters with chunks:
+  - a space between words is optional;
+  - up to 2 letter edits (drop a letter, or swap similar letters);
+  - number tokens are matched by number chunks;
+  - up to 400 tilings join the rerank.
+
+  Results: "where obama" → `w헤레옵암a` ("whereobama"); "check him pc" →
+  `ꍯck힘 ㍶`; usernames get spelled exactly when it's cheap
+  ("sodapoppin" → `소닾옾핀`). Search time is still about 2–3 s.
+- **Scripts off by default** (`Script::allowed_by_default`; `--all-scripts`
+  turns them back on):
+  - Ethiopic (mean outcome 0.59);
+  - Canadian syllabics (0.69);
+  - conjoining Hangul jamo (0.64);
+  - Runic (silent on Flash v2.5 in exp0).
+- **Reader:** apostrophes are kept for dictionary lookups (`you're`).
+  `phono phones` lists each target word as `word`/`name`, which also fixes
+  its display of split words.
+
+By our own scorer (optimistic as always), v4 beats the community on 32 of 34
+phrases (0.950 vs 0.812). 28 of 34 answers changed and now mostly spell the
+real words: "iowasucks", "toecancer", "picklepounder", "nextplease",
+"timeloop", "calypso". Doubtful ones: "joemama@aha", "ot are2s" (for
+"what are thoooose").
+
+**exp5 result (real TTS, 2026-11-24, ~152 credits; 665/10000 used after):
+v4 beats the community for the first time, on both measures.**
+
+| run | answers | phone fidelity | Whisper similarity | harness sim (per seed) | sim ≥ 0.8 |
+|---|---|---|---|---|---|
+| exp1 | community | 0.789 | 0.847 | 0.86 / 0.88 | 24 / 24 of 34 |
+| exp4 | phono v3 | 0.783 | 0.736 | 0.78 / 0.79 | 17 / 18 |
+| exp5 | **phono v4** | **0.830** | **0.872** | **0.89 / 0.90** | **28 / 30** |
+
+- Phone fidelity (wav2vec2, independent of Whisper) rose too. So the gain
+  is in the audio, not an artifact of a spelling-based metric.
+- **Per phrase**, using the mean of both truths and a 0.05 margin:
+  - vs the community: better on 10, worse on 3, about the same on 21;
+  - vs v3: better on 20, worse on 2;
+  - heard exactly on both seeds: 12 of 34.
+- **Prediction on the unseen clips:** Pearson 0.794 / Spearman 0.765 (v3 on
+  exp4: 0.745). Within-phrase ranking over all 157 pairs in exp1–exp5: 75.2%.
+  v4 still over-predicts its own picks (0.950 predicted vs a truth of about
+  0.85).
+- **The 3 losses:**
+  - `ot ㌃2s` → "Out R2s": a digit inside a word is read as a digit.
+  - `墸` (CJK "Sho ") → "show, ma'am": CJK chunks with a capital and a
+    trailing space still mislead.
+  - "thisesepicswag" → "The Decepic swag": the word "is" was lost.
+
+Clips: `data/generated/clips-exp5.tsv`, `clips-all5.tsv` (exp1–exp5).
+
+Known gaps (from v4's analysis and exp5):
+- **Digits inside a word** (`2s`) are read as digits, and so are uppercase
+  CJK readings (`Sho `). Penalize or skip both.
+- **Ties in reader segmentation.** The community's "varymoldifrog" splits
+  as mold|ifrog, while the TTS said "moldy frog".
+- **Uppercase runs are read as one word.** The TTS reads "PC" as letters.
+- The phonetic generator still misses natural spellings. The tiler covers
+  real words, not near-homophones.
+
 Known limitations / next steps (in priority order after exp2):
 
 0. **Make re-ranking robust to reading uncertainty.**
