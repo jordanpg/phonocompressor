@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-25T20:45:00Z",
+  "updated": "2026-11-25T21:15:00Z",
   "issue": 14,
   "parent_issue": 1,
   "task_issues": {
@@ -26,12 +26,13 @@
     "total": 9,
     "completed": 3
   },
-  "current_phase": 2,
-  "current_task": "2.2",
+  "current_phase": 3,
+  "current_task": "3.1",
   "commits": [
     "4710f8f: build(mise): add wasm32 target and check:wasm (wasm-binding_20261125)",
     "4c5814f: docs(conductor): point wasm32 gate at check:wasm (wasm-binding_20261125)",
     "d946a94: feat(core): switch profile and scripts in place (wasm-binding_20261125)",
-    "1051f44: feat(cli): add compress --json and --scripts (wasm-binding_20261125)"
+    "1051f44: feat(cli): add compress --json and --scripts (wasm-binding_20261125)",
+    "ff79481: build(wasm): add crates/wasm and wasm:build task (wasm-binding_20261125)"
   ]
 }
