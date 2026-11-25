@@ -78,6 +78,11 @@ run = [
   "node crates/wasm/parity/parity.mjs",
 ]
 
+[tasks."wasm:serve"]
+description = "Serve the wasm test page (crates/wasm/www) at http://127.0.0.1:8000/; --port, --host"
+depends = ["wasm:build"]
+run = "node crates/wasm/serve.mjs"
+
 # --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
 
 [tasks."harness:credits"]
