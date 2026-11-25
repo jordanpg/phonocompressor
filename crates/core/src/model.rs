@@ -54,6 +54,13 @@ pub struct ModelProfile {
 }
 
 impl ModelProfile {
+    /// The main model id (the first of [`ModelProfile::model_ids`]), for messages.
+    pub fn id(&self) -> &'static str {
+        self.model_ids
+            .first()
+            .expect("every profile covers at least one model id")
+    }
+
     pub fn script(&self, s: Script) -> ScriptProfile {
         (self.scripts)(s)
     }

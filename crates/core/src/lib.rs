@@ -20,7 +20,7 @@ pub mod search;
 pub mod tile;
 pub mod words;
 
-use chunks::{ChunkSet, Translit};
+use chunks::{ChunkSet, Scripts, Translit};
 use features::{FeatureSpace, PhoneDistance};
 use g2p::G2p;
 use lexicon::Lexicon;
@@ -59,8 +59,10 @@ pub struct Target {
 }
 
 pub struct Engine {
-    /// The TTS model the engine predicts readings for.
+    /// The TTS model the engine predicts readings for. Switch it with [`Engine::configure`].
     pub profile: &'static ModelProfile,
+    /// The scripts [`Engine::chunks`] was built from.
+    scripts: Scripts,
     pub features: FeatureSpace,
     pub dist: PhoneDistance,
     pub lexicon: Lexicon,
@@ -76,9 +78,11 @@ impl Engine {
     pub fn new(data: data::Data, profile: &'static ModelProfile) -> Result<Self, String> {
         let features = FeatureSpace::new(data.features);
         let dist = PhoneDistance::new(&features)?;
-        let chunks = ChunkSet::new(&data.translit, profile, |s| profile.script(s).default_on);
+        let scripts = Scripts::Default;
+        let chunks = ChunkSet::for_scripts(&data.translit, profile, &scripts)?;
         Ok(Engine {
             profile,
+            scripts,
             features,
             dist,
             lexicon: data.lexicon,
@@ -89,10 +93,39 @@ impl Engine {
         })
     }
 
+    /// Switch the model and the scripts the search uses, without decoding the data file again.
+    ///
+    /// Rebuilds [`Engine::chunks`] when either changes. A new profile also brings its own
+    /// [`Engine::weights`]; switching scripts alone keeps the current ones (which `phono fit`
+    /// and `calibrate` may have changed). On error, nothing changes.
+    pub fn configure(
+        &mut self,
+        profile: &'static ModelProfile,
+        scripts: Scripts,
+    ) -> Result<(), String> {
+        let scripts = scripts.normalized();
+        let new_profile = !std::ptr::eq(self.profile, profile);
+        if new_profile || scripts != self.scripts {
+            self.chunks = ChunkSet::for_scripts(&self.translit, profile, &scripts)?;
+        }
+        if new_profile {
+            self.weights = profile.weights.clone();
+        }
+        self.profile = profile;
+        self.scripts = scripts;
+        Ok(())
+    }
+
+    /// The scripts the search uses ([`Engine::configure`]).
+    pub fn scripts(&self) -> &Scripts {
+        &self.scripts
+    }
+
     /// Let the search use every script the model transliterates, including the ones off by
     /// default ([`model::ScriptProfile::default_on`]).
     pub fn allow_all_scripts(&mut self) {
-        self.chunks = ChunkSet::new(&self.translit, self.profile, |_| true);
+        self.configure(self.profile, Scripts::All)
+            .expect("Scripts::All is valid for every profile");
     }
 
     pub fn from_bytes(bytes: &[u8], profile: &'static ModelProfile) -> Result<Self, String> {
@@ -238,5 +271,122 @@ impl Engine {
         let (_, words) = self.read(text);
         let cand: Vec<Phone> = words.into_iter().flat_map(|w| w.phones).collect();
         self.scorer().align(&target, &cand)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chunks::Script;
+    use features::FeatureTable;
+    use model::{FLASH_V2_5, ScriptProfile, ScriptReading};
+
+    /// Only Latin and Hangul, both transliterated and on by default; weights differ from Flash.
+    static LATIN_HANGUL: ModelProfile = ModelProfile {
+        model_ids: &["test_latin_hangul"],
+        scripts: |s| ScriptProfile {
+            reading: if matches!(s, Script::Latin | Script::Hangul) {
+                ScriptReading::Transliterated
+            } else {
+                ScriptReading::Unmeasured
+            },
+            risk: 0.0,
+            default_on: true,
+        },
+        script_preference: &[Script::Latin, Script::Hangul],
+        reader: reading::ReaderParams {
+            split_short_word: 0.5,
+            split_g2p_letter: 0.3,
+            split_lone_letter: 0.7,
+            split_onset: 1.0,
+            glued_number_drop: 1.0,
+        },
+        weights: Weights::HAND,
+        predict: Predict::HAND,
+    };
+
+    fn engine() -> Engine {
+        let tsv = include_str!("../../../phoible/raw-data/FEATURES/phoible-segments-features.tsv");
+        let translit = [
+            ('a', "a"),
+            (' ', " "),
+            ('바', "ba"),
+            ('ꀠ', "ba"),
+            ('ሀ', "ha"),
+        ];
+        let data = data::Data {
+            version: data::FORMAT_VERSION,
+            features: FeatureTable::parse_tsv(tsv).unwrap(),
+            translit: Translit {
+                map: translit.iter().map(|&(c, s)| (c, s.to_string())).collect(),
+            },
+            ..Default::default()
+        };
+        Engine::new(data, &FLASH_V2_5).unwrap()
+    }
+
+    fn chars(e: &Engine) -> Vec<char> {
+        let mut c: Vec<char> = e.chunks.chunks.iter().map(|c| c.ch).collect();
+        c.sort();
+        c
+    }
+
+    #[test]
+    fn switching_scripts_and_back_restores_the_default() {
+        let mut e = engine();
+        let default = chars(&e);
+        assert_eq!(default, [' ', 'a', '바'], "Ethiopic `ሀ` is off by default");
+        assert_eq!(e.scripts(), &Scripts::Default);
+
+        e.allow_all_scripts();
+        assert_eq!(chars(&e), [' ', 'a', 'ሀ', '바']);
+        assert_eq!(e.scripts(), &Scripts::All);
+
+        e.configure(
+            &FLASH_V2_5,
+            Scripts::from_names(&["yi", "ethiopic"]).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(chars(&e), ['ሀ', 'ꀠ']);
+
+        e.configure(&FLASH_V2_5, Scripts::Default).unwrap();
+        assert_eq!(chars(&e), default);
+    }
+
+    #[test]
+    fn failed_switch_leaves_the_engine_unchanged() {
+        let mut e = engine();
+        e.allow_all_scripts();
+        let before = chars(&e);
+        let err = e
+            .configure(&FLASH_V2_5, Scripts::from_names(&["devanagari"]).unwrap())
+            .unwrap_err();
+        assert!(err.contains("natively"), "{err}");
+        let err = e
+            .configure(&LATIN_HANGUL, Scripts::from_names(&["yi"]).unwrap())
+            .unwrap_err();
+        assert!(
+            err.contains("test_latin_hangul"),
+            "checked against the new profile: {err}"
+        );
+        assert_eq!(chars(&e), before);
+        assert_eq!(e.scripts(), &Scripts::All);
+        assert!(std::ptr::eq(e.profile, &FLASH_V2_5));
+    }
+
+    #[test]
+    fn weights_follow_the_profile_not_the_scripts() {
+        let mut e = engine();
+        e.weights.sub_scale = 9.0; // as `phono fit` or `calibrate --hand` would
+        e.configure(&FLASH_V2_5, Scripts::All).unwrap();
+        assert_eq!(
+            e.weights.sub_scale, 9.0,
+            "a script switch keeps fitted weights"
+        );
+
+        e.configure(&LATIN_HANGUL, Scripts::Default).unwrap();
+        assert!(std::ptr::eq(e.profile, &LATIN_HANGUL));
+        assert_eq!(e.weights.sub_scale, Weights::HAND.sub_scale);
+        assert_eq!(chars(&e), [' ', 'a', '바']);
     }
 }
