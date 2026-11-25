@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#14](https://github.com/jordanpg/phonocompressor/issues/14) (sub-issue of [#1](https://github.com/jordanpg/phonocompressor/issues/1))
 **Created:** 2026-11-25
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -82,21 +82,21 @@ Run the binding in real browsers, off the main thread, and record what it costs.
 
 - [x] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
 - [x] Task 5.2: Measure in Chrome and Firefox: start-up time (fetch and decode), time per phrase for the parity phrases at defaults, `.wasm` and `phono.bin` sizes raw and gzip; record in `docs/PLAN.md` and a comment on #1; open a speed-tuning issue if time per phrase is well above native ([#21](https://github.com/jordanpg/phonocompressor/issues/21))
-- [~] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`wasm:check` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
+- [x] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`wasm:check` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
 
 ### Verification
 
-- [ ] `mise run wasm:serve`, then "hundred thousand apartments" shows the CLI's top results in Chrome and Firefox
-- [ ] The measurements are in PLAN.md and on #1
+- [x] `mise run wasm:serve`, then "hundred thousand apartments" shows the CLI's top results in Chrome and Firefox
+- [x] The measurements are in PLAN.md and on #1
 
 ## Final Verification
 
-- [ ] All acceptance criteria in spec.md met
-- [ ] `mise run fmt:check`, `mise run lint`, `cargo test --workspace`, `mise run wasm:check` and `mise run wasm:parity` pass; `phono eval` answers unchanged
-- [ ] Documentation updated (PLAN.md, README, tech-stack.md, workflow.md)
-- [ ] New dependencies' licenses checked; `THIRD_PARTY.md` updated if needed
-- [ ] All task issues closed after verification; #14 closed; #1 stays open for the front-end track
-- [ ] Ready for review
+- [x] All acceptance criteria in spec.md met
+- [x] `mise run fmt:check`, `mise run lint`, `cargo test --workspace`, `mise run wasm:check` and `mise run wasm:parity` pass; `phono eval` answers unchanged
+- [x] Documentation updated (PLAN.md, README, tech-stack.md, workflow.md)
+- [x] New dependencies' licenses checked; `THIRD_PARTY.md` updated if needed
+- [x] All task issues closed after verification; #14 closes when the PR merges (`Closes #14`); #1 stays open for the front-end track
+- [x] Ready for review
 
 ---
 

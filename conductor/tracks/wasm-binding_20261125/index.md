@@ -1,7 +1,7 @@
 # Track: Build the WASM binding
 
 **ID:** wasm-binding_20261125
-**Status:** In Progress (Task 5.3 in review)
+**Status:** Complete
 **Issue:** [#14](https://github.com/jordanpg/phonocompressor/issues/14) (sub-issue of [#1 Ship the WASM web tool](https://github.com/jordanpg/phonocompressor/issues/1))
 
 ## Documents
@@ -11,8 +11,8 @@
 
 ## Progress
 
-- Phases: 4/5 complete
-- Tasks: 8/9 complete
+- Phases: 5/5 complete
+- Tasks: 9/9 complete
 
 ## Quick Links
 

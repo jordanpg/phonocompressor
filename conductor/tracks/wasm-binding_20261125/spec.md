@@ -3,7 +3,7 @@
 **Track ID:** wasm-binding_20261125
 **Type:** Feature
 **Created:** 2026-11-25
-**Status:** Draft
+**Status:** Complete
 **Issue:** [#14 Build the WASM binding](https://github.com/jordanpg/phonocompressor/issues/14), a sub-issue of [#1 Ship the WASM web tool](https://github.com/jordanpg/phonocompressor/issues/1)
 
 ## Summary
@@ -25,10 +25,10 @@ As the developer building the web tool, I want to call `compress()` from JavaScr
 
 ## Acceptance Criteria
 
-- [ ] **Builds for wasm32.** `phono-core` and `crates/wasm` build for `wasm32-unknown-unknown`. The target is on `rust` in `mise.toml`, and a mise task runs the check (closes #2).
-- [ ] **Typed `compress()` API.** JavaScript creates an engine from the data file's bytes and calls `compress(phrase, { model, maxCodepoints, topN, allowedScripts })`, which returns `[{ text, latin, phones, score }]`. The TypeScript types are generated, not hand-written. An empty phrase, an out-of-range budget or `topN`, an unknown model or an unknown script returns an error message that says what failed and how to fix it, never a silent fallback.
-- [ ] **Same output as the CLI.** For a committed list of public phrases and option sets, the wasm build running under Node returns the same text in the same order as `phono compress --json` with the same settings, and scores within 1e-4. One mise task runs the check, and it fails loudly if `phono.bin` is missing.
-- [ ] **Test page in a Worker.** A minimal static page (plain HTML and JS, no framework) fetches `phono.bin`, runs `compress()` in a module Web Worker, and lists each result's text, Latin, phones and score. It shows errors and keeps the input. Browser time per phrase (Chrome and Firefox), start-up time (fetch and decode), and `.wasm` and `phono.bin` sizes (raw and gzip) are recorded in PLAN.md.
+- [x] **Builds for wasm32.** `phono-core` and `crates/wasm` build for `wasm32-unknown-unknown`. The target is on `rust` in `mise.toml`, and a mise task runs the check (closes #2).
+- [x] **Typed `compress()` API.** JavaScript creates an engine from the data file's bytes and calls `compress(phrase, { model, maxCodepoints, topN, allowedScripts })`, which returns `[{ text, latin, phones, score }]`. The TypeScript types are generated, not hand-written. An empty phrase, an out-of-range budget or `topN`, an unknown model or an unknown script returns an error message that says what failed and how to fix it, never a silent fallback.
+- [x] **Same output as the CLI.** For a committed list of public phrases and option sets, the wasm build running under Node returns the same text in the same order as `phono compress --json` with the same settings, and scores within 1e-4. One mise task runs the check, and it fails loudly if `phono.bin` is missing.
+- [x] **Test page in a Worker.** A minimal static page (plain HTML and JS, no framework) fetches `phono.bin`, runs `compress()` in a module Web Worker, and lists each result's text, Latin, phones and score. It shows errors and keeps the input. Browser time per phrase (Chrome and Firefox), start-up time (fetch and decode), and `.wasm` and `phono.bin` sizes (raw and gzip) are recorded in PLAN.md.
 
 ## Dependencies
 
