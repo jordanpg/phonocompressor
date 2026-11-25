@@ -14,6 +14,7 @@ phono-core = { path = "crates/core" }
 serde = { version = "1", features = ["derive"] }
 postcard = { version = "1", features = ["alloc"] }
 clap = { version = "4", features = ["derive"] }
+serde_json = "1"
 
 # The builder trains the G2P model; keep debug builds usable for it.
 [profile.dev.package."*"]

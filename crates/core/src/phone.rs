@@ -148,9 +148,32 @@ pub fn fmt_phones(phones: &[Phone]) -> String {
         .join(" ")
 }
 
+/// Format phones word by word, as `B AE1 D | D R IY1 M`: a target's words, or a guess's
+/// reading (`phono compress`, its `--json` and the wasm binding all use this).
+pub fn fmt_word_phones<'a>(words: impl IntoIterator<Item = &'a [Phone]>) -> String {
+    words
+        .into_iter()
+        .map(fmt_phones)
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formats_phones_by_word() {
+        let bad = parse_pron("B AE1 D").unwrap();
+        let dream = parse_pron("D R IY1 M").unwrap();
+        assert_eq!(fmt_phones(&bad), "B AE1 D");
+        assert_eq!(
+            fmt_word_phones([bad.as_slice(), dream.as_slice()]),
+            "B AE1 D | D R IY1 M"
+        );
+        assert_eq!(fmt_word_phones([dream.as_slice()]), "D R IY1 M");
+        assert_eq!(fmt_word_phones(std::iter::empty::<&[Phone]>()), "");
+    }
 
     #[test]
     fn parse_and_display_roundtrip() {

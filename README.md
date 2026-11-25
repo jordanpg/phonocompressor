@@ -64,14 +64,14 @@ mise run data      # export transliteration table + build data/generated/phono.b
 ### CLI
 
 ```sh
-mise run phono compress 'hundred thousand apartments'   # find strings (-n top, -m codepoint budget)
+mise run phono compress 'hundred thousand apartments'   # find strings (-n top, -m codepoint budget, --json)
 mise run phono score '҈㌀s' 'hundred thousand apartments' # fidelity + alignment
 mise run phono read 'ꀠddꏒꀊm'                            # how the TTS should read a string
 mise run phono phones 'bad dream'                        # target pronunciation
 mise run phono spell 'K AE1 T'                           # spelling options for ARPAbet phones
 ```
 
-Global flags: `--model <id>` (default `eleven_flash_v2_5`), `--all-scripts` (also search scripts the profile leaves off by default), `--data <path>`.
+Global flags: `--model <id>` (default `eleven_flash_v2_5`), `--all-scripts` (also search scripts the profile leaves off by default), `--scripts <names>` (search only these, e.g. `latin,hangul,yi`), `--data <path>`.
 
 Evaluation commands:
 
