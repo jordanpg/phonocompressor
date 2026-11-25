@@ -67,12 +67,12 @@ Show the wasm build gives the same guesses as `phono compress`.
 
 ### Tasks
 
-- [~] Task 4.1: Commit public phrases and option sets (defaults, a smaller budget, a larger `topN`, all scripts; never `sample/messages.json`); pin Node in `mise.toml`; add a Node script (`initSync`, reads `phono.bin` from disk) and a `wasm:parity` task that compares it with `phono compress --json`: same text in the same order, scores within 1e-4; it fails loudly without `phono.bin` or the build ([#19](https://github.com/jordanpg/phonocompressor/issues/19))
+- [x] Task 4.1: Commit public phrases and option sets (defaults, a smaller budget, a larger `topN`, all scripts; never `sample/messages.json`); pin Node in `mise.toml`; add a Node script (`initSync`, reads `phono.bin` from disk) and a `wasm:parity` task that compares it with `phono compress --json`: same text in the same order, scores within 1e-4; it fails loudly without `phono.bin` or the build ([#19](https://github.com/jordanpg/phonocompressor/issues/19))
 
 ### Verification
 
-- [ ] `mise run wasm:parity` passes
-- [ ] Changing one option on one side makes it fail
+- [x] `mise run wasm:parity` passes
+- [x] Changing one option on one side makes it fail
 
 ## Phase 5: Test page and measurements
 
@@ -80,7 +80,7 @@ Run the binding in real browsers, off the main thread, and record what it costs.
 
 ### Tasks
 
-- [ ] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
+- [~] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
 - [ ] Task 5.2: Measure in Chrome and Firefox: start-up time (fetch and decode), time per phrase for the parity phrases at defaults, `.wasm` and `phono.bin` sizes raw and gzip; record in `docs/PLAN.md` and a comment on #1; open a speed-tuning issue if time per phrase is well above native ([#21](https://github.com/jordanpg/phonocompressor/issues/21))
 - [ ] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`wasm:check` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
 
