@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-26T02:00:00Z",
+  "updated": "2026-11-26T02:30:00Z",
   "issue": 14,
   "parent_issue": 1,
   "task_issues": {
@@ -40,6 +40,7 @@
     "7caefef: test(wasm): add wasm:parity check against the CLI (wasm-binding_20261125)",
     "59701e0: feat(wasm): add worker test page and wasm:serve (wasm-binding_20261125)",
     "f6328c6: test(wasm): add a ?bench mode to the test page (wasm-binding_20261125)",
-    "2d60c4e: docs(plan): record wasm browser measurements (wasm-binding_20261125)"
+    "2d60c4e: docs(plan): record wasm browser measurements (wasm-binding_20261125)",
+    "fd71b94: docs(wasm): document the binding and its tasks (wasm-binding_20261125)"
   ]
 }
