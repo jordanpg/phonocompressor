@@ -156,7 +156,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
-| wasm32 | `phono-core` still builds for wasm | `mise run check:wasm` |
+| wasm32 | `phono-core` still builds for wasm | `mise run wasm:check` |
 | Licensing | No GPL code or data in anything shipped | Manual check of new deps and data |
 
 The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in `mise.toml`).

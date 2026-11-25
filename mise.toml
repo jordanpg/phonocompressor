@@ -58,7 +58,7 @@ run = [
 
 # --- WASM (web tool, Phase 3) ---
 
-[tasks."check:wasm"]
+[tasks."wasm:check"]
 description = "Check that phono-core and phono-wasm build for wasm32-unknown-unknown (the target comes from `mise install`)"
 run = "cargo build -p phono-core -p phono-wasm --target wasm32-unknown-unknown"
 

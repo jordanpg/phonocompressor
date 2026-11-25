@@ -23,11 +23,11 @@ Prove `phono-core` builds for `wasm32-unknown-unknown`, and make the check one c
 
 ### Tasks
 
-- [x] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `check:wasm` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
+- [x] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `wasm:check` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
 
 ### Verification
 
-- [x] `mise run check:wasm` passes after `mise install`; `mise run fmt:check`, `mise run lint` and `cargo test --workspace` pass
+- [x] `mise run wasm:check` passes after `mise install`; `mise run fmt:check`, `mise run lint` and `cargo test --workspace` pass
 
 ## Phase 2: Core and CLI support
 
@@ -43,7 +43,7 @@ Give the core a way to switch model and scripts without decoding the data again,
 
 - [x] `phono eval` answers unchanged before vs. after (numbers in the task issues)
 - [x] `phono compress 'bad dream' --json` parses as JSON; plain output unchanged
-- [x] Gates pass; `mise run check:wasm` still passes
+- [x] Gates pass; `mise run wasm:check` still passes
 
 ## Phase 3: The `crates/wasm` binding
 
@@ -52,6 +52,7 @@ Create the crate and export the engine with typed options and results.
 ### Tasks
 
 - [~] Task 3.1: Create `crates/wasm` (`cdylib`, `wasm-bindgen`) in the workspace; install `wasm-bindgen-cli` with mise, pinned to the crate's version; add a `wasm:build` task that runs `wasm-bindgen --target web` into a gitignored directory; check new dependencies' licenses and update `THIRD_PARTY.md` if needed ([#17](https://github.com/jordanpg/phonocompressor/issues/17))
+  - Output goes to `target/wasm-pkg` (already gitignored). Review: Task 1.1's `check:wasm` was renamed `wasm:check`, so every wasm task is `wasm:<name>`; it now builds `phono-wasm` too.
 - [ ] Task 3.2: Export a constructor from the data file's bytes (`Uint8Array`) and `compress(phrase, { model, maxCodepoints, topN, allowedScripts })` → `[{ text, latin, phones, score }]`, with the CLI's defaults; choose how to generate the TypeScript types (license and size checked); validate input with messages in the product-guidelines style; keep mapping and validation in plain Rust with native unit tests ([#18](https://github.com/jordanpg/phonocompressor/issues/18))
 
 ### Verification
@@ -80,7 +81,7 @@ Run the binding in real browsers, off the main thread, and record what it costs.
 
 - [ ] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
 - [ ] Task 5.2: Measure in Chrome and Firefox: start-up time (fetch and decode), time per phrase for the parity phrases at defaults, `.wasm` and `phono.bin` sizes raw and gzip; record in `docs/PLAN.md` and a comment on #1; open a speed-tuning issue if time per phrase is well above native ([#21](https://github.com/jordanpg/phonocompressor/issues/21))
-- [ ] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`check:wasm` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
+- [ ] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`wasm:check` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
 
 ### Verification
 
@@ -90,7 +91,7 @@ Run the binding in real browsers, off the main thread, and record what it costs.
 ## Final Verification
 
 - [ ] All acceptance criteria in spec.md met
-- [ ] `mise run fmt:check`, `mise run lint`, `cargo test --workspace`, `mise run check:wasm` and `mise run wasm:parity` pass; `phono eval` answers unchanged
+- [ ] `mise run fmt:check`, `mise run lint`, `cargo test --workspace`, `mise run wasm:check` and `mise run wasm:parity` pass; `phono eval` answers unchanged
 - [ ] Documentation updated (PLAN.md, README, tech-stack.md, workflow.md)
 - [ ] New dependencies' licenses checked; `THIRD_PARTY.md` updated if needed
 - [ ] All task issues closed after verification; #14 closed; #1 stays open for the front-end track
