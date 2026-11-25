@@ -36,7 +36,8 @@ Give the core a way to switch model and scripts without decoding the data again,
 ### Tasks
 
 - [x] Task 2.1: Add an `Engine` method that switches the model profile and allowed scripts by rebuilding the `ChunkSet` and weights, plus script lookup by name with an error listing valid names; reimplement `allow_all_scripts` on it. Tests: only allowed scripts in the chunk set, switching back restores the default, unknown name errors ([#15](https://github.com/jordanpg/phonocompressor/issues/15))
-- [ ] Task 2.2: Move `fmt_phones` from `phono-cli` into `phono-core`; add `--json` (`text`, `latin`, `phones`, `score`, `codepoints` per result) and `--scripts <names>` to `phono compress` ([#16](https://github.com/jordanpg/phonocompressor/issues/16))
+- [~] Task 2.2: Move `fmt_phones` from `phono-cli` into `phono-core`; add `--json` (`text`, `latin`, `phones`, `score`, `codepoints` per result) and `--scripts <names>` to `phono compress` ([#16](https://github.com/jordanpg/phonocompressor/issues/16))
+  - Deviation: `fmt_phones` was already in `phono-core` (`phone.rs`). The shared piece is the per-word join the CLI's `target:` line did inline, now `phone::fmt_word_phones` (`B AE1 D | D R IY1 M`), which `--json`'s `phones` and the wasm binding use. `--scripts` is global, like `--all-scripts`, and conflicts with it.
 
 ### Verification
 
