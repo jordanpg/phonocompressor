@@ -30,6 +30,30 @@ run = "uv run phono-harness translit-table ../data/generated/translit-unidecode.
 description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"
 run = "cargo run --release -q -p phono-cli --"
 
+# --- Formatting & linting (Rust: rustfmt + clippy; Python tools/: ruff) ---
+
+[tasks.fmt]
+description = "Format all code (rustfmt + ruff format + ruff import sorting)"
+run = [
+  "cargo fmt --all",
+  "uvx ruff format tools",
+  "uvx ruff check --select I --fix tools",
+]
+
+[tasks."fmt:check"]
+description = "Check formatting without changing files (for CI)"
+run = [
+  "cargo fmt --all --check",
+  "uvx ruff format --check tools",
+]
+
+[tasks.lint]
+description = "Lint: clippy (warnings are errors) + ruff check"
+run = [
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "uvx ruff check tools",
+]
+
 # --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
 
 [tasks."harness:credits"]
