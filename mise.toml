@@ -2,7 +2,7 @@ min_version = "2026.10.4"   # older mise rejects `secrets` on a task
 
 [tools]
 fnox = "latest"
-rust = "stable"
+rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }  # wasm32 for the web tool
 uv = "latest"
 
 [settings]
@@ -53,6 +53,12 @@ run = [
   "cargo clippy --workspace --all-targets -- -D warnings",
   "uvx ruff check tools",
 ]
+
+# --- WASM (web tool, Phase 3) ---
+
+[tasks."check:wasm"]
+description = "Check that phono-core builds for wasm32-unknown-unknown (the target comes from `mise install`)"
+run = "cargo build -p phono-core --target wasm32-unknown-unknown"
 
 # --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
 
