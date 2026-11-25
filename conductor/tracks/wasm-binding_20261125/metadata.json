@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-25T23:15:00Z",
+  "updated": "2026-11-25T23:45:00Z",
   "issue": 14,
   "parent_issue": 1,
   "task_issues": {
@@ -36,6 +36,7 @@
     "ff79481: build(wasm): add crates/wasm and wasm:build task (wasm-binding_20261125)",
     "4843e70: build(mise): rename check:wasm to wasm:check (wasm-binding_20261125)",
     "c9d9013: refactor(model): share profile lookup error (wasm-binding_20261125)",
-    "a0c36a2: feat(wasm): export Engine and typed compress() (wasm-binding_20261125)"
+    "a0c36a2: feat(wasm): export Engine and typed compress() (wasm-binding_20261125)",
+    "7caefef: test(wasm): add wasm:parity check against the CLI (wasm-binding_20261125)"
   ]
 }
