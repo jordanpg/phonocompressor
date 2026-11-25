@@ -174,13 +174,7 @@ fn main() -> Result<(), String> {
     let t = Instant::now();
     let bytes = std::fs::read(&cli.data)
         .map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
-    let profile = phono_core::model::for_model(&cli.model).ok_or_else(|| {
-        format!(
-            "no calibrated profile for model {:?} (have: {})",
-            cli.model,
-            phono_core::model::known_model_ids().join(", ")
-        )
-    })?;
+    let profile = phono_core::model::profile(&cli.model)?;
     let mut engine = Engine::from_bytes(&bytes, profile)?;
     let scripts = match &cli.scripts {
         Some(names) => Scripts::from_names(names)?,

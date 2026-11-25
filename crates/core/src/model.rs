@@ -90,6 +90,16 @@ pub fn for_model(id: &str) -> Option<&'static ModelProfile> {
     PROFILES.iter().copied().find(|p| p.model_ids.contains(&id))
 }
 
+/// The profile covering a model id, or an error that names the calibrated models.
+pub fn profile(id: &str) -> Result<&'static ModelProfile, String> {
+    for_model(id).ok_or_else(|| {
+        format!(
+            "no calibrated profile for model `{id}`; calibrated models: {}",
+            known_model_ids().join(", ")
+        )
+    })
+}
+
 /// Model ids with a profile, for error messages.
 pub fn known_model_ids() -> Vec<&'static str> {
     PROFILES
@@ -213,6 +223,15 @@ mod tests {
         assert!(
             for_model("eleven_v4").is_none(),
             "v4 reads Hangul natively: not calibrated"
+        );
+        assert!(std::ptr::eq(
+            profile("eleven_turbo_v2_5").unwrap(),
+            &FLASH_V2_5
+        ));
+        let err = profile("eleven_v4").err().unwrap();
+        assert!(
+            err.contains("`eleven_v4`") && err.contains("eleven_flash_v2_5"),
+            "{err}"
         );
     }
 
