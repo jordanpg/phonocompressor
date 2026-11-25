@@ -1,0 +1,15 @@
+[package]
+name = "phono-wasm"
+description = "wasm-bindgen binding for running phonocompressor in a browser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+# cdylib for the .wasm; rlib so native unit tests can link the mapping and validation code.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+phono-core.workspace = true
+wasm-bindgen.workspace = true
