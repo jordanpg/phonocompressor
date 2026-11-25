@@ -33,7 +33,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 - Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`.
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
-- Phase 3 (WASM web tool) in progress: `wasm-binding_20261125`.
+- Phase 3: WASM binding built (`wasm-binding_20261125`); the front end and deploy are next.
 
 ## Commands
 

@@ -17,7 +17,7 @@ Conventions for the `phono-core`, `phono-builder` and `phono-cli` crates, writte
 | `phono-core` | Pure computation over bytes and data passed in | File, network, env, clock or thread I/O. Dependencies that don't build for `wasm32-unknown-unknown`. |
 | `phono-builder` | Read Phoible, CMUdict, `deunicode`; train G2P; write `phono.bin` | Pull in GPL data (e.g. `unidecode` output) except through the explicit `--translit` dev flag |
 | `phono-cli` | Read files, parse args, print results | Hold engine logic that the web tool will also need. Move it into core. |
-| `crates/wasm` (planned) | wasm-bindgen glue, embed or load the data file | Logic beyond marshalling |
+| `crates/wasm` (`phono-wasm`) | wasm-bindgen glue: decode the data file from bytes the caller fetched, check options, map results | Engine logic: anything beyond marshalling and option checks belongs in core |
 
 `phono-core` dependencies stay minimal (today: `serde`, `postcard`). Add shared dependency versions to `[workspace.dependencies]` and refer to them with `.workspace = true`.
 
@@ -71,7 +71,7 @@ Target phones, phone distance and search stay model-independent. When a reader r
 
 ## Performance
 
-- Native speed is about 1–2 s per phrase; the browser will be slower. Measure before optimizing (`--release`, same phrases), and report before/after numbers.
+- Native speed is about 1.5–3 s per phrase; a first search in the browser takes 1.1–1.8× as long (PLAN.md, Phase 3). Measure before optimizing (`--release`, same phrases), and report before/after numbers.
 - Avoid allocation in the inner loops of search and scoring; reuse buffers.
 - No `unsafe`. There is none today.
 

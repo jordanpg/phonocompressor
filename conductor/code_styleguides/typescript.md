@@ -4,12 +4,12 @@ TypeScript-specific conventions and best practices for type-safe development.
 
 ## phonocompressor overrides
 
-TypeScript is for the planned web tool (Phase 3): Svelte + Vite over a wasm-bindgen module from `crates/wasm`. None of it exists yet. Where this section disagrees with the generic guidance below, this section wins.
+TypeScript is for the planned web tool (Phase 3): Svelte + Vite over the wasm-bindgen module from `crates/wasm`. The binding and its generated `.d.ts` exist; the front end does not yet. The test page (`crates/wasm/www`) and the Node scripts (`parity/parity.mjs`, `serve.mjs`) are plain JavaScript with no build step. Where this section disagrees with the generic guidance below, this section wins.
 
 - **Framework:** Svelte components (`.svelte` with `<script lang="ts">`), not React. Read the React import examples below as plain module imports.
 - **Strict mode:** use the strict `tsconfig` settings shown below.
 - **Formatter and linter:** to be chosen when the web tool starts, then added to `mise run fmt`, `fmt:check` and `lint` like Rust and Python. Until then, match the 100-column limit used elsewhere.
-- **WASM boundary:** use the types wasm-bindgen generates for `compress(...)`; don't hand-write duplicates. Keep the engine call in a Web Worker so a 1–2 s search doesn't freeze the page.
+- **WASM boundary:** use the types wasm-bindgen generates for `compress(...)`; don't hand-write duplicates. Keep the engine call in a Web Worker so a 2–6 s first search doesn't freeze the page.
 - **Client-side only:** no server calls, no API keys, no analytics that send the user's phrases anywhere.
 - **Results UI:** show each result's text, its Latin transliteration and its score. Make them copyable as plain text. Follow the accessibility rules in `product-guidelines.md`.
 - **Bundle size matters:** the data file is already multiple megabytes. Justify each new runtime dependency.

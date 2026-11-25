@@ -32,7 +32,7 @@ The full design, experiment write-ups and decision history are in [`docs/PLAN.md
 
 ## Status
 
-Native CLI works end to end (about 1–2 s per phrase in release). The WASM bundle (Phase 3) is planned but not started: there is no `wasm` crate yet.
+The native CLI works end to end (about 1.5–3 s per phrase in release). The browser binding (`crates/wasm`) works too: it returns the same guesses as the CLI and runs in Chrome and Firefox, about 0.4 s to start and 2–6 s for a first search (see PLAN.md, Phase 3). The web front end and its deployment are not built yet.
 
 **Scope today:** the engine targets one TTS, ElevenLabs `eleven_flash_v2_5` (and `eleven_turbo_v2_5`, which behaves the same). The reader, script risks and scorer weights are all calibrated against that model's actual output, and the CLI rejects models without a calibrated profile. Model-specific settings are kept in a `ModelProfile` so more ElevenLabs models can be added by probing and calibrating them. Other TTS providers might be supported someday, but nothing in the repo does that yet, and it would need its own measurement work, not just a new profile.
 
@@ -45,6 +45,7 @@ Against a set of hand-made reference messages (34 samples, Whisper transcripts o
 | `crates/core` | Phone features, G2P, reader, scorer, search. No I/O; builds for `wasm32`. |
 | `crates/builder` | Builds `data/generated/phono.bin` from Phoible, CMUdict, the G2P model and the transliteration table. |
 | `crates/cli` | The `phono` command-line tool. |
+| `crates/wasm` | Browser binding (wasm-bindgen): `Engine` and a typed `compress()`, plus a test page (`www/`) and a parity check against the CLI (`parity/`). |
 | `tools/` | Python harness (uv): ElevenLabs synthesis, local Whisper/wav2vec2 transcription, experiment reports. |
 | `tools/experiments/` | Experiment definitions (`exp0`–`exp9`). |
 | `docs/PLAN.md` | Design, results and decisions. |
@@ -52,7 +53,7 @@ Against a set of hand-made reference messages (34 samples, Whisper transcripts o
 
 ## Getting started
 
-Requirements: [mise](https://mise.jdx.dev/) (it installs Rust, uv and fnox), and a clone with submodules.
+Requirements: [mise](https://mise.jdx.dev/) (it installs Rust with the wasm32 target, uv, fnox, Node and the wasm-bindgen CLI), and a clone with submodules.
 
 ```sh
 git clone --recurse-submodules https://github.com/jordanpg/phonocompressor.git
@@ -82,6 +83,28 @@ mise run phono fit                  # fit scorer weights with cross-validation
 ```
 
 `eval` reads `sample/messages.json` (hand-made reference messages, gitignored). `calibrate` and `fit` need clips exported by the harness.
+
+### WASM binding
+
+`crates/wasm` runs the same engine in a browser. The caller fetches `phono.bin` and passes its bytes in; the engine decodes them once and is reused for every phrase. The test page does this in a Web Worker so a search doesn't block the page.
+
+```js
+import init, { Engine } from "./pkg/phono_wasm.js";
+
+await init();
+const engine = new Engine(new Uint8Array(await (await fetch("phono.bin")).arrayBuffer()));
+engine.compress("bad dream", { maxCodepoints: 6, topN: 10 });
+// → [{ text, latin, phones, score }, …]
+```
+
+Options: `model` (default `eleven_flash_v2_5`), `maxCodepoints` (1–30, default 6), `topN` (1–50, default 10) and `allowedScripts` (names such as `latin`, `hangul`, `yi`; default: the model's default scripts). Invalid input throws an `Error` that says what to change. The TypeScript types are generated into `phono_wasm.d.ts`.
+
+```sh
+mise run wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts (wasm-bindgen --target web)
+mise run wasm:check     # phono-core and phono-wasm build for wasm32
+mise run wasm:parity    # same guesses as `phono compress --json` on crates/wasm/parity/cases.json (Node)
+mise run wasm:serve     # test page at http://127.0.0.1:8000/; open /?bench to time it
+```
 
 ### Test harness
 

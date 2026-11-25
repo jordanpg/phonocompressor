@@ -7,8 +7,9 @@
 | Engine | Rust (edition 2024, stable) | Working |
 | Data build | Rust (`phono-builder`) | Working |
 | CLI | Rust (`phono-cli`, clap) | Working |
+| Browser binding | Rust (`phono-wasm`, wasm-bindgen + tsify) | Working: matches the CLI, runs in Chrome and Firefox |
 | Test harness | Python ≥ 3.13 (uv) | Working |
-| Web front end | TypeScript + Svelte + Vite, over a wasm-bindgen module | Planned (Phase 3) |
+| Web front end | TypeScript + Svelte + Vite, over the `phono-wasm` module | Planned (Phase 3) |
 | Backend | None: the engine runs client-side | — |
 | Database | None: one postcard-encoded data file | — |
 | Hosting | GitHub Pages (static) | Planned |
@@ -22,8 +23,8 @@ Cargo workspace, `resolver = "3"`, version 0.1.0, license `MIT OR Apache-2.0`.
 |---|---|---|---|
 | `crates/core` (`phono-core`) | — | Phone features, G2P, reader, scorer, search. No I/O; builds for `wasm32`. | `serde` 1 (derive), `postcard` 1 (alloc) |
 | `crates/builder` (`phono-builder`) | `phono-build` | Builds `data/generated/phono.bin` from Phoible, CMUdict, the G2P model and the transliteration table | `phono-core`, `clap` 4, `deunicode` 1.6 |
-| `crates/cli` (`phono-cli`) | `phono` | `compress`, `score`, `read`, `phones`, `spell`, `eval`, `calibrate`, `fit` | `phono-core`, `clap` 4 |
-| `crates/wasm` | — | wasm-bindgen bindings that embed the data file | Planned, not created |
+| `crates/cli` (`phono-cli`) | `phono` | `compress` (`--json`), `score`, `read`, `phones`, `spell`, `eval`, `calibrate`, `fit` | `phono-core`, `clap` 4, `serde_json` 1 |
+| `crates/wasm` (`phono-wasm`) | — | Browser binding: `Engine` from the data file's bytes and a typed `compress()`; option checks. Also a test page (`www/`), its dev server (`serve.mjs`) and the CLI parity check (`parity/`) | `phono-core`, `wasm-bindgen` =0.2.130, `tsify` 0.5 (`js`), `serde-wasm-bindgen` 0.6, `js-sys` 0.3 |
 
 Build profiles: dependencies build at `opt-level = 2` and the workspace at `opt-level = 1` in dev builds, so the builder's G2P training stays usable without `--release`.
 
@@ -58,9 +59,12 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 ## Web front end (planned)
 
 - **TypeScript + Svelte + Vite.** A single-page tool with a small amount of interactive state (phrase, budget, model, results). Svelte compiles away most of its runtime, which keeps the bundle small next to a multi-megabyte data file.
-- **Engine binding:** `crates/wasm` with wasm-bindgen. Planned API (PLAN.md, Phase 3):
-  `compress(phrase, { model, maxCodepoints: 6, topN, allowedScripts }) → [{ text, latin, phones, score }]`.
-- Likely needs a smaller beam or pruning in the browser (native is about 1–2 s per phrase). Run the engine off the main thread (Web Worker).
+- **Engine binding:** `crates/wasm` (built). `new Engine(bytes)` with `phono.bin`'s bytes, then
+  `engine.compress(phrase, { model, maxCodepoints, topN, allowedScripts }) → [{ text, latin, phones, score }]`.
+  `mise run wasm:build` writes the `--target web` package and its `.d.ts` to `target/wasm-pkg`.
+- Run the engine in a Web Worker. Measured (PLAN.md, Phase 3): ready in about 0.4 s after the
+  download, 2–6 s for a first search (1.1–1.8× native), faster on repeats. The download is
+  mostly `phono.bin` (7.5 MB gzipped).
 - The package manager for the front end is still to be chosen.
 
 ## Infrastructure
@@ -75,7 +79,9 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 | Tool | Purpose | Config |
 |---|---|---|
-| mise (≥ 2026.10.4) | Installs Rust, uv, fnox; runs all tasks | `mise.toml` |
+| mise (≥ 2026.10.4) | Installs Rust (with the wasm32 target), uv, fnox, Node and the wasm-bindgen CLI; runs all tasks | `mise.toml` |
+| wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
+| Node 26 (LTS) | Runs the parity check (`wasm:parity`) and the test page server (`wasm:serve`) | `mise.toml` |
 | cargo | Rust build and tests | `Cargo.toml` |
 | uv | Python env and runs | `tools/pyproject.toml`, `tools/uv.lock` |
 | fnox | Secret injection | `fnox.toml` (gitignored) |
@@ -91,6 +97,9 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Engine regression | `phono eval` over the 34 sample messages (`sample/`, gitignored) | `mise run phono eval` |
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
 | Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run harness:…` (spends credits) |
+| wasm32 build | `phono-core` and `phono-wasm` build for `wasm32-unknown-unknown` | `mise run wasm:check` |
+| Binding vs. CLI | Node runs `crates/wasm/parity/cases.json` through both and compares | `mise run wasm:parity` |
+| Binding in a browser | Test page with the engine in a Web Worker; `/?bench` times it | `mise run wasm:serve` |
 | Python tests | none yet | — |
 | Front end | to be chosen with the web tool | — |
 
@@ -134,7 +143,27 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 **Decision:** Host the web tool on GitHub Pages.
 
-**Consequences:** No server-side code, keys or storage. The data file must be served as a static asset (or embedded in the `.wasm`).
+**Consequences:** No server-side code, keys or storage. The data file is served as a static asset next to the `.wasm` (see "Fetch the data file at run time").
+
+### Fetch the data file at run time, don't embed it
+
+**Date:** 2026-11-25 · **Status:** accepted (`wasm-binding_20261125`)
+
+**Context:** PLAN.md planned to embed `phono.bin` (12.6 MB) in the `.wasm`.
+
+**Decision:** The page fetches `phono.bin` and passes its bytes to `new Engine(bytes)`.
+
+**Consequences:** The `.wasm` stays at 150 KB gzipped. The browser caches code and data separately, so a code change doesn't download the data again, and the raw bytes can be freed after decoding (0.3–0.4 s). The front end has to fetch two files and handle a failed data download.
+
+### `tsify` for the binding's TypeScript types
+
+**Date:** 2026-11-25 · **Status:** accepted (`wasm-binding_20261125`)
+
+**Context:** wasm-bindgen doesn't generate interfaces for plain option and result objects, and the types must be generated, not hand-written.
+
+**Decision:** `tsify` 0.5 (MIT OR Apache-2.0; `tsify-next` is deprecated in its favour) with its `Ts<T>` wrapper and the `js` feature (serde-wasm-bindgen). Options are read field by field because serde-wasm-bindgen ignores unknown keys.
+
+**Consequences:** `phono_wasm.d.ts` has typed `CompressOptions` and `Guess` with no `any`. The conversion layer is about 3% of the `.wasm`'s code.
 
 ## Version requirements
 
@@ -143,4 +172,6 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Rust | stable with edition 2024 (1.85+) | Installed by mise |
 | Python | 3.13 | `requires-python = ">=3.13"`, ruff `target-version = "py313"` |
 | mise | 2026.10.4 | Older versions reject `secrets` on a task |
-| wasm target | `wasm32-unknown-unknown` | For `phono-core` and the planned `crates/wasm` |
+| wasm target | `wasm32-unknown-unknown` | For `phono-core` and `crates/wasm`; `targets` on `rust` in `mise.toml` |
+| wasm-bindgen | 0.2.130, exactly | The crate and the CLI must match |
+| Node | 26 | Parity check and test page server |

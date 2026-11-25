@@ -215,7 +215,7 @@ model N.
 ```
 crates/core      phone features, scoring, search — no I/O, builds for wasm32
 crates/builder   native: Phoible + CMUdict + transliteration table + Unihan → one binary data file
-crates/wasm      wasm-bindgen bindings (embeds the data file)
+crates/wasm      wasm-bindgen binding (the caller fetches the data file), test page, CLI parity check
 crates/cli       native CLI for iterating
 tools/           Python (uv, run via mise): ElevenLabs harness, ASR, evaluation
 sample/          community sample messages (test set)
@@ -1001,9 +1001,38 @@ phone-to-spelling table from CMUdict alignments.
 
 ### Phase 3 — WASM
 
-wasm-bindgen API:
-`compress(phrase, { model, maxCodepoints: 6, topN, allowedScripts }) → [{ text, latin, phones, score }]`,
-where `model` is an ElevenLabs model id with a profile (default `eleven_flash_v2_5`).
+**Status (2026-11-25):** the binding is done (#14). `crates/wasm` builds for wasm32, gives the
+same guesses as `phono compress`, and runs in Chrome and Firefox from a plain test page. The
+Svelte front end and the GitHub Pages deploy are the next track (#1).
+
+wasm-bindgen API (`crates/wasm`; TypeScript types generated with `tsify`):
+
+```ts
+const engine = new Engine(bytes);  // phono.bin's bytes, fetched by the caller; decoded once
+engine.compress(phrase, { model, maxCodepoints, topN, allowedScripts });
+// → [{ text, latin, phones, score }], best first
+```
+
+`model` is an ElevenLabs model id with a profile (default `eleven_flash_v2_5`), `maxCodepoints`
+a whole number from 1 to 30 (default 6), `topN` from 1 to 50 (default 10), and `allowedScripts`
+a list of script names (`latin`, `hangul`, …; default: the profile's default scripts). The
+engine switches model and scripts per call without decoding the data again
+(`Engine::configure`). Invalid input throws an `Error` that says what to change: an empty
+phrase or one with nothing to pronounce, a number out of range, an unknown model, script or
+option name. Options are read field by field because serde-wasm-bindgen ignores unknown keys,
+which would let a typo like `maxCodepoint` pass silently.
+
+**Decision: fetch the data file at run time instead of embedding it.** The plan was to embed
+`phono.bin` in the `.wasm`. The page fetches it instead and passes the bytes to `new Engine`.
+The `.wasm` stays small (150 KB gzipped, against 7.5 MB for the data), the browser caches the
+two separately so a code change doesn't download the data again, and the raw bytes can be
+freed once decoded.
+
+Checks: `mise run wasm:parity` runs the parity cases (`crates/wasm/parity/cases.json`, public
+phrases only) through the CLI and through the wasm build under Node. Text, Latin and phones
+must match in the same order, and scores within 1e-4; the largest difference seen is 2.9e-8.
+`mise run wasm:serve` serves the test page (`crates/wasm/www`), which runs the engine in a
+module Web Worker.
 
 #### Browser measurements (2026-11-25)
 

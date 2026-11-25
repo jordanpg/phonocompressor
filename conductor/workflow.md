@@ -156,12 +156,15 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
-| wasm32 | `phono-core` still builds for wasm | `mise run wasm:check` |
+| wasm32 | `phono-core` and `phono-wasm` still build for wasm | `mise run wasm:check` |
+| WASM parity | The binding still gives the CLI's guesses, if the core, `compress --json` or `crates/wasm` changed | `mise run wasm:parity` |
 | Licensing | No GPL code or data in anything shipped | Manual check of new deps and data |
 
 The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in `mise.toml`).
 
-`phono eval` needs `sample/messages.json`, and `calibrate` needs exported clips; both are gitignored and local. If they are missing, say so rather than skipping silently.
+`phono eval` needs `sample/messages.json`, and `calibrate` needs exported clips; both are gitignored and local. `wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
+
+In a fresh git worktree, run `git submodule update --init` before the gates: the core's tests read Phoible's feature table from `phoible/`.
 
 To fix formatting: `mise run fmt`.
 
@@ -180,6 +183,11 @@ mise run phono read 'ꀠddꏒꀊm'
 # Check
 mise run fmt:check && mise run lint && cargo test --workspace
 mise run phono eval
+mise run wasm:check && mise run wasm:parity
+
+# Browser binding
+mise run wasm:build                          # target/wasm-pkg (.wasm, JS glue, .d.ts)
+mise run wasm:serve                          # test page at http://127.0.0.1:8000/ (/?bench times it)
 
 # Harness (free)
 mise run harness:credits
