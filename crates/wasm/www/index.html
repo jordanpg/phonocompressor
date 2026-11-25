@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>phonocompressor: wasm test page</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body {
+      font: 16px/1.5 system-ui, sans-serif;
+      margin: 2rem auto;
+      max-width: 70rem;
+      padding: 0 1rem;
+    }
+    form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 1rem 0; }
+    label { display: flex; flex-direction: column; font-size: 0.9rem; }
+    input { font: inherit; padding: 0.25rem 0.5rem; }
+    #phrase { width: 22rem; }
+    input[type="number"] { width: 6rem; }
+    button { font: inherit; padding: 0.3rem 1rem; }
+    #error { color: #b00020; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #ccc; }
+    td.text { font-size: 1.4rem; white-space: pre; }
+    td.latin, td.phones { font-family: ui-monospace, monospace; font-size: 0.9rem; }
+    td.score { font-variant-numeric: tabular-nums; }
+    .muted { color: #555; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>phonocompressor: wasm test page</h1>
+    <p class="muted">
+      Developer page for the <code>crates/wasm</code> binding. The engine runs in a Web Worker,
+      off the main thread. Results are guesses: the TTS doesn't read a string the same way
+      every time. Add <code>?bench</code> to the URL to time the parity phrases.
+    </p>
+    <p id="startup" class="muted"></p>
+    <p id="status" role="status" aria-live="polite">Loading the engine…</p>
+
+    <!-- novalidate: out-of-range values go to the binding, so its error messages show. -->
+    <form id="form" novalidate>
+      <label>Phrase
+        <input id="phrase" autocomplete="off" value="hundred thousand apartments">
+      </label>
+      <label>Budget (codepoints)
+        <input id="max" type="number" value="6">
+      </label>
+      <label>Top N
+        <input id="top" type="number" value="10">
+      </label>
+      <button id="go" type="submit" disabled>Compress</button>
+    </form>
+
+    <p id="error" role="alert" hidden></p>
+
+    <table id="results" hidden>
+      <caption id="caption" class="muted"></caption>
+      <thead>
+        <tr>
+          <th>#</th><th>Text</th><th>Latin</th><th>Phones (predicted reading)</th><th>Score</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <section id="bench" hidden>
+      <h2>Benchmark</h2>
+      <p class="muted">
+        Defaults (6 codepoints, top 10). Run 1 is cold; later runs reuse the engine's G2P cache.
+      </p>
+      <table id="bench-table">
+        <thead>
+          <tr><th>Phrase</th><th>Run 1</th><th>Run 2</th><th>Run 3</th><th>Top guess</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <pre id="bench-json"></pre>
+    </section>
+  </main>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

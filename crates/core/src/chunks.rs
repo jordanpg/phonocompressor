@@ -96,6 +96,65 @@ pub enum Script {
 }
 
 impl Script {
+    /// Every script, in declaration order.
+    pub const ALL: [Script; 18] = [
+        Script::Latin,
+        Script::Hangul,
+        Script::Yi,
+        Script::CjkCompat,
+        Script::Cherokee,
+        Script::Ucas,
+        Script::Ethiopic,
+        Script::HangulCompatJamo,
+        Script::HangulJamo,
+        Script::Runic,
+        Script::Armenian,
+        Script::Hiragana,
+        Script::Katakana,
+        Script::CjkUnified,
+        Script::CyrillicNumber,
+        Script::Devanagari,
+        Script::Cyrillic,
+        Script::Other,
+    ];
+
+    /// The script's name in options and messages (`hangul`, `cjk-compat`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Script::Latin => "latin",
+            Script::Hangul => "hangul",
+            Script::Yi => "yi",
+            Script::CjkCompat => "cjk-compat",
+            Script::Cherokee => "cherokee",
+            Script::Ucas => "ucas",
+            Script::Ethiopic => "ethiopic",
+            Script::HangulCompatJamo => "hangul-compat-jamo",
+            Script::HangulJamo => "hangul-jamo",
+            Script::Runic => "runic",
+            Script::Armenian => "armenian",
+            Script::Hiragana => "hiragana",
+            Script::Katakana => "katakana",
+            Script::CjkUnified => "cjk-unified",
+            Script::CyrillicNumber => "cyrillic-number",
+            Script::Devanagari => "devanagari",
+            Script::Cyrillic => "cyrillic",
+            Script::Other => "other",
+        }
+    }
+
+    /// The script called `name` ([`Script::name`], any case).
+    pub fn from_name(name: &str) -> Result<Script, String> {
+        Script::ALL
+            .into_iter()
+            .find(|s| s.name().eq_ignore_ascii_case(name.trim()))
+            .ok_or_else(|| {
+                format!(
+                    "unknown script `{name}`; known scripts: {}",
+                    names(Script::ALL)
+                )
+            })
+    }
+
     pub fn of(c: char) -> Script {
         match c as u32 {
             0x20..=0x7E => Script::Latin,
@@ -117,6 +176,95 @@ impl Script {
             0xAC00..=0xD7A3 => Script::Hangul,
             _ => Script::Other,
         }
+    }
+}
+
+fn names(scripts: impl IntoIterator<Item = Script>) -> String {
+    scripts
+        .into_iter()
+        .map(Script::name)
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Which scripts the search may use. Only scripts the model reads by transliteration
+/// ([`ScriptReading::Transliterated`]) are ever searched.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum Scripts {
+    /// The model's defaults ([`crate::model::ScriptProfile::default_on`]).
+    #[default]
+    Default,
+    /// Every script the model reads by transliteration, including the ones off by default.
+    All,
+    /// Exactly these. Naming one the model doesn't read by transliteration is an error.
+    Only(Vec<Script>),
+}
+
+impl Scripts {
+    /// [`Scripts::Only`] from script names ([`Script::name`]).
+    pub fn from_names<S: AsRef<str>>(names: &[S]) -> Result<Scripts, String> {
+        let scripts = names
+            .iter()
+            .map(|n| Script::from_name(n.as_ref()))
+            .collect::<Result<_, _>>()?;
+        Ok(Scripts::Only(scripts))
+    }
+
+    /// The same selection with [`Scripts::Only`] sorted and deduplicated, so equal sets compare
+    /// equal.
+    pub fn normalized(self) -> Scripts {
+        match self {
+            Scripts::Only(mut v) => {
+                v.sort();
+                v.dedup();
+                Scripts::Only(v)
+            }
+            other => other,
+        }
+    }
+
+    /// Whether the search may use `s` under `profile`, before [`ChunkSet::new`]'s own
+    /// transliteration check.
+    fn allows(&self, profile: &ModelProfile, s: Script) -> bool {
+        match self {
+            Scripts::Default => profile.script(s).default_on,
+            Scripts::All => true,
+            Scripts::Only(v) => v.contains(&s),
+        }
+    }
+
+    /// Reject an empty list, or a script `profile`'s model doesn't read by transliteration.
+    fn check(&self, profile: &ModelProfile) -> Result<(), String> {
+        let Scripts::Only(v) = self else {
+            return Ok(());
+        };
+        let usable = || {
+            names(
+                Script::ALL
+                    .into_iter()
+                    .filter(|&s| profile.script(s).reading == ScriptReading::Transliterated),
+            )
+        };
+        if v.is_empty() {
+            return Err(format!(
+                "no scripts given; name at least one of: {}",
+                usable()
+            ));
+        }
+        for &s in v {
+            let why = match profile.script(s).reading {
+                ScriptReading::Transliterated => continue,
+                ScriptReading::Native => "is read natively by",
+                ScriptReading::Unmeasured => "has not been measured on",
+            };
+            return Err(format!(
+                "script `{}` {why} {}, so the search can't use it; scripts it can use: {}",
+                s.name(),
+                profile.id(),
+                usable()
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -248,6 +396,17 @@ pub struct ChunkSet {
 }
 
 impl ChunkSet {
+    /// Chunks from the scripts `scripts` selects under `profile`. Errors on an empty
+    /// [`Scripts::Only`] or a script the model doesn't read by transliteration.
+    pub fn for_scripts(
+        translit: &Translit,
+        profile: &ModelProfile,
+        scripts: &Scripts,
+    ) -> Result<Self, String> {
+        scripts.check(profile)?;
+        Ok(Self::new(translit, profile, |s| scripts.allows(profile, s)))
+    }
+
     /// Chunks from the scripts `profile` reads by transliteration and `allowed` accepts (for
     /// the model's defaults, `|s| profile.script(s).default_on`).
     pub fn new(
@@ -364,5 +523,100 @@ mod tests {
         assert_eq!(set.get(set.trie.chunk_at(ba).unwrap()).ch, '바');
         assert!(set.trie.chunk_at(walk("b").unwrap()).is_none());
         assert!(walk("100").is_none(), "phonetic chunks aren't in the trie");
+    }
+
+    #[test]
+    fn script_names_round_trip() {
+        for s in Script::ALL {
+            assert_eq!(Script::from_name(s.name()), Ok(s));
+        }
+        assert_eq!(Script::from_name("Hangul"), Ok(Script::Hangul));
+        assert_eq!(Script::from_name("cjk-compat"), Ok(Script::CjkCompat));
+        let mut names: Vec<&str> = Script::ALL.iter().map(|s| s.name()).collect();
+        names.dedup();
+        assert_eq!(names.len(), Script::ALL.len(), "names are unique");
+    }
+
+    #[test]
+    fn unknown_script_name_lists_valid_names() {
+        let err = Script::from_name("klingon").unwrap_err();
+        assert!(err.contains("unknown script `klingon`"), "{err}");
+        assert!(
+            err.contains("hangul") && err.contains("cjk-compat"),
+            "{err}"
+        );
+        let err = Scripts::from_names(&["hangul", "klingon"]).unwrap_err();
+        assert!(err.contains("`klingon`"), "{err}");
+    }
+
+    fn fixture() -> Translit {
+        translit(&[
+            ('a', "a"),
+            (' ', " "),
+            ('바', "ba"),
+            ('ꀠ', "ba"),
+            ('ꀊ', "a"),
+            ('ሀ', "ha"),
+            ('क', "k"),
+        ])
+    }
+
+    fn scripts_of(set: &ChunkSet) -> Vec<Script> {
+        let mut s: Vec<Script> = set.chunks.iter().map(|c| c.script).collect();
+        s.sort();
+        s.dedup();
+        s
+    }
+
+    #[test]
+    fn keeps_only_allowed_scripts() {
+        let p = &crate::model::FLASH_V2_5;
+        let t = fixture();
+
+        let only_yi = ChunkSet::for_scripts(&t, p, &Scripts::from_names(&["yi"]).unwrap()).unwrap();
+        assert_eq!(scripts_of(&only_yi), [Script::Yi]);
+        let by_latin: HashMap<&str, char> = only_yi
+            .chunks
+            .iter()
+            .map(|c| (c.latin.as_str(), c.ch))
+            .collect();
+        assert_eq!(
+            by_latin["ba"], 'ꀠ',
+            "Yi represents `ba` once Hangul is out"
+        );
+
+        let default = ChunkSet::for_scripts(&t, p, &Scripts::Default).unwrap();
+        assert_eq!(
+            scripts_of(&default),
+            [Script::Latin, Script::Hangul],
+            "Ethiopic is off by default; Yi's `a` and `ba` lose to Latin and Hangul"
+        );
+        let all = ChunkSet::for_scripts(&t, p, &Scripts::All).unwrap();
+        assert!(scripts_of(&all).contains(&Script::Ethiopic));
+        assert!(!scripts_of(&all).contains(&Script::Devanagari));
+    }
+
+    #[test]
+    fn rejects_scripts_the_model_cannot_use() {
+        let p = &crate::model::FLASH_V2_5;
+        let t = fixture();
+        let err = |names: &[&str]| {
+            ChunkSet::for_scripts(&t, p, &Scripts::from_names(names).unwrap())
+                .err()
+                .unwrap()
+        };
+        let native = err(&["hangul", "devanagari"]);
+        assert!(
+            native.contains("`devanagari`") && native.contains("natively"),
+            "{native}"
+        );
+        assert!(
+            native.contains("hangul") && !native.contains("cyrillic,"),
+            "{native}"
+        );
+        let unmeasured = err(&["other"]);
+        assert!(unmeasured.contains("not been measured"), "{unmeasured}");
+        let none = err(&[]);
+        assert!(none.contains("no scripts"), "{none}");
     }
 }

@@ -18,4 +18,12 @@ by hand.
 `crates/builder/src/translit.rs` holds our own overrides to the table (`OVERRIDES`). Each one has to
 come from observed TTS behaviour or Unicode data.
 
+The Rust crates compiled into the browser build (`crates/wasm`) are `wasm-bindgen`, `js-sys`,
+`serde`, `serde-wasm-bindgen`, `tsify`, `postcard` and their runtime dependencies
+(`wasm-bindgen-shared`, `cfg-if`, `serde_core`, `cobs`, `heapless`, `hash32`, `stable_deref_trait`,
+`thiserror`, `byteorder`, and `futures-core`, `futures-task`, `futures-util`, `pin-project-lite`
+and `slab` through `js-sys`). All are MIT OR Apache-2.0 except `serde-wasm-bindgen` and `slab`
+(MIT) and `byteorder` (Unlicense OR MIT). Proc-macro crates (`serde_derive`, `wasm-bindgen-macro`,
+`tsify-macros`, `syn`, …) run only at build time and are not shipped.
+
 The ElevenLabs harness clips, `sample/` messages and `tools/results/` are not distributed.

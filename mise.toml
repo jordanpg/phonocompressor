@@ -2,8 +2,11 @@ min_version = "2026.10.4"   # older mise rejects `secrets` on a task
 
 [tools]
 fnox = "latest"
-rust = "stable"
+rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }  # wasm32 for the web tool
 uv = "latest"
+# Must equal the `wasm-bindgen` crate version pinned in Cargo.toml.
+"github:wasm-bindgen/wasm-bindgen" = "0.2.130"
+node = "26"                 # LTS; runs the wasm parity check
 
 [settings]
 experimental = true         # mise secrets is experimental
@@ -53,6 +56,32 @@ run = [
   "cargo clippy --workspace --all-targets -- -D warnings",
   "uvx ruff check tools",
 ]
+
+# --- WASM (web tool, Phase 3) ---
+
+[tasks."wasm:check"]
+description = "Check that phono-core and phono-wasm build for wasm32-unknown-unknown (the target comes from `mise install`)"
+run = "cargo build -p phono-core -p phono-wasm --target wasm32-unknown-unknown"
+
+[tasks."wasm:build"]
+description = "Build the browser binding into target/wasm-pkg (.wasm, .js, .d.ts; wasm-bindgen --target web)"
+run = [
+  "cargo build -p phono-wasm --release --target wasm32-unknown-unknown",
+  "wasm-bindgen --target web --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/phono_wasm.wasm",
+]
+
+[tasks."wasm:parity"]
+description = "Check the wasm binding gives the same guesses as `phono compress --json` (Node; needs phono.bin)"
+depends = ["wasm:build"]
+run = [
+  "cargo build --release -q -p phono-cli",
+  "node crates/wasm/parity/parity.mjs",
+]
+
+[tasks."wasm:serve"]
+description = "Serve the wasm test page (crates/wasm/www) at http://127.0.0.1:8000/; --port, --host"
+depends = ["wasm:build"]
+run = "node crates/wasm/serve.mjs"
 
 # --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
 

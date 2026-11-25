@@ -4,10 +4,12 @@ mod fit;
 
 use clap::{Parser, Subcommand};
 use phono_core::Engine;
-use phono_core::phone::fmt_phones;
+use phono_core::chunks::Scripts;
+use phono_core::phone::{fmt_phones, fmt_word_phones};
 use phono_core::reading::Word;
 use phono_core::score::Op;
-use phono_core::search::{SearchConfig, Searcher};
+use phono_core::search::{Candidate, SearchConfig, Searcher};
+use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -25,6 +27,15 @@ struct Cli {
     /// unreliable).
     #[arg(long, global = true)]
     all_scripts: bool,
+    /// Search only these scripts (comma-separated names such as `latin,hangul,yi`). Naming
+    /// one the model doesn't read by transliteration is an error that lists the usable ones.
+    #[arg(
+        long,
+        global = true,
+        value_delimiter = ',',
+        conflicts_with = "all_scripts"
+    )]
+    scripts: Option<Vec<String>>,
     #[command(subcommand)]
     command: Command,
 }
@@ -60,6 +71,9 @@ enum Command {
         /// Debug: report where this known-good string ranks in generation.
         #[arg(long)]
         want: Option<String>,
+        /// Print the results as a JSON array of `{text, latin, phones, score, codepoints}`.
+        #[arg(long, conflicts_with = "want")]
+        json: bool,
     },
     /// Compare predicted fidelity with what the TTS actually produced (phones recognized in
     /// harness clips, from `mise run harness:export`).
@@ -124,6 +138,29 @@ enum Command {
     },
 }
 
+/// One `phono compress --json` result. The wasm binding returns the same fields except
+/// `codepoints`, and `wasm:parity` compares the two.
+#[derive(Serialize)]
+struct Guess<'a> {
+    text: &'a str,
+    latin: &'a str,
+    phones: String,
+    score: f32,
+    codepoints: usize,
+}
+
+impl<'a> From<&'a Candidate> for Guess<'a> {
+    fn from(c: &'a Candidate) -> Self {
+        Guess {
+            text: &c.text,
+            latin: &c.latin,
+            phones: fmt_word_phones(c.words.iter().map(|w| w.phones.as_slice())),
+            score: c.fidelity,
+            codepoints: c.codepoints,
+        }
+    }
+}
+
 fn words_str(words: &[Word]) -> String {
     words
         .iter()
@@ -137,17 +174,14 @@ fn main() -> Result<(), String> {
     let t = Instant::now();
     let bytes = std::fs::read(&cli.data)
         .map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
-    let profile = phono_core::model::for_model(&cli.model).ok_or_else(|| {
-        format!(
-            "no calibrated profile for model {:?} (have: {})",
-            cli.model,
-            phono_core::model::known_model_ids().join(", ")
-        )
-    })?;
+    let profile = phono_core::model::profile(&cli.model)?;
     let mut engine = Engine::from_bytes(&bytes, profile)?;
-    if cli.all_scripts {
-        engine.allow_all_scripts();
-    }
+    let scripts = match &cli.scripts {
+        Some(names) => Scripts::from_names(names)?,
+        None if cli.all_scripts => Scripts::All,
+        None => Scripts::Default,
+    };
+    engine.configure(profile, scripts)?;
     eprintln!(
         "loaded {} in {:.2}s",
         cli.data.display(),
@@ -179,12 +213,7 @@ fn main() -> Result<(), String> {
             println!("reads:    {}", words_str(&words));
             println!(
                 "target:   {}",
-                engine
-                    .target(&phrase)
-                    .iter()
-                    .map(|w| fmt_phones(w))
-                    .collect::<Vec<_>>()
-                    .join(" | ")
+                fmt_word_phones(engine.target(&phrase).iter().map(Vec::as_slice))
             );
             println!(
                 "fidelity: {:.3} (cost {:.2} / {:.2})",
@@ -215,6 +244,7 @@ fn main() -> Result<(), String> {
             per_state,
             per_root,
             want,
+            json,
         } => {
             let searcher = Searcher::new(&engine);
             let cfg = SearchConfig {
@@ -228,6 +258,12 @@ fn main() -> Result<(), String> {
             let t = Instant::now();
             let results = searcher.search(&phrase, &cfg);
             eprintln!("searched in {:.2}s", t.elapsed().as_secs_f32());
+            if json {
+                let guesses: Vec<Guess> = results.iter().map(Guess::from).collect();
+                let out = serde_json::to_string(&guesses).map_err(|e| e.to_string())?;
+                println!("{out}");
+                return Ok(());
+            }
             if let Some(w) = want {
                 let (rank, total) = searcher.generation_rank(&phrase, &w, &cfg);
                 let a = engine.score(&w, &phrase);
@@ -244,12 +280,7 @@ fn main() -> Result<(), String> {
             }
             println!(
                 "target: {}",
-                engine
-                    .target(&phrase)
-                    .iter()
-                    .map(|w| fmt_phones(w))
-                    .collect::<Vec<_>>()
-                    .join(" | ")
+                fmt_word_phones(engine.target(&phrase).iter().map(Vec::as_slice))
             );
             for (i, c) in results.iter().enumerate() {
                 println!(

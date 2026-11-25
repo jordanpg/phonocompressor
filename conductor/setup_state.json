@@ -1,0 +1,51 @@
+{
+  "status": "complete",
+  "project_type": "brownfield",
+  "current_section": "done",
+  "current_question": 0,
+  "completed_sections": ["product", "guidelines", "tech_stack", "workflow", "styleguides"],
+  "answers": {
+    "product.name": "phonocompressor",
+    "product.description": "A phonetic compression engine (Rust, native CLI now, WASM planned) that searches for short exotic-character strings whose TTS reading matches a target phrase.",
+    "product.problem": "Live-chat TTS messages (e.g. Twitch) have a tiny character budget, and there is no tool that finds the shortest string a specific TTS model will read as a given phrase. Today people hand-craft these messages by trial and error, which is slow, costs synthesis credits, and gives inconsistent results.",
+    "product.users": "Live-stream chat viewers (e.g. Twitch) who send TTS messages, via the planned web tool; and the developer/researcher running the CLI and test harness to calibrate the engine.",
+    "product.goals": [
+      "Ship the WASM web tool (Phase 3): run the engine fully in-browser",
+      "Add more TTS models: calibrate more ElevenLabs models as new ModelProfiles beyond eleven_flash_v2_5",
+      "Beat hand-made messages: keep matching or beating hand-crafted reference messages on Whisper intelligibility"
+    ],
+    "guidelines.tone": "Concise and direct: plain sentences, state results and limits outright, no marketing language.",
+    "guidelines.principles": [
+      "Measure against real TTS: engine changes are judged by experiments on real ElevenLabs clips (Whisper/wav2vec2), not intuition; results and decisions recorded in docs/PLAN.md",
+      "Browser-first, no I/O core: phono-core stays I/O-free and wasm32-buildable; everything shipped must run client-side",
+      "Credit-frugal: fit the ElevenLabs free tier; cache every clip, dry-run by default, refuse to overspend an experiment's budget",
+      "License-clean distribution: only permissively licensed data ships (deunicode, not GPL unidecode); GPL tooling stays dev-only",
+      "Support diverse models and providers (user-added)"
+    ],
+    "tech.languages": "Rust (edition 2024, stable via mise) for the engine; Python >=3.13 (uv) for the tools/ harness; TypeScript for the planned web front end around the WASM bundle",
+    "tech.frontend": "Svelte + Vite (planned, Phase 3 web tool)",
+    "tech.backend": "None: engine runs client-side",
+    "tech.database": "None: data is a postcard-encoded data/generated/phono.bin built by phono-builder",
+    "tech.infrastructure": "GitHub Pages (static hosting for the client-side WASM web tool); code distributed on GitHub",
+    "workflow.tdd": "Moderate: tests encouraged for engine logic (reader rules, scorer, search, data format), not blocking; experiments on real clips remain the measure of quality",
+    "workflow.commits": "Conventional Commits; no AI attribution lines (no Co-Authored-By or generated-by trailers)",
+    "workflow.review": "Optional; self-review OK",
+    "workflow.checkpoints": "After each task completion; spending ElevenLabs credits (harness:synth --spend) always needs explicit user go-ahead",
+    "styleguides.languages": ["typescript", "python", "rust", "general"],
+    "styleguides.existing_configs": "Use existing configs as source of truth: rustfmt.toml, ruff in tools/pyproject.toml, mise fmt/fmt:check/lint tasks"
+  },
+  "files_created": [
+    "conductor/index.md",
+    "conductor/product.md",
+    "conductor/product-guidelines.md",
+    "conductor/tech-stack.md",
+    "conductor/workflow.md",
+    "conductor/tracks.md",
+    "conductor/code_styleguides/general.md",
+    "conductor/code_styleguides/rust.md",
+    "conductor/code_styleguides/python.md",
+    "conductor/code_styleguides/typescript.md"
+  ],
+  "started_at": "2026-11-25T00:00:00Z",
+  "last_updated": "2026-11-25T00:00:00Z"
+}

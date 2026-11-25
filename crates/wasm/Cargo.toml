@@ -1,0 +1,23 @@
+[package]
+name = "phono-wasm"
+description = "wasm-bindgen binding for running phonocompressor in a browser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+# cdylib for the .wasm; rlib so native unit tests can link the mapping and validation code.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+js-sys = "0.3"
+phono-core.workspace = true
+serde.workspace = true
+serde-wasm-bindgen = "0.6"
+# TypeScript interfaces for the options and results, converted with serde-wasm-bindgen.
+tsify = { version = "0.5.8", default-features = false, features = ["js"] }
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
