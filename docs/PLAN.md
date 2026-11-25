@@ -1012,7 +1012,45 @@ where `model` is an ElevenLabs model id with a profile (default `eleven_flash_v2
 | Phoible features | phone distance | CC-BY 4.0 (attribution required) |
 | CMUdict | English pronunciations | BSD-style |
 | Unihan | CJK readings (model N) | Unicode License |
-| Transliteration table | chunk inventory | Python `unidecode` is **GPL-2.0+**; Rust `deunicode` is BSD-3. We can also rebuild most of the table from Unicode names + Unihan. Decide before shipping the table in the bundle. |
+| Transliteration table | chunk inventory | Today generated from Python `unidecode`, which is **GPL-2.0+**. **Decision (2026-11-25): move to Rust `deunicode` (BSD-3)**; see "Transliteration source" below. |
+
+### Transliteration source: move from `unidecode` to `deunicode`
+
+**Decision (2026-11-25):** switch the chunk table's source to the `deunicode`
+crate (BSD-3). The goal is a browser-only web tool, so we will distribute the
+table inside the WASM bundle, and we also want to publish the tables on GitHub.
+Shipping tables derived from GPL-2.0+ `unidecode` would pull the bundle and the
+published tables under the GPL, which blocks a permissive repo license
+(MIT OR Apache-2.0 is the plan). Not started.
+
+To do:
+
+1. **Diff the tables.** Export `deunicode`'s output over the same blocks as
+   `data:translit` and compare it chunk by chunk with `unidecode`. The
+   whole project rests on the TTS matching `unidecode`'s romanization
+   (`hu` not `fu`, 嬶/壗 as Kaka/Mama, Hangul and Yi via Unicode names), so any
+   disagreement has to be checked against real TTS output, not assumed
+   harmless. A small exp0-style probe on the disagreeing chunks should
+   settle it, and it is cheap on the free tier.
+2. **Patch where they differ.** Where the TTS follows `unidecode` and
+   `deunicode` doesn't, keep a small override table of our own (or rebuild
+   those blocks from Unicode names plus Unihan, which the original plan
+   already allowed for). The overrides must be written from observed TTS
+   behaviour and Unicode data, not copied from `unidecode`'s table.
+3. **Move the export into Rust.** Replace `data:translit` (the uv task running
+   `phono-harness translit-table`) with a step in `crates/builder`, so the data
+   build no longer needs Python. `unidecode` stays in `tools/` only for
+   comparisons and the "what should the TTS read?" dev view, and never feeds
+   shipped data.
+4. **Re-run calibration.** The fitted weights (`phono fit`) and risk tables
+   were fitted on clips chosen under the old table. Check that `calibrate`
+   output is unchanged on the existing clips, and spend credits on a fresh
+   experiment only if chunks changed.
+5. **Publish the tables.** Release the chunk table (and ideally the
+   per-script reading notes) as files on GitHub, with attribution for
+   `deunicode`, Phoible (CC BY 4.0) and CMUdict in a `THIRD_PARTY.md`.
+6. **Then license the repo.** Add `license = "MIT OR Apache-2.0"` to
+   `[workspace.package]`, plus `LICENSE-MIT` and `LICENSE-APACHE`.
 
 ## Open questions
 
