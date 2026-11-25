@@ -51,7 +51,7 @@ Create the crate and export the engine with typed options and results.
 
 ### Tasks
 
-- [~] Task 3.1: Create `crates/wasm` (`cdylib`, `wasm-bindgen`) in the workspace; install `wasm-bindgen-cli` with mise, pinned to the crate's version; add a `wasm:build` task that runs `wasm-bindgen --target web` into a gitignored directory; check new dependencies' licenses and update `THIRD_PARTY.md` if needed ([#17](https://github.com/jordanpg/phonocompressor/issues/17))
+- [x] Task 3.1: Create `crates/wasm` (`cdylib`, `wasm-bindgen`) in the workspace; install `wasm-bindgen-cli` with mise, pinned to the crate's version; add a `wasm:build` task that runs `wasm-bindgen --target web` into a gitignored directory; check new dependencies' licenses and update `THIRD_PARTY.md` if needed ([#17](https://github.com/jordanpg/phonocompressor/issues/17))
   - Output goes to `target/wasm-pkg` (already gitignored). Review: Task 1.1's `check:wasm` was renamed `wasm:check`, so every wasm task is `wasm:<name>`; it now builds `phono-wasm` too.
 - [ ] Task 3.2: Export a constructor from the data file's bytes (`Uint8Array`) and `compress(phrase, { model, maxCodepoints, topN, allowedScripts })` → `[{ text, latin, phones, score }]`, with the CLI's defaults; choose how to generate the TypeScript types (license and size checked); validate input with messages in the product-guidelines style; keep mapping and validation in plain Rust with native unit tests ([#18](https://github.com/jordanpg/phonocompressor/issues/18))
 
