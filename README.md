@@ -4,7 +4,7 @@ Turn an English phrase into a **very short string of Unicode characters** that s
 
 For example, "hundred thousand apartments" can be written as `҈㌀s` (3 codepoints): `҈` reads as "*100.000*", `㌀` reads as "apartment", and `s` pluralizes it.
 
-The input text reaches the TTS essentially unmodified, so pronunciation controls (phoneme tags, aliases, breaks) aren't available and the only lever is the text itself. This project searches for short strings of exotic characters whose TTS reading lands on the intended sound. (It was built for short messages read aloud by a TTS in a live chat, hence the small default budget.)
+This project searches for short strings of exotic characters whose TTS reading lands on the intended sound. (It was built for short messages read aloud by a TTS in a live chat, hence the small default budget.)
 
 ## How it works
 
