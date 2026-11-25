@@ -33,8 +33,9 @@
     <p class="muted">
       Developer page for the <code>crates/wasm</code> binding. The engine runs in a Web Worker,
       off the main thread. Results are guesses: the TTS doesn't read a string the same way
-      every time.
+      every time. Add <code>?bench</code> to the URL to time the parity phrases.
     </p>
+    <p id="startup" class="muted"></p>
     <p id="status" role="status" aria-live="polite">Loading the engine…</p>
 
     <!-- novalidate: out-of-range values go to the binding, so its error messages show. -->
@@ -62,6 +63,20 @@
       </thead>
       <tbody></tbody>
     </table>
+
+    <section id="bench" hidden>
+      <h2>Benchmark</h2>
+      <p class="muted">
+        Defaults (6 codepoints, top 10). Run 1 is cold; later runs reuse the engine's G2P cache.
+      </p>
+      <table id="bench-table">
+        <thead>
+          <tr><th>Phrase</th><th>Run 1</th><th>Run 2</th><th>Run 3</th><th>Top guess</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <pre id="bench-json"></pre>
+    </section>
   </main>
   <script type="module" src="main.js"></script>
 </body>
