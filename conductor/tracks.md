@@ -2,7 +2,7 @@
 
 | Status | Track ID | Title | Created | Updated |
 | ------ | -------- | ----- | ------- | ------- |
-| [ ] | [wasm-binding_20261125](./tracks/wasm-binding_20261125/index.md) | [Build the WASM binding](https://github.com/jordanpg/phonocompressor/issues/14) | 2026-11-25 | 2026-11-25 |
+| [~] | [wasm-binding_20261125](./tracks/wasm-binding_20261125/index.md) | [Build the WASM binding](https://github.com/jordanpg/phonocompressor/issues/14) | 2026-11-25 | 2026-11-25 |
 
 <!-- Tracks registered by /conductor:new-track -->
 

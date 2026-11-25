@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#14](https://github.com/jordanpg/phonocompressor/issues/14) (sub-issue of [#1](https://github.com/jordanpg/phonocompressor/issues/1))
 **Created:** 2026-11-25
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -23,7 +23,7 @@ Prove `phono-core` builds for `wasm32-unknown-unknown`, and make the check one c
 
 ### Tasks
 
-- [ ] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `check:wasm` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
+- [~] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `check:wasm` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
 
 ### Verification
 

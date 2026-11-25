@@ -27,13 +27,13 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [ ] [Build the WASM binding](./tracks/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 0/9 tasks.
+- [~] [Build the WASM binding](./tracks/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 0/9 tasks.
 
 ## Project Status
 
 - Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`.
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
-- Phase 3 (WASM web tool) not started.
+- Phase 3 (WASM web tool) in progress: `wasm-binding_20261125`.
 
 ## Commands
 
