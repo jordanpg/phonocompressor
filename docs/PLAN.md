@@ -904,7 +904,41 @@ text by default. The user believes their TTS setup sends
 `apply_text_normalization: "auto"` and no `language_code`, which matches the
 harness.
 
-Known limitations / next steps (in priority order after exp2; status as of v6.2):
+**exp9 result (real TTS, 2026-11-24, 100 credits; 869/10000 used after):
+no new lever. The reader was already right about camelCase and most
+symbols, and Flash v2.5 doesn't normalize text by default.** This was item
+6's probe: 19 cases × 2 seeds on Flash v2.5, same voice. `tools/experiments/exp9.toml` has the
+cases and the reader's predictions; the report is `tools/results/exp9.md`.
+The harness can now send `apply_text_normalization` per case (`normalization
+= "on"`). The cache key leaves it out when unset, so cached clips keep their
+keys.
+
+| question | heard (seed 1 / seed 2) | conclusion |
+|---|---|---|
+| camelCase as a free word boundary | `ambigchungus` "I'm Big Chungus" ×2; `amBigChungus` "Ambig Chungus" / "I'm Big Chungus"; `빞빞엠T뤀` "Bipipem Truck" / "Bit by Pemtruck" vs lowercase "Bibi Pemtrak" / "Bip by Pemtruck" | No boundary: phones are unchanged. The reader's rule (an interior capital stays in the word) holds. exp1's "Ombigchungus" for `암빅ꍲn궀` has the same phones as "I'm Big Chungus": Whisper split identical audio differently. |
+| interior capitals in a pseudo-word | `doeg` /aɡɑː/, /dəka/; `doEg` /duːik/, /duːiŋ/; `dOeg` /doːɡ/, /lɑu/ | Isolated 4-letter pseudo-words are too unstable to measure. `doEg` gave /duːi…/ on both seeds, so a capital vowel may be read as its letter name (a capital consonant isn't: `tHe`, exp5). The search never emits capitals, so this only matters when scoring other people's texts. |
+| `kwi` (Latin) | "quay" /xwei/, "Quays" /kwai/ | Not /kwiː/ (G2P: K W IY0). A final `i` in a one-syllable pseudo-word reads /aɪ/-like, as in "hi" and "pi". Same direction as `퀴` → "kawaii" (item 5). |
+| `you&me` | "You and me" ×2 | `&` → "and" confirmed. |
+| `#blessed`, `a=b`, `and/or` | "Blessed" ×2; "A." / "A, B."; "And or" ×2 | `#`, `=` and `/` are silent, as the reader assumes. |
+| `$5` | "Fire me" / "Five dollars" | `$` before a digit may be read "dollars" (1 of 2). The reader drops it. |
+| `⅔ done`, `½ off` | "2-3 done" ×2 (/tuː θɹiː/); "Half off" / "One how off" | `⅔` → "two three" (the reader agrees). `½` → "(one) half", not unidecode's "1/2" (the reader says "one two"). |
+| `3×3`, `90°` | "Three of three" / "3-3"; "90D" ×2 | `×` isn't "ex" (the reader says "three ex three"). `°` isn't "degrees". |
+| `gr8 m8`, default vs normalization "on" | default /dʒiː ɑːɹ eɪt ɛm eɪt/ ("GR8M8"), /ɹeɪt ɛm eɪt/; "on": "Great Mate" ×2 | Default = no normalization, as the models page says. The reader's prediction (G R eight M eight) matches seed 1 exactly. With "on", glued digits become rebus sounds; that would need a different reader. |
+
+- `½ × ° ⅔` are outside the searchable scripts (`Script::Other`), so their
+  readings only affect scoring of texts that contain them. No new symbol
+  words to add.
+- Calibration: `clips-all9.tsv` (580 clips; the 2 normalization-"on" clips
+  are left out). v6 weights rank 190/227 within-phrase pairs (83.7%).
+  - A refit with substitution scales held gets 188/227 in-sample and
+    80–81% held out.
+  - A free refit again makes vowel swaps cheaper (3.0 → 2.0), which v6
+    rejected.
+  - The new exp9 pairs are mostly capital variants the reader reads
+    identically, so no weights can order them.
+  - So v6's weights stay.
+
+Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
    n-best expectation, voicing weight 3, script risk and default scripts,
@@ -926,27 +960,15 @@ Known limitations / next steps (in priority order after exp2; status as of v6.2)
    learn letter-to-sound corrections from the heard phones in the clips.
    This now looks like a bigger lever than item 1. Learned corrections are
    Flash observations, so store them in the model profile (`model.rs`), not
-   in module constants. Item 6 tests a cheaper lever first.
-6. **exp9 probe: respelling tricks and symbols on Flash v2.5** (from the
-   ElevenLabs best-practices review, 2026-11-24; not run, ask before spending
-   credits). The docs say capitals, apostrophes, dashes and quotes around a
-   letter change stress or pronunciation on models without phoneme tags
-   ("trapezIi"). We don't use that: the chunk set skips uppercase ASCII,
-   `normalize` drops apostrophes, and the reader treats a single interior
-   capital as a no-op. That rule rests on `tHe` → "the", which is
-   unstressed, so it can't show a stress shift. A capital costs the same
-   codepoint as a lowercase letter, so it would be a free knob. Cases, 2 seeds:
-   - interior capitals in item 5's pseudo-words: `kwi`/`kwI`, `doeg`/`dOeg`;
-   - an apostrophe or hyphen splitting a run-together string
-     (`ombig'chungus`, vs exp1's "Ombigchungus");
-   - 6–8 symbols beyond `@ & + %` (`$ # = ° ½ ⅔ / ×`). The docs' readings
-     are normalizer output, and Flash v2.5 doesn't normalize by default;
-   - 2 digit strings with `apply_text_normalization` at the default vs "on".
-     This needs the harness to pass the parameter, which `TtsRequest`
-     lacks.
-
-   About 20 texts × 2 seeds ≈ 40 clips, estimated 80–120 credits from
-   exp7/exp8 rates.
+   in module constants. exp9 adds Latin `kwi` → /kweɪ/, /kwaɪ/ (a final `i`
+   in a one-syllable pseudo-word reads /aɪ/-like). It also showed isolated
+   4-letter pseudo-words are too unstable to measure, so collect these
+   readings inside phrases.
+6. ~~**exp9 probe: respelling tricks and symbols on Flash v2.5.**~~ Run
+   2026-11-24 (see "exp9 result"): no new lever. CamelCase gives no
+   boundary, the reader was right about `& # = / ⅔`, and Flash v2.5 doesn't
+   normalize by default. Small reader fixes it suggests, none searchable
+   today: `½` → "half", `×` not "ex", `$`+digits → "dollars".
 7. **Supporting another model.** Each one needs:
    - an exp0-style probe;
    - a community-message run (exp1-style);

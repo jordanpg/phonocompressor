@@ -34,12 +34,20 @@ class TtsRequest:
     voice_id: str
     seed: int | None = None
     output_format: str = OUTPUT_FORMAT
+    # "auto" | "on" | "off"; None sends nothing (the API default, "auto").
+    apply_text_normalization: str | None = None
 
     @property
     def key(self) -> str:
-        """Stable cache key: anything that changes the audio changes the key."""
-        blob = json.dumps(asdict(self), sort_keys=True, ensure_ascii=False).encode()
+        """Stable cache key: anything that changes the audio changes the key. Optional fields
+        left at None are omitted, so adding one doesn't change the keys of cached clips."""
+        fields = {k: v for k, v in asdict(self).items() if not (k in _OPTIONAL and v is None)}
+        blob = json.dumps(fields, sort_keys=True, ensure_ascii=False).encode()
         return hashlib.sha256(blob).hexdigest()[:24]
+
+
+# Fields added after clips were cached: omitted from the cache key when None.
+_OPTIONAL = {"apply_text_normalization"}
 
 
 class Client:
@@ -82,6 +90,8 @@ class Client:
         body: dict = {"text": req.text, "model_id": req.model_id}
         if req.seed is not None:
             body["seed"] = req.seed
+        if req.apply_text_normalization is not None:
+            body["apply_text_normalization"] = req.apply_text_normalization
         r = self._request(
             "POST",
             f"/v1/text-to-speech/{req.voice_id}/with-timestamps",

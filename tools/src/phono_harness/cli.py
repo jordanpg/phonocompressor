@@ -210,6 +210,8 @@ def cmd_report(args) -> None:
             lines += [f"- T predicts: {case.t or '—'}", f"- N predicts: {case.n or '—'}"]
         if case.note:
             lines.append(f"- note: {case.note}")
+        if case.normalization:
+            lines.append(f"- apply_text_normalization: `{case.normalization}`")
         sim_h = " sim |" if case.target else ""
         lines += [
             "",
@@ -245,7 +247,8 @@ def cmd_report(args) -> None:
 
 def cmd_export_clips(args) -> None:
     """TSV of transcribed clips for `phono calibrate`: experiment, case, seed, model, text,
-    target phrase, Whisper English, recognized IPA phones. Only cases with a target phrase.
+    target phrase, Whisper English, recognized IPA phones. Only cases with a target phrase, and
+    only clips made with the API's default settings (calibration models the default reading).
     Contains sample phrases when exported from exp1/exp2: write it somewhere gitignored."""
     from pathlib import Path
 
@@ -263,7 +266,7 @@ def cmd_export_clips(args) -> None:
             exp = load(name)
             for case, req in exp.requests():
                 asr = cache.read_json(cache.asr_path(req.key, ASR_VERSION))
-                if not case.target or asr is None:
+                if not case.target or asr is None or req.apply_text_normalization is not None:
                     continue
                 cells = [exp.name, case.id, str(req.seed), req.model_id, case.text, case.target,
                          asr.get("en", ""), asr.get("phones", "")]

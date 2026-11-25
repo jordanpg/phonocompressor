@@ -1,0 +1,149 @@
+name = "exp9"
+description = """
+Probe of respelling tricks and symbols on Flash v2.5 (docs/PLAN.md next steps, item 6), from the
+ElevenLabs best-practices review. The docs say capitals, dashes, apostrophes and quotes change
+how models without phoneme tags pronounce a word. Four questions:
+1. CamelCase: does a capital inside a run of letters start a new word? If so, it is a word
+   boundary that costs no codepoint (a space, hyphen or apostrophe costs one). Our reader keeps
+   a single interior capital in the word (exp5 heard `tHe` as "the").
+2. Interior capitals in pseudo-words (item 5's `doeg`, heard "Dag"/"Deg" in exp5–exp6): do they
+   change the reading at all? Our reader says no.
+3. Symbols beyond `@ & + %`: which are read as words when glued to text?
+4. Text normalization: the models page says it is off by default on Flash v2.5. Compare the
+   default with apply_text_normalization "on" for glued digits (`gr8 m8`). The "on" clips are
+   left out of `export-clips`, since the user's setup is believed to send "auto".
+`t` = what phono v6.2's reader predicts. Same model, voice and seeds as exp1–exp8.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 120
+
+# --- 1. CamelCase as a free word boundary ---
+
+[[cases]]
+id = "chungus_lower"
+text = "ambigchungus"
+target = "am big chungus"
+t = "one run: ambigchungus"
+note = "Pure-Latin baseline. exp1 heard the community's 암빅ꍲn궀 as 'Ombigchungus'."
+
+[[cases]]
+id = "chungus_camel"
+text = "amBigChungus"
+target = "am big chungus"
+t = "same as lowercase (interior capitals stay in the word)"
+
+[[cases]]
+id = "truck_lower"
+text = "빞빞엠t뤀"
+target = "Beep beep am truck"
+t = "bipbipemtruk"
+note = "Community msg230, cached from exp1 (heard 'Bibi Pemtrak')."
+
+[[cases]]
+id = "truck_camel"
+text = "빞빞엠T뤀"
+target = "Beep beep am truck"
+t = "bipbipemtruk (same as lowercase)"
+note = "Mixed script: a Latin capital between Hangul syllables."
+
+# --- 2. Interior capitals in a short pseudo-word ---
+
+[[cases]]
+id = "doeg"
+text = "doeg"
+target = "doug"
+t = "D OW1 G"
+note = "Latin version of 됙, heard 'Dag'/'Deg' in exp5–exp6."
+
+[[cases]]
+id = "doeg_E"
+text = "doEg"
+target = "doug"
+t = "D OW1 G (no change)"
+
+[[cases]]
+id = "doeg_O"
+text = "dOeg"
+target = "doug"
+t = "D OW1 G (no change)"
+
+[[cases]]
+id = "kwi"
+text = "kwi"
+target = "kwee"
+t = "K W IY0"
+note = "Latin version of 퀴, heard 'kawaii' in exp5 (item 5)."
+
+# --- 3. Symbols glued to text ---
+
+[[cases]]
+id = "sym_amp"
+text = "you&me"
+target = "you and me"
+t = "you and me (already a symbol word)"
+
+[[cases]]
+id = "sym_hash"
+text = "#blessed"
+target = "hashtag blessed"
+t = "blessed (# is silent)"
+
+[[cases]]
+id = "sym_eq"
+text = "a=b"
+target = "a equals b"
+t = "a b (= is silent)"
+
+[[cases]]
+id = "sym_deg"
+text = "90°"
+target = "ninety degrees"
+t = "ninety deg (unidecode: 90deg)"
+
+[[cases]]
+id = "sym_twothirds"
+text = "⅔ done"
+target = "two thirds done"
+t = "two three done (unidecode: 2/3)"
+
+[[cases]]
+id = "sym_dollar"
+text = "$5"
+target = "five dollars"
+t = "five ($ is silent)"
+
+[[cases]]
+id = "sym_slash"
+text = "and/or"
+target = "and or"
+t = "and or (/ is silent)"
+
+[[cases]]
+id = "sym_times"
+text = "3×3"
+target = "three by three"
+t = "three x three (unidecode: 3x3)"
+
+[[cases]]
+id = "sym_half"
+text = "½ off"
+target = "half off"
+t = "one two off (unidecode: 1/2)"
+
+# --- 4. Text normalization: default vs "on" ---
+
+[[cases]]
+id = "gr8_default"
+text = "gr8 m8"
+target = "great mate"
+t = "gr eight m eight (each glued digit may drop)"
+
+[[cases]]
+id = "gr8_norm_on"
+text = "gr8 m8"
+target = "great mate"
+t = "—"
+normalization = "on"

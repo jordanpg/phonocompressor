@@ -15,6 +15,7 @@ An experiment is a list of cases (text + predictions) crossed with models and se
     t = "dis is"               # reading model T: transliterate, read as English
     n = "[tisit̚]"              # reading model N: native-language reading
     note = "..."
+    normalization = "on"       # optional: apply_text_normalization for this case (default: not sent)
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ class Case:
     n: str = ""
     note: str = ""
     target: str = ""  # plain-English phrase the message is meant to sound like (scored in reports)
+    normalization: str = ""  # apply_text_normalization to send ("" = don't send: the API default)
 
 
 def cases_from_messages(path: Path) -> list[Case]:
@@ -62,7 +64,16 @@ class Experiment:
 
     def requests(self) -> list[tuple[Case, TtsRequest]]:
         return [
-            (case, TtsRequest(text=case.text, model_id=model, voice_id=self.voice_id, seed=seed))
+            (
+                case,
+                TtsRequest(
+                    text=case.text,
+                    model_id=model,
+                    voice_id=self.voice_id,
+                    seed=seed,
+                    apply_text_normalization=case.normalization or None,
+                ),
+            )
             for case in self.cases
             for model in self.models
             for seed in self.seeds
