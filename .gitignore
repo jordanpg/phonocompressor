@@ -2,13 +2,10 @@
 /sample/
 /.cache/
 __pycache__/
-# reproduce sample/ messages
-/tools/results/exp1.md
-/data/generated/
-/tools/results/exp2.md
-/tools/results/exp3.md
-/tools/results/exp4.md
-fnox.toml
-/tools/results/exp5.md
-tools/results/exp6.md
+
 /tools/results/exp*.md
+/data/generated/
+fnox.toml
+
+# Visual Studio Code
+.vscode/*
