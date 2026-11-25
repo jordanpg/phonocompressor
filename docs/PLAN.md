@@ -904,7 +904,7 @@ text by default. The user believes their TTS setup sends
 `apply_text_normalization: "auto"` and no `language_code`, which matches the
 harness.
 
-Known limitations / next steps (in priority order after exp2; status as of v6):
+Known limitations / next steps (in priority order after exp2; status as of v6.2):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
    n-best expectation, voicing weight 3, script risk and default scripts,
@@ -924,7 +924,48 @@ Known limitations / next steps (in priority order after exp2; status as of v6):
    `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
    read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or
    learn letter-to-sound corrections from the heard phones in the clips.
-   This now looks like a bigger lever than item 1.
+   This now looks like a bigger lever than item 1. Learned corrections are
+   Flash observations, so store them in the model profile (`model.rs`), not
+   in module constants. Item 6 tests a cheaper lever first.
+6. **exp9 probe: respelling tricks and symbols on Flash v2.5** (from the
+   ElevenLabs best-practices review, 2026-11-24; not run, ask before spending
+   credits). The docs say capitals, apostrophes, dashes and quotes around a
+   letter change stress or pronunciation on models without phoneme tags
+   ("trapezIi"). We don't use that: the chunk set skips uppercase ASCII,
+   `normalize` drops apostrophes, and the reader treats a single interior
+   capital as a no-op. That rule rests on `tHe` → "the", which is
+   unstressed, so it can't show a stress shift. A capital costs the same
+   codepoint as a lowercase letter, so it would be a free knob. Cases, 2 seeds:
+   - interior capitals in item 5's pseudo-words: `kwi`/`kwI`, `doeg`/`dOeg`;
+   - an apostrophe or hyphen splitting a run-together string
+     (`ombig'chungus`, vs exp1's "Ombigchungus");
+   - 6–8 symbols beyond `@ & + %` (`$ # = ° ½ ⅔ / ×`). The docs' readings
+     are normalizer output, and Flash v2.5 doesn't normalize by default;
+   - 2 digit strings with `apply_text_normalization` at the default vs "on".
+     This needs the harness to pass the parameter, which `TtsRequest`
+     lacks.
+
+   About 20 texts × 2 seeds ≈ 40 clips, estimated 80–120 credits from
+   exp7/exp8 rates.
+7. **Supporting another model.** Each one needs:
+   - an exp0-style probe;
+   - a community-message run (exp1-style);
+   - a new `ModelProfile` with its script table, reader constants and
+     `phono fit --model <id>` weights.
+
+   Two more things come with it:
+   - Move the capital-letter rules, plurals and number grouping from
+     `reading.rs` into profile data once a second model's clips disagree
+     with them.
+   - v3 and v4 need reading model N (Phase 2). exp0 found v4 reads Hangul as
+     Korean, so that needs a Korean reader for Hangul runs: sounds change
+     across syllables (`딧잇` → [디싣], heard "did it"). Per-character
+     readings aren't enough. On v3/v4, `[brackets]` are audio tags and ALL
+     CAPS add emphasis. v4 also reads IPA between slashes, but at about one
+     codepoint per phone.
+8. **Watch for a v4 migration.** ElevenLabs "strongly recommend[s]" v4. If
+   the TTS this targets moves to v4, re-run exp0 on it first: the current
+   chunk table is wrong there.
 4. Speed is fine natively (about 2.4 s per phrase); WASM (Phase 3) may need
    a smaller beam or pruning. The data file is 12.5 MB since v3: the G2P
    tables are unpruned u64 keys + f32. Delta-coded keys, u16 log-probs, or
@@ -953,7 +994,10 @@ where `model` is an ElevenLabs model id with a profile (default `eleven_flash_v2
 
 ## Open questions
 
-- Which ElevenLabs model and voice to standardize on (Phase 0 decides).
+- ~~Which ElevenLabs model to standardize on.~~ Phase 0 picked Flash
+  v2.5, and since v6.2 other models can get their own profiles (item 7).
+  The real voice is still unmeasured: the free-tier API can't use Voice
+  Library voices, so the harness uses premade Adam.
 - Whether a space between pseudo-words is worth its codepoint
   (`ꆌ rizz` suggests yes for word boundaries).
 - How far to trust the "close enough" behaviour the samples show. The
