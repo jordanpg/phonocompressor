@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-25T21:45:00Z",
+  "updated": "2026-11-25T23:00:00Z",
   "issue": 14,
   "parent_issue": 1,
   "task_issues": {
@@ -27,13 +27,15 @@
     "completed": 4
   },
   "current_phase": 3,
-  "current_task": "3.1",
+  "current_task": "3.2",
   "commits": [
     "4710f8f: build(mise): add wasm32 target and check:wasm (wasm-binding_20261125)",
     "4c5814f: docs(conductor): point wasm32 gate at check:wasm (wasm-binding_20261125)",
     "d946a94: feat(core): switch profile and scripts in place (wasm-binding_20261125)",
     "1051f44: feat(cli): add compress --json and --scripts (wasm-binding_20261125)",
     "ff79481: build(wasm): add crates/wasm and wasm:build task (wasm-binding_20261125)",
-    "4843e70: build(mise): rename check:wasm to wasm:check (wasm-binding_20261125)"
+    "4843e70: build(mise): rename check:wasm to wasm:check (wasm-binding_20261125)",
+    "c9d9013: refactor(model): share profile lookup error (wasm-binding_20261125)",
+    "a0c36a2: feat(wasm): export Engine and typed compress() (wasm-binding_20261125)"
   ]
 }
