@@ -1,0 +1,29 @@
+{
+  "id": "wasm-binding_20261125",
+  "title": "Build the WASM binding",
+  "type": "feature",
+  "status": "pending",
+  "created": "2026-11-25T00:00:00Z",
+  "updated": "2026-11-25T00:00:00Z",
+  "issue": 14,
+  "parent_issue": 1,
+  "task_issues": {
+    "1.1": 2,
+    "2.1": 15,
+    "2.2": 16,
+    "3.1": 17,
+    "3.2": 18,
+    "4.1": 19,
+    "5.1": 20,
+    "5.2": 21,
+    "5.3": 22
+  },
+  "phases": {
+    "total": 5,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 9,
+    "completed": 0
+  }
+}
