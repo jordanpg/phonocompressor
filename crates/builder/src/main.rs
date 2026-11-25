@@ -20,7 +20,10 @@ use std::time::Instant;
 #[derive(Parser)]
 #[command(about = "Build the phonocompressor data file")]
 struct Args {
-    #[arg(long, default_value = "phoible/raw-data/FEATURES/phoible-segments-features.tsv")]
+    #[arg(
+        long,
+        default_value = "phoible/raw-data/FEATURES/phoible-segments-features.tsv"
+    )]
     phoible: PathBuf,
     #[arg(long, default_value = "cmudict/cmudict.dict")]
     cmudict: PathBuf,
@@ -51,7 +54,11 @@ fn main() -> Result<(), String> {
 
     let features = FeatureTable::parse_tsv(&read(&args.phoible)?)?;
     PhoneDistance::new(&FeatureSpace::new(features.clone()))?; // every English phone must resolve
-    println!("phoible: {} segments × {} features", features.segments.len(), features.names.len());
+    println!(
+        "phoible: {} segments × {} features",
+        features.segments.len(),
+        features.names.len()
+    );
 
     let lexicon = Lexicon::parse_cmudict(&read(&args.cmudict)?)?;
     println!("cmudict: {} words", lexicon.len());
@@ -61,12 +68,17 @@ fn main() -> Result<(), String> {
         None => translit::from_deunicode(),
     };
     if let Some(path) = &args.dump_translit {
-        std::fs::write(path, translit::to_tsv(&translit)).map_err(|e| format!("{}: {e}", path.display()))?;
+        std::fs::write(path, translit::to_tsv(&translit))
+            .map_err(|e| format!("{}: {e}", path.display()))?;
     }
     // Chunk stats for the default model; the data file itself doesn't depend on the model.
     let profile = phono_core::model::DEFAULT;
     let chunks = ChunkSet::new(&translit, profile, |s| profile.script(s).default_on);
-    let spelling = chunks.chunks.iter().filter(|c| c.kind == ChunkKind::Spelling).count();
+    let spelling = chunks
+        .chunks
+        .iter()
+        .filter(|c| c.kind == ChunkKind::Spelling)
+        .count();
     println!(
         "translit: {} codepoints → {} chunks ({} spelling, {} phonetic), trie {} nodes",
         translit.map.len(),
@@ -84,13 +96,19 @@ fn main() -> Result<(), String> {
         .map(|(w, p)| (w.as_str(), p[0].as_slice()))
         .collect();
     words.sort();
-    let (held_out, train): (Vec<_>, Vec<_>) = words.iter().enumerate().partition(|(i, _)| i % 50 == 7);
+    let (held_out, train): (Vec<_>, Vec<_>) =
+        words.iter().enumerate().partition(|(i, _)| i % 50 == 7);
     let train: Vec<(&str, &[Phone])> = train.into_iter().map(|(_, w)| *w).collect();
     let held_out: Vec<(&str, &[Phone])> = held_out.into_iter().map(|(_, w)| *w).collect();
 
     let t = Instant::now();
     let aligned = align::align(&train, args.em_iters);
-    println!("aligned {} / {} training words in {:.1}s", aligned.len(), train.len(), t.elapsed().as_secs_f32());
+    println!(
+        "aligned {} / {} training words in {:.1}s",
+        aligned.len(),
+        train.len(),
+        t.elapsed().as_secs_f32()
+    );
 
     let model = G2pModel::train(aligned.iter().map(|w| w.as_slice()), args.g2p_order)?;
     let per_order: Vec<String> = model.grams.iter().map(|g| g.len().to_string()).collect();
@@ -106,7 +124,13 @@ fn main() -> Result<(), String> {
     evaluate(&g2p, &held_out, &lexicon);
     let model = g2p.into_model();
 
-    let data = Data { version: FORMAT_VERSION, features, lexicon, g2p: model, translit };
+    let data = Data {
+        version: FORMAT_VERSION,
+        features,
+        lexicon,
+        g2p: model,
+        translit,
+    };
     let bytes = data.to_bytes()?;
     if let Some(dir) = args.out.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
@@ -126,7 +150,12 @@ fn evaluate(g2p: &G2p, held_out: &[(&str, &[Phone])], lexicon: &Lexicon) {
     let t = Instant::now();
     let (mut correct, mut errors, mut ref_len) = (0usize, 0usize, 0usize);
     for &(word, reference) in held_out {
-        let hyp = g2p.pronounce(word, 1).into_iter().next().map(|(p, _)| p).unwrap_or_default();
+        let hyp = g2p
+            .pronounce(word, 1)
+            .into_iter()
+            .next()
+            .map(|(p, _)| p)
+            .unwrap_or_default();
         if lexicon.get(word).is_some_and(|prons| prons.contains(&hyp)) {
             correct += 1;
         }
@@ -140,8 +169,21 @@ fn evaluate(g2p: &G2p, held_out: &[(&str, &[Phone])], lexicon: &Lexicon) {
         100.0 * errors as f64 / ref_len as f64,
         t.elapsed().as_secs_f32()
     );
-    for w in ["sux", "baddream", "timeloop", "huridakui", "gigamax", "kutabireru", "disis"] {
-        let p = g2p.pronounce(w, 1).into_iter().next().map(|(p, _)| p).unwrap_or_default();
+    for w in [
+        "sux",
+        "baddream",
+        "timeloop",
+        "huridakui",
+        "gigamax",
+        "kutabireru",
+        "disis",
+    ] {
+        let p = g2p
+            .pronounce(w, 1)
+            .into_iter()
+            .next()
+            .map(|(p, _)| p)
+            .unwrap_or_default();
         println!("  {w:12} {}", phono_core::phone::fmt_phones(&p));
     }
 }
@@ -151,7 +193,9 @@ fn edit_distance(a: &[Phone], b: &[Phone]) -> usize {
     for (i, x) in a.iter().enumerate() {
         let mut cur = vec![i + 1; b.len() + 1];
         for (j, y) in b.iter().enumerate() {
-            cur[j + 1] = (prev[j] + usize::from(x != y)).min(prev[j + 1] + 1).min(cur[j] + 1);
+            cur[j + 1] = (prev[j] + usize::from(x != y))
+                .min(prev[j + 1] + 1)
+                .min(cur[j] + 1);
         }
         prev = cur;
     }

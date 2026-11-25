@@ -49,7 +49,10 @@ fn similar(a: u8, b: u8) -> bool {
 }
 
 fn alnum(s: &str) -> String {
-    s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect()
+    s.chars()
+        .filter(|c| c.is_alphanumeric())
+        .flat_map(|c| c.to_lowercase())
+        .collect()
 }
 
 struct Tiler<'a> {
@@ -83,7 +86,10 @@ impl Tiler<'_> {
         }
         if seg == self.segs.len() {
             let text: String = path.iter().map(|&c| self.chunks.get(c).ch).collect();
-            let spelled: String = path.iter().map(|&c| self.chunks.get(c).latin.as_str()).collect();
+            let spelled: String = path
+                .iter()
+                .map(|&c| self.chunks.get(c).latin.as_str())
+                .collect();
             self.out.push((text, edits, spelled.trim_end().to_string()));
             return;
         }
@@ -137,16 +143,33 @@ impl Tiler<'_> {
 
     /// Chunks matching `letters[start..]`, found by walking the trie from `node` with `used`
     /// letters covered and `edits` ≤ `budget` edits so far.
-    fn walk(&self, letters: &[u8], start: usize, (node, used, edits): (u32, usize, usize), budget: usize, found: &mut Vec<Found>) {
+    fn walk(
+        &self,
+        letters: &[u8],
+        start: usize,
+        (node, used, edits): (u32, usize, usize),
+        budget: usize,
+        found: &mut Vec<Found>,
+    ) {
         let trie = &self.chunks.trie;
         if used > 0 {
             if let Some(chunk) = trie.chunk_at(node) {
-                found.push(Found { len: used, chunk, edits, spaced: false });
+                found.push(Found {
+                    len: used,
+                    chunk,
+                    edits,
+                    spaced: false,
+                });
             }
             if start + used == letters.len()
                 && let Some(chunk) = trie.step(node, BOUNDARY).and_then(|n| trie.chunk_at(n))
             {
-                found.push(Found { len: used, chunk, edits, spaced: true });
+                found.push(Found {
+                    len: used,
+                    chunk,
+                    edits,
+                    spaced: true,
+                });
             }
         }
         let rest = &letters[start + used..];
@@ -162,7 +185,13 @@ impl Tiler<'_> {
             }
             if let Some(next) = trie.step(node, b'x') {
                 for cluster in X_CLUSTERS.iter().filter(|c| rest.starts_with(c)) {
-                    self.walk(letters, start, (next, used + cluster.len(), edits + 1), budget, found);
+                    self.walk(
+                        letters,
+                        start,
+                        (next, used + cluster.len(), edits + 1),
+                        budget,
+                        found,
+                    );
                 }
             }
         }
@@ -174,7 +203,11 @@ impl Tiler<'_> {
         if seg < self.segs.len()
             && seg > 0
             && path.len() < self.max_cp
-            && let Some(space) = self.chunks.trie.step(0, BOUNDARY).and_then(|n| self.chunks.trie.chunk_at(n))
+            && let Some(space) = self
+                .chunks
+                .trie
+                .step(0, BOUNDARY)
+                .and_then(|n| self.chunks.trie.chunk_at(n))
         {
             path.push(space);
             self.go(seg, 0, path, edits);
@@ -208,9 +241,17 @@ pub fn tile(
     }
     let mut segs = Vec::new();
     for token in phrase.split_whitespace() {
-        let letters: Vec<u8> = token.bytes().filter(u8::is_ascii_alphabetic).map(|b| b.to_ascii_lowercase()).collect();
+        let letters: Vec<u8> = token
+            .bytes()
+            .filter(u8::is_ascii_alphabetic)
+            .map(|b| b.to_ascii_lowercase())
+            .collect();
         if !letters.is_empty() {
-            let whole = std::str::from_utf8(&letters).ok().and_then(|w| symbols.get(w)).cloned().unwrap_or_default();
+            let whole = std::str::from_utf8(&letters)
+                .ok()
+                .and_then(|w| symbols.get(w))
+                .cloned()
+                .unwrap_or_default();
             segs.push(Seg::Letters(letters, whole));
         } else if alnum(token).is_empty() {
             // Punctuation (`-`, `!`): nothing to say. (v4 matched it with every symbol chunk,
@@ -224,25 +265,45 @@ pub fn tile(
     if segs.is_empty() {
         return Vec::new();
     }
-    let max_letters = chunks.chunks.iter().map(|c| c.latin.trim().len()).max().unwrap_or(1);
+    let max_letters = chunks
+        .chunks
+        .iter()
+        .map(|c| c.latin.trim().len())
+        .max()
+        .unwrap_or(1);
     // Enumerate a wide pool, then keep the best `limit`. Depth-first order alone would fill the
     // cap with variants of whatever prefix it tries first (`푼Ճ…` before `푼ch…`).
     let pool = limit.saturating_mul(POOL_FACTOR);
-    let mut t = Tiler { chunks, segs, max_cp, max_edits, limit: pool, out: Vec::new(), max_letters };
+    let mut t = Tiler {
+        chunks,
+        segs,
+        max_cp,
+        max_edits,
+        limit: pool,
+        out: Vec::new(),
+        max_letters,
+    };
     // Exact tilings first, then one edit, then two: if the pool fills, it holds the closest.
     for budget in 0..=max_edits {
         t.max_edits = budget;
         t.go(0, 0, &mut Vec::new(), 0);
     }
     // Fewest edits, then the most reliable scripts, then the fewest codepoints.
-    let risk = |s: &str| s.chars().map(|c| (profile.script(Script::of(c)).risk * 1000.0).round() as u32).sum::<u32>();
+    let risk = |s: &str| {
+        s.chars()
+            .map(|c| (profile.script(Script::of(c)).risk * 1000.0).round() as u32)
+            .sum::<u32>()
+    };
     let mut all: Vec<(String, usize, String)> = t.out;
     all.sort_by_cached_key(|(s, e, _)| (*e, risk(s), s.chars().count(), s.clone()));
     // Tilings that spell the same letters read alike: keep the best of each, so the rerank
     // budget goes to distinct spellings rather than re-chunkings of one.
     let mut seen = std::collections::HashSet::new();
-    let mut out: Vec<(String, usize)> =
-        all.into_iter().filter(|(_, _, spelled)| seen.insert(spelled.clone())).map(|(s, e, _)| (s, e)).collect();
+    let mut out: Vec<(String, usize)> = all
+        .into_iter()
+        .filter(|(_, _, spelled)| seen.insert(spelled.clone()))
+        .map(|(s, e, _)| (s, e))
+        .collect();
     out.truncate(limit);
     out
 }
@@ -250,8 +311,8 @@ pub fn tile(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::FLASH_V2_5;
     use crate::chunks::Translit;
+    use crate::model::FLASH_V2_5;
 
     fn set() -> ChunkSet {
         let pairs = [
@@ -272,7 +333,9 @@ mod tests {
             ('ꍱ', "chux"),
             ('@', "@"),
         ];
-        let t = Translit { map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect() };
+        let t = Translit {
+            map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect(),
+        };
         ChunkSet::new(&t, &FLASH_V2_5, |s| FLASH_V2_5.script(s).default_on)
     }
 
@@ -282,7 +345,12 @@ mod tests {
         assert!(!out.is_empty());
         assert_eq!(out[0].1, 0, "an exact tiling exists");
         let texts: Vec<&str> = out.iter().map(|(t, _)| t.as_str()).collect();
-        assert!(texts.contains(&"바ddream") || texts.contains(&"바d dream") || texts.iter().any(|t| t.starts_with('바')), "{texts:?}");
+        assert!(
+            texts.contains(&"바ddream")
+                || texts.contains(&"바d dream")
+                || texts.iter().any(|t| t.starts_with('바')),
+            "{texts:?}"
+        );
         assert!(out.iter().all(|(t, _)| t.chars().count() <= 6));
     }
 
@@ -297,7 +365,10 @@ mod tests {
     #[test]
     fn punctuation_is_skipped() {
         let out = tile(&set(), &FLASH_V2_5, "bad - bad", 6, 0, 100);
-        assert!(!out.is_empty() && out.iter().all(|(t, _)| !t.contains('@')), "{out:?}");
+        assert!(
+            !out.is_empty() && out.iter().all(|(t, _)| !t.contains('@')),
+            "{out:?}"
+        );
     }
 
     #[test]

@@ -44,7 +44,11 @@ pub struct Predict {
 impl Predict {
     /// v1–v5's values, for comparison (`phono calibrate --hand`). Each model's fitted values
     /// are in its profile ([`model::ModelProfile::predict`]).
-    pub const HAND: Predict = Predict { nbest: true, risk_scale: 1.0, spelling: 0.4 };
+    pub const HAND: Predict = Predict {
+        nbest: true,
+        risk_scale: 1.0,
+        spelling: 0.4,
+    };
 }
 
 /// A phrase to compress: its words (real or not) and their phones, flattened for alignment.
@@ -96,7 +100,11 @@ impl Engine {
     }
 
     pub fn reader(&self) -> Reader<'_> {
-        Reader { lexicon: &self.lexicon, g2p: &self.g2p, params: self.profile.reader }
+        Reader {
+            lexicon: &self.lexicon,
+            g2p: &self.g2p,
+            params: self.profile.reader,
+        }
     }
 
     pub fn scorer(&self) -> Scorer<'_> {
@@ -105,7 +113,11 @@ impl Engine {
 
     /// Target pronunciation of an English phrase, one phone list per word.
     pub fn target(&self, phrase: &str) -> Vec<Vec<Phone>> {
-        self.reader().read(phrase).into_iter().map(|w| w.phones).collect()
+        self.reader()
+            .read(phrase)
+            .into_iter()
+            .map(|w| w.phones)
+            .collect()
     }
 
     /// The phrase's words, each marked real (dictionary, number, symbol) or not (usernames,
@@ -120,11 +132,21 @@ impl Engine {
             let read = reader.read(&token);
             let has_letters = token.chars().any(|c| c.is_alphabetic());
             let single_dictionary = read.len() == 1 && read[0].source == Source::Dictionary;
-            if single_dictionary || (!has_letters && read.iter().all(|w| w.source == Source::Dictionary)) {
-                out.extend(read.into_iter().map(|w| words::TargetWord { text: w.text, phones: w.phones, lexical: true }));
+            if single_dictionary
+                || (!has_letters && read.iter().all(|w| w.source == Source::Dictionary))
+            {
+                out.extend(read.into_iter().map(|w| words::TargetWord {
+                    text: w.text,
+                    phones: w.phones,
+                    lexical: true,
+                }));
             } else if !read.is_empty() {
                 let phones = read.into_iter().flat_map(|w| w.phones).collect();
-                out.push(words::TargetWord { text: token.to_lowercase(), phones, lexical: false });
+                out.push(words::TargetWord {
+                    text: token.to_lowercase(),
+                    phones,
+                    lexical: false,
+                });
             }
         }
         out
@@ -175,14 +197,23 @@ impl Engine {
     }
 
     /// The sound part of [`Engine::predict`]: expected phone fidelity minus script risk.
-    fn predict_sound(&self, text: &str, words: &[Word], target: &[TargetPhone], opts: &Predict) -> f32 {
+    fn predict_sound(
+        &self,
+        text: &str,
+        words: &[Word],
+        target: &[TargetPhone],
+        opts: &Predict,
+    ) -> f32 {
         let scorer = self.scorer();
         let max = scorer.max_cost(target);
         if max <= 0.0 {
             return 0.0;
         }
         let fidelity = |phones: &[Phone]| (1.0 - scorer.cost(target, phones) / max).max(0.0);
-        let base: Vec<Phone> = words.iter().flat_map(|w| w.phones.iter().copied()).collect();
+        let base: Vec<Phone> = words
+            .iter()
+            .flat_map(|w| w.phones.iter().copied())
+            .collect();
         let f0 = fidelity(&base);
         let mut expected = f0;
         if opts.nbest {

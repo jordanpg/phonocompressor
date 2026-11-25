@@ -105,7 +105,10 @@ pub struct Heard {
 
 impl Default for Heard {
     fn default() -> Self {
-        Heard { vowel_scale: 2.0, rhotic: 0.0 }
+        Heard {
+            vowel_scale: 2.0,
+            rhotic: 0.0,
+        }
     }
 }
 
@@ -117,7 +120,10 @@ pub struct Scorer<'a> {
 impl<'a> Scorer<'a> {
     /// A scorer with the hand-set weights ([`Weights::HAND`]).
     pub fn new(dist: &'a PhoneDistance) -> Self {
-        Scorer { dist, w: Weights::HAND }
+        Scorer {
+            dist,
+            w: Weights::HAND,
+        }
     }
 
     pub fn with_weights(dist: &'a PhoneDistance, w: Weights) -> Self {
@@ -146,7 +152,11 @@ impl<'a> Scorer<'a> {
     }
 
     pub fn sub_cost(&self, t: Phone, c: Phone) -> f32 {
-        let scale = if t.is_vowel() && c.is_vowel() { self.w.vowel_sub_scale } else { self.w.sub_scale };
+        let scale = if t.is_vowel() && c.is_vowel() {
+            self.w.vowel_sub_scale
+        } else {
+            self.w.sub_scale
+        };
         let mut cost = self.dist.get(t, c) * scale;
         if t.is_vowel() != c.is_vowel() {
             cost += self.w.class_mismatch;
@@ -167,18 +177,35 @@ impl<'a> Scorer<'a> {
     /// schwas often `ɚ`), so vowel-for-vowel differences are scaled by `heard.vowel_scale` and
     /// rhoticity by `heard.rhotic`. Recognized phones carry no stress: vowels are inserted at
     /// the mean of the stressed/unstressed costs and no stress mismatch is charged.
-    pub fn fidelity_segments(&self, space: &FeatureSpace, target: &[TargetPhone], cand: &[usize], heard: &Heard) -> f32 {
+    pub fn fidelity_segments(
+        &self,
+        space: &FeatureSpace,
+        target: &[TargetPhone],
+        cand: &[usize],
+        heard: &Heard,
+    ) -> f32 {
         let ins = |c: usize| {
-            if space.is_vowel(c) { (self.w.ins_stressed + self.w.ins_unstressed) / 2.0 } else { self.w.ins_consonant }
+            if space.is_vowel(c) {
+                (self.w.ins_stressed + self.w.ins_unstressed) / 2.0
+            } else {
+                self.w.ins_consonant
+            }
         };
         let sub = |t: Phone, c: usize| {
             let ts = self.dist.segment(t);
             let (tv, cv) = (t.is_vowel(), space.is_vowel(c));
-            let scale = if tv && cv { heard.vowel_scale } else { self.w.sub_scale };
-            space.segment_distance_with(ts, c, heard.rhotic) * scale + if tv != cv { self.w.class_mismatch } else { 0.0 }
+            let scale = if tv && cv {
+                heard.vowel_scale
+            } else {
+                self.w.sub_scale
+            };
+            space.segment_distance_with(ts, c, heard.rhotic) * scale
+                + if tv != cv { self.w.class_mismatch } else { 0.0 }
         };
         let m = cand.len();
-        let mut prev: Vec<f32> = (0..=m).map(|j| cand[..j].iter().map(|&c| ins(c)).sum()).collect();
+        let mut prev: Vec<f32> = (0..=m)
+            .map(|j| cand[..j].iter().map(|&c| ins(c)).sum())
+            .collect();
         let mut cur = vec![0.0; m + 1];
         for t in target {
             cur[0] = prev[0] + self.del_cost(t);
@@ -190,13 +217,19 @@ impl<'a> Scorer<'a> {
             std::mem::swap(&mut prev, &mut cur);
         }
         let max = self.max_cost(target);
-        if max > 0.0 { (1.0 - prev[m] / max).max(0.0) } else { 0.0 }
+        if max > 0.0 {
+            (1.0 - prev[m] / max).max(0.0)
+        } else {
+            0.0
+        }
     }
 
     /// Alignment cost only (no traceback), for the search's inner loop.
     pub fn cost(&self, target: &[TargetPhone], cand: &[Phone]) -> f32 {
         let m = cand.len();
-        let mut prev: Vec<f32> = (0..=m).map(|j| cand[..j].iter().map(|&c| self.ins_cost(c)).sum()).collect();
+        let mut prev: Vec<f32> = (0..=m)
+            .map(|j| cand[..j].iter().map(|&c| self.ins_cost(c)).sum())
+            .collect();
         let mut cur = vec![0.0; m + 1];
         for t in target {
             cur[0] = prev[0] + self.del_cost(t);
@@ -237,8 +270,14 @@ impl<'a> Scorer<'a> {
                     continue;
                 }
             }
-            if i > 0 && (j == 0 || (d[i][j] - (d[i - 1][j] + self.del_cost(&target[i - 1]))).abs() < 1e-5) {
-                ops.push(Op::Delete(target[i - 1].phone, self.del_cost(&target[i - 1])));
+            if i > 0
+                && (j == 0
+                    || (d[i][j] - (d[i - 1][j] + self.del_cost(&target[i - 1]))).abs() < 1e-5)
+            {
+                ops.push(Op::Delete(
+                    target[i - 1].phone,
+                    self.del_cost(&target[i - 1]),
+                ));
                 i -= 1;
             } else {
                 ops.push(Op::Insert(cand[j - 1], self.ins_cost(cand[j - 1])));
@@ -248,8 +287,17 @@ impl<'a> Scorer<'a> {
         ops.reverse();
         let cost = d[n][m];
         let max_cost = self.max_cost(target);
-        let fidelity = if max_cost > 0.0 { (1.0 - cost / max_cost).max(0.0) } else { 0.0 };
-        Alignment { cost, max_cost, fidelity, ops }
+        let fidelity = if max_cost > 0.0 {
+            (1.0 - cost / max_cost).max(0.0)
+        } else {
+            0.0
+        };
+        Alignment {
+            cost,
+            max_cost,
+            fidelity,
+            ops,
+        }
     }
 }
 
@@ -273,14 +321,28 @@ mod tests {
     fn english_phone_distances_are_sensible() {
         let d = dist();
         let p = |s| Phone::parse(s).unwrap();
-        assert!(d.get(p("P"), p("B")) < d.get(p("P"), p("K")), "voicing < place");
+        assert!(
+            d.get(p("P"), p("B")) < d.get(p("P"), p("K")),
+            "voicing < place"
+        );
         assert!(d.get(p("TH"), p("F")) < d.get(p("TH"), p("M")));
         assert!(d.get(p("IY1"), p("IH1")) < d.get(p("IY1"), p("AA1")));
         assert!(d.get(p("K"), p("AA1")) > 0.4, "consonant vs vowel is far");
-        assert!(d.get(p("W"), p("UW1")) < d.get(p("W"), p("V")), "glide is near its vowel");
+        assert!(
+            d.get(p("W"), p("UW1")) < d.get(p("W"), p("V")),
+            "glide is near its vowel"
+        );
         let s = Scorer::new(&d);
-        let k = TargetPhone { phone: p("K"), word_start: false, word_end: false, in_cluster: false };
-        assert!(s.sub_cost(p("K"), p("AA1")) > s.del_cost(&k), "vowel-for-consonant beats deleting");
+        let k = TargetPhone {
+            phone: p("K"),
+            word_start: false,
+            word_end: false,
+            in_cluster: false,
+        };
+        assert!(
+            s.sub_cost(p("K"), p("AA1")) > s.del_cost(&k),
+            "vowel-for-consonant beats deleting"
+        );
     }
 
     #[test]
@@ -292,7 +354,12 @@ mod tests {
         let close = s.align(&t, &parse_pron("B AE1 D R IY1 M").unwrap()); // one D lost in a cluster
         let worse = s.align(&t, &parse_pron("B AH0 D R AH0 M").unwrap()); // stressed vowels reduced
         assert!((exact.fidelity - 1.0).abs() < 1e-6);
-        assert!(close.fidelity > worse.fidelity, "{} vs {}", close.fidelity, worse.fidelity);
+        assert!(
+            close.fidelity > worse.fidelity,
+            "{} vs {}",
+            close.fidelity,
+            worse.fidelity
+        );
         assert!((s.cost(&t, &parse_pron("B AE1 D R IY1 M").unwrap()) - close.cost).abs() < 1e-5);
     }
 
@@ -318,12 +385,32 @@ mod probe {
         use crate::features::*;
         use crate::phone::Phone;
         let tsv = include_str!("../../../phoible/raw-data/FEATURES/phoible-segments-features.tsv");
-        let d = PhoneDistance::new(&FeatureSpace::new(FeatureTable::parse_tsv(tsv).unwrap())).unwrap();
+        let d =
+            PhoneDistance::new(&FeatureSpace::new(FeatureTable::parse_tsv(tsv).unwrap())).unwrap();
         let p = |s| Phone::parse(s).unwrap();
         for (a, b) in [
-            ("P", "B"), ("P", "K"), ("P", "T"), ("TH", "F"), ("TH", "S"), ("TH", "M"), ("DH", "D"), ("DH", "Z"),
-            ("IY1", "IH1"), ("IY1", "AA1"), ("K", "AA1"), ("S", "AA1"), ("S", "Z"), ("AE1", "EH1"), ("R", "L"),
-            ("W", "V"), ("W", "UW1"), ("Y", "IY1"), ("AY1", "EH1"), ("UW1", "OW1"), ("ER1", "AH1"), ("AE1", "AA1"),
+            ("P", "B"),
+            ("P", "K"),
+            ("P", "T"),
+            ("TH", "F"),
+            ("TH", "S"),
+            ("TH", "M"),
+            ("DH", "D"),
+            ("DH", "Z"),
+            ("IY1", "IH1"),
+            ("IY1", "AA1"),
+            ("K", "AA1"),
+            ("S", "AA1"),
+            ("S", "Z"),
+            ("AE1", "EH1"),
+            ("R", "L"),
+            ("W", "V"),
+            ("W", "UW1"),
+            ("Y", "IY1"),
+            ("AY1", "EH1"),
+            ("UW1", "OW1"),
+            ("ER1", "AH1"),
+            ("AE1", "AA1"),
         ] {
             println!("{a:>4} {b:>4} {:.3}", d.get(p(a), p(b)));
         }

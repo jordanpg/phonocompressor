@@ -125,21 +125,34 @@ enum Command {
 }
 
 fn words_str(words: &[Word]) -> String {
-    words.iter().map(|w| format!("{}[{}]", w.text, fmt_phones(&w.phones))).collect::<Vec<_>>().join(" ")
+    words
+        .iter()
+        .map(|w| format!("{}[{}]", w.text, fmt_phones(&w.phones)))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn main() -> Result<(), String> {
     let cli = Cli::parse();
     let t = Instant::now();
-    let bytes = std::fs::read(&cli.data).map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
+    let bytes = std::fs::read(&cli.data)
+        .map_err(|e| format!("{}: {e} (run `mise run data`)", cli.data.display()))?;
     let profile = phono_core::model::for_model(&cli.model).ok_or_else(|| {
-        format!("no calibrated profile for model {:?} (have: {})", cli.model, phono_core::model::known_model_ids().join(", "))
+        format!(
+            "no calibrated profile for model {:?} (have: {})",
+            cli.model,
+            phono_core::model::known_model_ids().join(", ")
+        )
     })?;
     let mut engine = Engine::from_bytes(&bytes, profile)?;
     if cli.all_scripts {
         engine.allow_all_scripts();
     }
-    eprintln!("loaded {} in {:.2}s", cli.data.display(), t.elapsed().as_secs_f32());
+    eprintln!(
+        "loaded {} in {:.2}s",
+        cli.data.display(),
+        t.elapsed().as_secs_f32()
+    );
 
     match cli.command {
         Command::Phones { phrase } => {
@@ -164,10 +177,24 @@ fn main() -> Result<(), String> {
             let a = engine.score(&text, &phrase);
             println!("latin:    {latin:?}");
             println!("reads:    {}", words_str(&words));
-            println!("target:   {}", engine.target(&phrase).iter().map(|w| fmt_phones(w)).collect::<Vec<_>>().join(" | "));
-            println!("fidelity: {:.3} (cost {:.2} / {:.2})", a.fidelity, a.cost, a.max_cost);
-            let predicted = engine.predict(&text, &engine.target_of(&phrase), &engine.profile.predict);
-            println!("predict:  {predicted:.3} (n-best expectation, script risk, spelling: what the search ranks by)");
+            println!(
+                "target:   {}",
+                engine
+                    .target(&phrase)
+                    .iter()
+                    .map(|w| fmt_phones(w))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            );
+            println!(
+                "fidelity: {:.3} (cost {:.2} / {:.2})",
+                a.fidelity, a.cost, a.max_cost
+            );
+            let predicted =
+                engine.predict(&text, &engine.target_of(&phrase), &engine.profile.predict);
+            println!(
+                "predict:  {predicted:.3} (n-best expectation, script risk, spelling: what the search ranks by)"
+            );
             let ops: Vec<String> = a
                 .ops
                 .iter()
@@ -180,9 +207,24 @@ fn main() -> Result<(), String> {
                 .collect();
             println!("align:    {}", ops.join(" "));
         }
-        Command::Compress { phrase, top, max, beam, per_state, per_root, want } => {
+        Command::Compress {
+            phrase,
+            top,
+            max,
+            beam,
+            per_state,
+            per_root,
+            want,
+        } => {
             let searcher = Searcher::new(&engine);
-            let cfg = SearchConfig { max_codepoints: max, top_n: top, beam, per_state, per_root, ..Default::default() };
+            let cfg = SearchConfig {
+                max_codepoints: max,
+                top_n: top,
+                beam,
+                per_state,
+                per_root,
+                ..Default::default()
+            };
             let t = Instant::now();
             let results = searcher.search(&phrase, &cfg);
             eprintln!("searched in {:.2}s", t.elapsed().as_secs_f32());
@@ -190,11 +232,25 @@ fn main() -> Result<(), String> {
                 let (rank, total) = searcher.generation_rank(&phrase, &w, &cfg);
                 let a = engine.score(&w, &phrase);
                 match rank {
-                    Some(r) => println!("want {w}: generated at rank {r} of {total} (re-rank budget {}), fidelity {:.3}", cfg.rerank, a.fidelity),
-                    None => println!("want {w}: not generated ({total} candidates), fidelity {:.3}", a.fidelity),
+                    Some(r) => println!(
+                        "want {w}: generated at rank {r} of {total} (re-rank budget {}), fidelity {:.3}",
+                        cfg.rerank, a.fidelity
+                    ),
+                    None => println!(
+                        "want {w}: not generated ({total} candidates), fidelity {:.3}",
+                        a.fidelity
+                    ),
                 }
             }
-            println!("target: {}", engine.target(&phrase).iter().map(|w| fmt_phones(w)).collect::<Vec<_>>().join(" | "));
+            println!(
+                "target: {}",
+                engine
+                    .target(&phrase)
+                    .iter()
+                    .map(|w| fmt_phones(w))
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            );
             for (i, c) in results.iter().enumerate() {
                 println!(
                     "{:2}. {:.3}  {}cp  {:<8}  {:<28} {}",
@@ -207,8 +263,22 @@ fn main() -> Result<(), String> {
                 );
             }
         }
-        Command::Calibrate { clips, worst, heard_vowel_scale, heard_rhotic, no_nbest, risk_scale, spelling, voicing, dump, hand } => {
-            let heard = phono_core::score::Heard { vowel_scale: heard_vowel_scale, rhotic: heard_rhotic };
+        Command::Calibrate {
+            clips,
+            worst,
+            heard_vowel_scale,
+            heard_rhotic,
+            no_nbest,
+            risk_scale,
+            spelling,
+            voicing,
+            dump,
+            hand,
+        } => {
+            let heard = phono_core::score::Heard {
+                vowel_scale: heard_vowel_scale,
+                rhotic: heard_rhotic,
+            };
             let defaults = engine.profile.predict;
             let mut predict = phono_core::Predict {
                 nbest: !no_nbest,
@@ -218,17 +288,38 @@ fn main() -> Result<(), String> {
             let mut engine = engine;
             if hand {
                 engine.weights = phono_core::score::Weights::HAND;
-                predict = phono_core::Predict { nbest: !no_nbest, ..phono_core::Predict::HAND };
+                predict = phono_core::Predict {
+                    nbest: !no_nbest,
+                    ..phono_core::Predict::HAND
+                };
             }
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
             calibrate(&engine, &clips, worst, &heard, &predict, dump.as_ref())?
         }
-        Command::Fit { clips, folds, repeats, truth, fix, lambdas } => {
+        Command::Fit {
+            clips,
+            folds,
+            repeats,
+            truth,
+            fix,
+            lambdas,
+        } => {
             let mut engine = engine;
-            let opts = fit::FitOpts { folds, repeats, lambdas, truth, fix };
-            fit::run(&mut engine, &clips, &phono_core::score::Heard::default(), &opts)?
+            let opts = fit::FitOpts {
+                folds,
+                repeats,
+                lambdas,
+                truth,
+                fix,
+            };
+            fit::run(
+                &mut engine,
+                &clips,
+                &phono_core::score::Heard::default(),
+                &opts,
+            )?
         }
         Command::Eval { messages, export } => eval(&engine, &messages, export.as_ref())?,
     }
@@ -243,7 +334,9 @@ fn load_messages(path: &PathBuf) -> Result<Vec<(String, String, String)>, String
     let mut rest = text.as_str();
     while let Some(pos) = rest.find("\"unicode\"") {
         let before = &rest[..pos];
-        let id = before.rfind("\": {").and_then(|e| before[..e].rfind('"').map(|s| before[s + 1..e].to_string()));
+        let id = before
+            .rfind("\": {")
+            .and_then(|e| before[..e].rfind('"').map(|s| before[s + 1..e].to_string()));
         rest = &rest[pos..];
         let unicode = json_string_field(rest, "unicode").ok_or("bad unicode field")?;
         let spoken = json_string_field(rest, "spoken").ok_or("bad spoken field")?;
@@ -279,21 +372,33 @@ fn json_string_field(s: &str, name: &str) -> Option<String> {
 fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(), String> {
     let messages = load_messages(path)?;
     let searcher = Searcher::new(engine);
-    let cfg = SearchConfig { top_n: 1, ..Default::default() };
+    let cfg = SearchConfig {
+        top_n: 1,
+        ..Default::default()
+    };
     let (mut theirs, mut ours, mut wins) = (0.0, 0.0, 0);
     let mut exported = Vec::new();
-    println!("{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}", "id", "phrase", "theirs", "", "ours", "");
+    println!(
+        "{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}",
+        "id", "phrase", "theirs", "", "ours", ""
+    );
     for (id, unicode, spoken) in &messages {
         let target = engine.target_of(spoken);
         let their = engine.predict(unicode, &target, &engine.profile.predict);
         let best = searcher.search(spoken, &cfg);
-        let (our_text, our) = best.first().map(|c| (c.text.clone(), c.fidelity)).unwrap_or_default();
+        let (our_text, our) = best
+            .first()
+            .map(|c| (c.text.clone(), c.fidelity))
+            .unwrap_or_default();
         theirs += their;
         ours += our;
         if our >= their {
             wins += 1;
         }
-        println!("{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}", truncate(spoken, 28));
+        println!(
+            "{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
+            truncate(spoken, 28)
+        );
         exported.push(format!(
             "  {{\"{id}\": {{\"unicode\": {}, \"spoken\": {}, \"notes\": \"phono top-1, predicted {our:.3} (community {their:.3})\"}}}}",
             json_quote(&our_text),
@@ -301,7 +406,8 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         ));
     }
     if let Some(out) = export {
-        std::fs::write(out, format!("[\n{}\n]\n", exported.join(",\n"))).map_err(|e| format!("{}: {e}", out.display()))?;
+        std::fs::write(out, format!("[\n{}\n]\n", exported.join(",\n")))
+            .map_err(|e| format!("{}: {e}", out.display()))?;
         eprintln!("wrote {}", out.display());
     }
     let n = messages.len() as f32;
@@ -329,7 +435,11 @@ fn json_quote(s: &str) -> String {
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.chars().count() <= n { s.to_string() } else { s.chars().take(n - 1).collect::<String>() + "…" }
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        s.chars().take(n - 1).collect::<String>() + "…"
+    }
 }
 
 struct Clip {
@@ -342,8 +452,12 @@ struct Clip {
 }
 
 /// Harness clips recorded with one of `profile`'s models; clips from other models are skipped.
-fn load_clips(path: &PathBuf, profile: &phono_core::model::ModelProfile) -> Result<Vec<Clip>, String> {
-    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e} (run `mise run harness:export`)", path.display()))?;
+fn load_clips(
+    path: &PathBuf,
+    profile: &phono_core::model::ModelProfile,
+) -> Result<Vec<Clip>, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|e| format!("{}: {e} (run `mise run harness:export`)", path.display()))?;
     let mut out = Vec::new();
     let mut other = 0;
     for line in text.lines().skip(1) {
@@ -365,10 +479,17 @@ fn load_clips(path: &PathBuf, profile: &phono_core::model::ModelProfile) -> Resu
         });
     }
     if other > 0 {
-        eprintln!("skipped {other} clips from models other than {}", profile.model_ids.join("/"));
+        eprintln!(
+            "skipped {other} clips from models other than {}",
+            profile.model_ids.join("/")
+        );
     }
     if out.is_empty() {
-        return Err(format!("{}: no clips from {}", path.display(), profile.model_ids.join("/")));
+        return Err(format!(
+            "{}: no clips from {}",
+            path.display(),
+            profile.model_ids.join("/")
+        ));
     }
     Ok(out)
 }
@@ -394,7 +515,12 @@ fn ranks(v: &[f32]) -> Vec<f32> {
 
 /// Letter-level similarity (1 − normalized edit distance), ignoring case, spaces, punctuation.
 fn text_sim(a: &str, b: &str) -> f32 {
-    let norm = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect::<Vec<char>>();
+    let norm = |s: &str| {
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(|c| c.to_lowercase())
+            .collect::<Vec<char>>()
+    };
     let (a, b) = (norm(a), norm(b));
     if a.is_empty() && b.is_empty() {
         return 1.0;
@@ -403,7 +529,9 @@ fn text_sim(a: &str, b: &str) -> f32 {
     for (i, x) in a.iter().enumerate() {
         let mut cur = vec![i + 1; b.len() + 1];
         for (j, y) in b.iter().enumerate() {
-            cur[j + 1] = (prev[j] + usize::from(x != y)).min(prev[j + 1] + 1).min(cur[j] + 1);
+            cur[j + 1] = (prev[j] + usize::from(x != y))
+                .min(prev[j + 1] + 1)
+                .min(cur[j] + 1);
         }
         prev = cur;
     }
@@ -413,10 +541,22 @@ fn text_sim(a: &str, b: &str) -> f32 {
 /// What the TTS actually produced for a clip: (phone-level fidelity of the recognized phones,
 /// Whisper text similarity). Truth keeps its original definition (phones of the reader's words,
 /// hand-set weights in `scorer`) across versions. `phono calibrate` and `phono fit` use their mean.
-fn clip_truth(engine: &Engine, scorer: &phono_core::score::Scorer, c: &Clip, heard: &phono_core::score::Heard) -> (f32, f32) {
+fn clip_truth(
+    engine: &Engine,
+    scorer: &phono_core::score::Scorer,
+    c: &Clip,
+    heard: &phono_core::score::Heard,
+) -> (f32, f32) {
     let target = phono_core::score::flatten_target(&engine.target(&c.target));
-    let heard_phones: Vec<usize> = c.phones.split_whitespace().flat_map(|t| engine.features.parse_ipa_token(t)).collect();
-    (scorer.fidelity_segments(&engine.features, &target, &heard_phones, heard), text_sim(&c.whisper, &c.target))
+    let heard_phones: Vec<usize> = c
+        .phones
+        .split_whitespace()
+        .flat_map(|t| engine.features.parse_ipa_token(t))
+        .collect();
+    (
+        scorer.fidelity_segments(&engine.features, &target, &heard_phones, heard),
+        text_sim(&c.whisper, &c.target),
+    )
 }
 
 /// Truth difference below which two answers count as a tie.
@@ -428,12 +568,17 @@ const RANK_MARGIN: f32 = 0.05;
 fn within_phrase_ranking(rows: &[(&Clip, f32)], truth: &[f32]) -> (usize, usize) {
     let mut by_text: std::collections::BTreeMap<(&str, &str), (f32, f32, f32)> = Default::default();
     for ((clip, pred), &t) in rows.iter().zip(truth) {
-        let e = by_text.entry((clip.target.as_str(), clip.text.as_str())).or_default();
+        let e = by_text
+            .entry((clip.target.as_str(), clip.text.as_str()))
+            .or_default();
         e.0 += pred;
         e.1 += t;
         e.2 += 1.0;
     }
-    let answers: Vec<(&str, f32, f32)> = by_text.iter().map(|(&(target, _), &(p, t, n))| (target, p / n, t / n)).collect();
+    let answers: Vec<(&str, f32, f32)> = by_text
+        .iter()
+        .map(|(&(target, _), &(p, t, n))| (target, p / n, t / n))
+        .collect();
     let (mut right, mut pairs) = (0, 0);
     for (i, a) in answers.iter().enumerate() {
         for b in &answers[i + 1..] {
@@ -456,7 +601,8 @@ fn calibrate(
 ) -> Result<(), String> {
     let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
-    let scorer = phono_core::score::Scorer::with_weights(&engine.dist, phono_core::score::Weights::HAND);
+    let scorer =
+        phono_core::score::Scorer::with_weights(&engine.dist, phono_core::score::Weights::HAND);
     struct Row<'a> {
         clip: &'a Clip,
         predicted: f32,
@@ -466,14 +612,21 @@ fn calibrate(
     let mut rows = Vec::new();
     for c in &clips {
         let (actual, whisper) = clip_truth(engine, &scorer, c, heard);
-        rows.push(Row { clip: c, predicted: engine.predict(&c.text, &engine.target_of(&c.target), predict), actual, whisper });
+        rows.push(Row {
+            clip: c,
+            predicted: engine.predict(&c.text, &engine.target_of(&c.target), predict),
+            actual,
+            whisper,
+        });
     }
     let col = |f: fn(&Row) -> f32| rows.iter().map(f).collect::<Vec<f32>>();
     let (pred, act, wh) = (col(|r| r.predicted), col(|r| r.actual), col(|r| r.whisper));
     // Ground truth: mean of the phone-level and Whisper-text measures (independent errors).
     let truth: Vec<f32> = act.iter().zip(&wh).map(|(a, w)| (a + w) / 2.0).collect();
     if let Some(path) = dump {
-        let mut out = String::from("exp\tcase\ttext\ttarget\tpredicted\tactual\twhisper\trisk\twords\tspell\tshare\n");
+        let mut out = String::from(
+            "exp\tcase\ttext\ttarget\tpredicted\tactual\twhisper\trisk\twords\tspell\tshare\n",
+        );
         for r in &rows {
             let target = engine.target_words(&r.clip.target);
             let (_, read) = engine.read(&r.clip.text);
@@ -495,7 +648,17 @@ fn calibrate(
             let (spell, share) = phono_core::words::spelling(&target, &read).unwrap_or((0.0, 0.0));
             out += &format!(
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                r.clip.exp, r.clip.case, r.clip.text, r.clip.target, r.predicted, r.actual, r.whisper, risk, words.join(" "), spell, share
+                r.clip.exp,
+                r.clip.case,
+                r.clip.text,
+                r.clip.target,
+                r.predicted,
+                r.actual,
+                r.whisper,
+                risk,
+                words.join(" "),
+                spell,
+                share
             );
         }
         std::fs::write(path, out).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -506,10 +669,26 @@ fn calibrate(
         pearson(&pred, &truth),
         pearson(&ranks(&pred), &ranks(&truth))
     );
-    println!("predicted vs actual phones:  pearson {:.3}  spearman {:.3}", pearson(&pred, &act), pearson(&ranks(&pred), &ranks(&act)));
-    println!("predicted vs whisper text:   pearson {:.3}", pearson(&pred, &wh));
-    println!("actual phones vs whisper:    pearson {:.3}  (do the two ground truths agree?)", pearson(&act, &wh));
-    let (right, pairs) = within_phrase_ranking(&rows.iter().map(|r| (r.clip, r.predicted)).collect::<Vec<_>>(), &truth);
+    println!(
+        "predicted vs actual phones:  pearson {:.3}  spearman {:.3}",
+        pearson(&pred, &act),
+        pearson(&ranks(&pred), &ranks(&act))
+    );
+    println!(
+        "predicted vs whisper text:   pearson {:.3}",
+        pearson(&pred, &wh)
+    );
+    println!(
+        "actual phones vs whisper:    pearson {:.3}  (do the two ground truths agree?)",
+        pearson(&act, &wh)
+    );
+    let (right, pairs) = within_phrase_ranking(
+        &rows
+            .iter()
+            .map(|r| (r.clip, r.predicted))
+            .collect::<Vec<_>>(),
+        &truth,
+    );
     println!(
         "within-phrase ranking: {right}/{pairs} pairs of different answers ({:.1}%) ordered like truth (|Δ| ≥ {RANK_MARGIN})",
         100.0 * right as f32 / pairs.max(1) as f32

@@ -40,7 +40,11 @@ pub struct WordJudgement {
 /// Target phones of the words, flattened, with each phone's word index.
 pub fn flatten(words: &[TargetWord]) -> (Vec<TargetPhone>, Vec<usize>) {
     let phones: Vec<Vec<Phone>> = words.iter().map(|w| w.phones.clone()).collect();
-    let owner = words.iter().enumerate().flat_map(|(i, w)| std::iter::repeat_n(i, w.phones.len())).collect();
+    let owner = words
+        .iter()
+        .enumerate()
+        .flat_map(|(i, w)| std::iter::repeat_n(i, w.phones.len()))
+        .collect();
     (flatten_target(&phones), owner)
 }
 
@@ -48,7 +52,11 @@ pub fn flatten(words: &[TargetWord]) -> (Vec<TargetPhone>, Vec<usize>) {
 pub fn judge(scorer: &Scorer, target: &[TargetWord], cand: &[Word]) -> Vec<WordJudgement> {
     let (tphones, towner) = flatten(target);
     let cphones: Vec<Phone> = cand.iter().flat_map(|w| w.phones.iter().copied()).collect();
-    let cowner: Vec<usize> = cand.iter().enumerate().flat_map(|(i, w)| std::iter::repeat_n(i, w.phones.len())).collect();
+    let cowner: Vec<usize> = cand
+        .iter()
+        .enumerate()
+        .flat_map(|(i, w)| std::iter::repeat_n(i, w.phones.len()))
+        .collect();
     let n = target.len();
     let mut cost = vec![0f32; n];
     let mut covered: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -79,8 +87,17 @@ pub fn judge(scorer: &Scorer, target: &[TargetWord], cand: &[Word]) -> Vec<WordJ
     }
     let mut out = Vec::with_capacity(n);
     for (w, tw) in target.iter().enumerate() {
-        let max: f32 = tphones.iter().zip(&towner).filter(|&(_, &o)| o == w).map(|(t, _)| scorer.del_cost(t)).sum();
-        let fidelity = if max > 0.0 { (1.0 - cost[w] / max).max(0.0) } else { 1.0 };
+        let max: f32 = tphones
+            .iter()
+            .zip(&towner)
+            .filter(|&(_, &o)| o == w)
+            .map(|(t, _)| scorer.del_cost(t))
+            .sum();
+        let fidelity = if max > 0.0 {
+            (1.0 - cost[w] / max).max(0.0)
+        } else {
+            1.0
+        };
         let shares = |other: Option<usize>| {
             other.is_some_and(|o| covered[w].iter().any(|c| covered[o].contains(c)))
         };
@@ -88,9 +105,17 @@ pub fn judge(scorer: &Scorer, target: &[TargetWord], cand: &[Word]) -> Vec<WordJ
         let joined_next = shares((w + 1 < n).then_some(w + 1));
         let mut cw = covered[w].clone();
         cw.dedup();
-        let dictionary_hit =
-            cw.len() == 1 && !joined_prev && !joined_next && cand[cw[0]].source == Source::Dictionary;
-        out.push(WordJudgement { fidelity, lexical: tw.lexical, joined_prev, joined_next, dictionary_hit });
+        let dictionary_hit = cw.len() == 1
+            && !joined_prev
+            && !joined_next
+            && cand[cw[0]].source == Source::Dictionary;
+        out.push(WordJudgement {
+            fidelity,
+            lexical: tw.lexical,
+            joined_prev,
+            joined_next,
+            dictionary_hit,
+        });
     }
     out
 }
@@ -119,7 +144,12 @@ pub fn judge(scorer: &Scorer, target: &[TargetWord], cand: &[Word]) -> Vec<WordJ
 /// Returns (letter-weighted mean similarity over real words, share of the target's letters
 /// that belong to real words), or `None` when the phrase has no real words.
 pub fn spelling(target: &[TargetWord], cand: &[Word]) -> Option<(f32, f32)> {
-    let letters = |s: &str| s.chars().filter(|c| c.is_alphanumeric()).flat_map(|c| c.to_lowercase()).collect::<Vec<char>>();
+    let letters = |s: &str| {
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(|c| c.to_lowercase())
+            .collect::<Vec<char>>()
+    };
     let hay: Vec<char> = cand.iter().flat_map(|w| letters(&w.text)).collect();
     let (mut real, mut total) = (0u32, 0u32);
     // best[j]: fewest edits for the real words so far, the last one ending at or before hay[j].
@@ -136,7 +166,9 @@ pub fn spelling(target: &[TargetWord], cand: &[Word]) -> Option<(f32, f32)> {
         for &x in &word {
             let mut cur = vec![prev[0] + 1; hay.len() + 1];
             for (j, &y) in hay.iter().enumerate() {
-                cur[j + 1] = (prev[j] + u32::from(x != y)).min(prev[j + 1] + 1).min(cur[j] + 1);
+                cur[j + 1] = (prev[j] + u32::from(x != y))
+                    .min(prev[j + 1] + 1)
+                    .min(cur[j] + 1);
             }
             prev = cur;
         }
@@ -164,11 +196,20 @@ mod tests {
     }
 
     fn tw(text: &str, pron: &str, lexical: bool) -> TargetWord {
-        TargetWord { text: text.into(), phones: parse_pron(pron).unwrap(), lexical }
+        TargetWord {
+            text: text.into(),
+            phones: parse_pron(pron).unwrap(),
+            lexical,
+        }
     }
 
     fn cw(text: &str, pron: &str, source: Source) -> Word {
-        Word { text: text.into(), phones: parse_pron(pron).unwrap(), source, alternatives: vec![] }
+        Word {
+            text: text.into(),
+            phones: parse_pron(pron).unwrap(),
+            source,
+            alternatives: vec![],
+        }
     }
 
     #[test]
@@ -177,24 +218,54 @@ mod tests {
         let s = Scorer::new(&d);
         let target = [tw("bad", "B AE1 D", true), tw("dream", "D R IY1 M", true)];
         // "bad dream" read as two dictionary words: both land.
-        let two = judge(&s, &target, &[cw("bad", "B AE1 D", Source::Dictionary), cw("dream", "D R IY1 M", Source::Dictionary)]);
-        assert!(two.iter().all(|j| j.dictionary_hit && !j.joined_next && !j.joined_prev && j.fidelity > 0.99));
+        let two = judge(
+            &s,
+            &target,
+            &[
+                cw("bad", "B AE1 D", Source::Dictionary),
+                cw("dream", "D R IY1 M", Source::Dictionary),
+            ],
+        );
+        assert!(
+            two.iter()
+                .all(|j| j.dictionary_hit && !j.joined_next && !j.joined_prev && j.fidelity > 0.99)
+        );
         // One pseudo-word over both: same sound, but the words run together.
-        let one = judge(&s, &target, &[cw("baddrim", "B AE1 D R IY1 M", Source::G2p)]);
+        let one = judge(
+            &s,
+            &target,
+            &[cw("baddrim", "B AE1 D R IY1 M", Source::G2p)],
+        );
         assert!(one[0].joined_next && one[1].joined_prev);
         assert!(!one[0].dictionary_hit && !one[1].dictionary_hit);
     }
 
     #[test]
     fn spelling_counts_real_words_only() {
-        let target = [tw("check", "CH EH1 K", true), tw("xqc", "EH1 K S K Y UW1 S IY1", false)];
+        let target = [
+            tw("check", "CH EH1 K", true),
+            tw("xqc", "EH1 K S K Y UW1 S IY1", false),
+        ];
         // Exact spelling of the real word; the username respelled by sound is not held against it.
-        let (sim, share) =
-            spelling(&target, &[cw("check", "CH EH1 K", Source::Dictionary), cw("ekskyusee", "", Source::G2p)]).unwrap();
+        let (sim, share) = spelling(
+            &target,
+            &[
+                cw("check", "CH EH1 K", Source::Dictionary),
+                cw("ekskyusee", "", Source::G2p),
+            ],
+        )
+        .unwrap();
         assert!((sim - 1.0).abs() < 1e-6, "{sim}");
         assert!((share - 5.0 / 8.0).abs() < 1e-6);
         // A misspelled real word scores lower.
-        let (sim, _) = spelling(&target, &[cw("chep", "CH EH1 P", Source::G2p), cw("xqc", "", Source::Letters)]).unwrap();
+        let (sim, _) = spelling(
+            &target,
+            &[
+                cw("chep", "CH EH1 P", Source::G2p),
+                cw("xqc", "", Source::Letters),
+            ],
+        )
+        .unwrap();
         assert!(sim < 0.7, "{sim}");
         // No real words: nothing to say.
         assert!(spelling(&target[1..], &[cw("xqc", "", Source::Letters)]).is_none());
@@ -202,11 +273,23 @@ mod tests {
 
     #[test]
     fn spelling_matches_words_in_order_once() {
-        let target = [tw("doug", "D AH1 G", true), tw("doug", "D AH1 G", true), tw("did", "D IH1 D", true)];
+        let target = [
+            tw("doug", "D AH1 G", true),
+            tw("doug", "D AH1 G", true),
+            tw("did", "D IH1 D", true),
+        ];
         // One "doug" can't stand for both: the second is "doeg", one edit.
         let (sim, _) = spelling(&target, &[cw("dougdoegdid", "", Source::G2p)]).unwrap();
         assert!((sim - (1.0 - 1.0 / 11.0)).abs() < 1e-6, "{sim}");
-        let (sim, _) = spelling(&target, &[cw("doug", "", Source::Dictionary), cw("doug", "", Source::Dictionary), cw("did", "", Source::Dictionary)]).unwrap();
+        let (sim, _) = spelling(
+            &target,
+            &[
+                cw("doug", "", Source::Dictionary),
+                cw("doug", "", Source::Dictionary),
+                cw("did", "", Source::Dictionary),
+            ],
+        )
+        .unwrap();
         assert!((sim - 1.0).abs() < 1e-6, "{sim}");
         // Order matters: "did" before both "doug"s can't be used for the last word.
         let (sim, _) = spelling(&target, &[cw("diddougdoug", "", Source::G2p)]).unwrap();
@@ -218,7 +301,10 @@ mod tests {
         let d = dist();
         let s = Scorer::new(&d);
         let target = [tw("time", "T AY1 M", true), tw("loop", "L UW1 P", true)];
-        let cand = [cw("time", "T AY1 M", Source::Dictionary), cw("lag", "L AE1 G", Source::Dictionary)];
+        let cand = [
+            cw("time", "T AY1 M", Source::Dictionary),
+            cw("lag", "L AE1 G", Source::Dictionary),
+        ];
         let j = judge(&s, &target, &cand);
         assert!(j[0].fidelity > 0.99);
         assert!(j[1].fidelity < 0.6, "{}", j[1].fidelity);

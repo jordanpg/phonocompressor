@@ -34,8 +34,12 @@ pub const OVERRIDES: &[(char, &str)] = &[
 pub fn from_deunicode() -> Translit {
     let mut map: HashMap<char, String> = HashMap::new();
     for cp in 0x20u32..0x10000 {
-        let Some(c) = char::from_u32(cp) else { continue };
-        let Some(t) = deunicode::deunicode_char(c) else { continue };
+        let Some(c) = char::from_u32(cp) else {
+            continue;
+        };
+        let Some(t) = deunicode::deunicode_char(c) else {
+            continue;
+        };
         if !t.is_empty() && t != "[?]" {
             map.insert(c, t.to_string());
         }

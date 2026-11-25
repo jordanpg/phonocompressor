@@ -89,22 +89,39 @@ type KeyMap<V> = HashMap<u64, V, BuildHasherDefault<KeyHasher>>;
 fn discounts(n: [f64; 5]) -> [f64; 3] {
     if n[1..].iter().all(|&x| x > 0.0) {
         let y = n[1] / (n[1] + 2.0 * n[2]);
-        let d = [1.0 - 2.0 * y * n[2] / n[1], 2.0 - 3.0 * y * n[3] / n[2], 3.0 - 4.0 * y * n[4] / n[3]];
-        if d.iter().enumerate().all(|(i, &x)| x > 0.0 && x < (i + 1) as f64) {
+        let d = [
+            1.0 - 2.0 * y * n[2] / n[1],
+            2.0 - 3.0 * y * n[3] / n[2],
+            3.0 - 4.0 * y * n[4] / n[3],
+        ];
+        if d.iter()
+            .enumerate()
+            .all(|(i, &x)| x > 0.0 && x < (i + 1) as f64)
+        {
             return d;
         }
     }
-    let d = if n[1] > 0.0 && n[2] > 0.0 { n[1] / (n[1] + 2.0 * n[2]) } else { 0.5 };
+    let d = if n[1] > 0.0 && n[2] > 0.0 {
+        n[1] / (n[1] + 2.0 * n[2])
+    } else {
+        0.5
+    };
     [d; 3]
 }
 
 impl G2pModel {
     /// Train an order-`order` Kneser-Ney model over aligned words.
-    pub fn train<'a>(words: impl IntoIterator<Item = &'a [Unit]>, order: usize) -> Result<Self, String> {
+    pub fn train<'a>(
+        words: impl IntoIterator<Item = &'a [Unit]>,
+        order: usize,
+    ) -> Result<Self, String> {
         if order < 2 {
             return Err(format!("g2p order must be ≥ 2, got {order}"));
         }
-        let mut units = vec![Unit { letters: String::new(), phones: vec![] }];
+        let mut units = vec![Unit {
+            letters: String::new(),
+            phones: vec![],
+        }];
         let mut uni = vec![0u32];
         let mut ids: HashMap<Unit, u32> = HashMap::new();
         let mut seqs: Vec<Vec<u32>> = Vec::new();
@@ -126,16 +143,28 @@ impl G2pModel {
         }
         let bits = id_bits(units.len());
         if order as u32 * bits > 64 {
-            return Err(format!("g2p order {order} with {} units needs {} key bits (> 64)", units.len(), order as u32 * bits));
+            return Err(format!(
+                "g2p order {order} with {} units needs {} key bits (> 64)",
+                units.len(),
+                order as u32 * bits
+            ));
         }
-        let mask = |k: usize| if k == 0 { 0 } else { u64::MAX >> (64 - k as u32 * bits) };
+        let mask = |k: usize| {
+            if k == 0 {
+                0
+            } else {
+                u64::MAX >> (64 - k as u32 * bits)
+            }
+        };
 
         // counts[k]: n-grams with k context units. Raw counts at the top order; below it,
         // continuation counts (how many distinct units precede the n-gram).
         let mut counts: Vec<KeyMap<u32>> = (0..order).map(|_| KeyMap::default()).collect();
         for seq in &seqs {
             for i in order - 1..seq.len() {
-                let key = seq[i + 1 - order..=i].iter().fold(0u64, |k, &id| k << bits | id as u64);
+                let key = seq[i + 1 - order..=i]
+                    .iter()
+                    .fold(0u64, |k, &id| k << bits | id as u64);
                 *counts[order - 1].entry(key).or_default() += 1;
             }
         }
@@ -185,7 +214,8 @@ impl G2pModel {
             let mut probs: KeyMap<f32> = KeyMap::default();
             for (&key, &c) in level {
                 let stats = &ctx[&(key >> bits)];
-                let p = (c as f64 - d[(c as usize).min(3) - 1]) / stats.0 as f64 + gamma(stats) * lower(key);
+                let p = (c as f64 - d[(c as usize).min(3) - 1]) / stats.0 as f64
+                    + gamma(stats) * lower(key);
                 probs.insert(key, p.ln() as f32);
             }
             if k == 0 {
@@ -195,7 +225,11 @@ impl G2pModel {
                     *slot = probs.get(&(w as u64)).copied().unwrap_or(floor.ln() as f32);
                 }
             } else {
-                backoff.push(ctx.iter().map(|(&h, s)| (h, gamma(s).ln() as f32)).collect());
+                backoff.push(
+                    ctx.iter()
+                        .map(|(&h, s)| (h, gamma(s).ln() as f32))
+                        .collect(),
+                );
                 grams.push(probs);
             }
         }
@@ -247,19 +281,36 @@ impl G2p {
     pub fn new(mut model: G2pModel) -> Self {
         let mut by_letters: HashMap<String, Vec<u32>> = HashMap::new();
         for (id, u) in model.units.iter().enumerate().skip(1) {
-            by_letters.entry(u.letters.clone()).or_default().push(id as u32);
+            by_letters
+                .entry(u.letters.clone())
+                .or_default()
+                .push(id as u32);
         }
         let order = (model.order as usize).max(1);
         let bits = id_bits(model.units.len());
         let to_map = |v: Vec<(u64, f32)>| v.into_iter().collect::<KeyMap<f32>>();
-        let grams: Vec<KeyMap<f32>> = std::mem::take(&mut model.grams).into_iter().map(to_map).collect();
-        let backoff: Vec<KeyMap<f32>> = std::mem::take(&mut model.backoff).into_iter().map(to_map).collect();
-        let max_letters = model.units.iter().map(|u| u.letters.chars().count()).max().unwrap_or(1);
+        let grams: Vec<KeyMap<f32>> = std::mem::take(&mut model.grams)
+            .into_iter()
+            .map(to_map)
+            .collect();
+        let backoff: Vec<KeyMap<f32>> = std::mem::take(&mut model.backoff)
+            .into_iter()
+            .map(to_map)
+            .collect();
+        let max_letters = model
+            .units
+            .iter()
+            .map(|u| u.letters.chars().count())
+            .max()
+            .unwrap_or(1);
 
         let mut groups: HashMap<Vec<Phone>, Vec<(u32, u32)>> = HashMap::new();
         for (id, u) in model.units.iter().enumerate().skip(1) {
             let key: Vec<Phone> = u.phones.iter().map(|p| p.collapse_stress()).collect();
-            groups.entry(key).or_default().push((id as u32, model.uni[id]));
+            groups
+                .entry(key)
+                .or_default()
+                .push((id as u32, model.uni[id]));
         }
         let mut p2g = HashMap::new();
         for (key, members) in groups {
@@ -268,7 +319,9 @@ impl G2p {
             // keep the most frequent unit id and pool the counts.
             let mut by_letters: HashMap<&str, (u32, u32, u32)> = HashMap::new();
             for (id, c) in members {
-                let e = by_letters.entry(model.units[id as usize].letters.as_str()).or_insert((id, 0, 0));
+                let e = by_letters
+                    .entry(model.units[id as usize].letters.as_str())
+                    .or_insert((id, 0, 0));
                 e.2 += c;
                 if c > e.1 {
                     *e = (id, c, e.2);
@@ -283,11 +336,31 @@ impl G2p {
                     cost: -((total as f64 / sum).ln()) as f32,
                 })
                 .collect();
-            spellings.sort_by(|a, b| a.cost.total_cmp(&b.cost).then_with(|| a.letters.cmp(&b.letters)));
+            spellings.sort_by(|a, b| {
+                a.cost
+                    .total_cmp(&b.cost)
+                    .then_with(|| a.letters.cmp(&b.letters))
+            });
             p2g.insert(key, spellings);
         }
-        let max_phones = model.units.iter().map(|u| u.phones.len()).max().unwrap_or(1);
-        G2p { model, by_letters, order, bits, grams, backoff, max_letters, p2g, max_phones, cache: Mutex::default() }
+        let max_phones = model
+            .units
+            .iter()
+            .map(|u| u.phones.len())
+            .max()
+            .unwrap_or(1);
+        G2p {
+            model,
+            by_letters,
+            order,
+            bits,
+            grams,
+            backoff,
+            max_letters,
+            p2g,
+            max_phones,
+            cache: Mutex::default(),
+        }
     }
 
     /// Give back the underlying model (e.g. to serialize it).
@@ -320,7 +393,11 @@ impl G2p {
     }
 
     fn mask(&self, k: usize) -> u64 {
-        if k == 0 { 0 } else { u64::MAX >> (64 - k as u32 * self.bits) }
+        if k == 0 {
+            0
+        } else {
+            u64::MAX >> (64 - k as u32 * self.bits)
+        }
     }
 
     /// History after appending unit `w`: the last `order - 1` units, newest in the low bits.
@@ -385,10 +462,14 @@ impl G2p {
                 for len in 1..=self.max_letters.min(n - i) {
                     key.clear();
                     key.extend(&letters[i..i + len]);
-                    let Some(units) = self.by_letters.get(&key) else { continue };
+                    let Some(units) = self.by_letters.get(&key) else {
+                        continue;
+                    };
                     for &w in units {
                         let nlp = lp + self.logp(hist, w);
-                        let slot = states[i + len].entry(self.push(hist, w)).or_insert((f64::NEG_INFINITY, 0));
+                        let slot = states[i + len]
+                            .entry(self.push(hist, w))
+                            .or_insert((f64::NEG_INFINITY, 0));
                         if nlp > slot.0 {
                             arena.push((node, w));
                             *slot = (nlp, arena.len() - 1);
@@ -409,8 +490,11 @@ impl G2p {
                 units.push(arena[node].1);
                 node = arena[node].0;
             }
-            let phones: Vec<Phone> =
-                units.iter().rev().flat_map(|&u| self.model.units[u as usize].phones.iter().copied()).collect();
+            let phones: Vec<Phone> = units
+                .iter()
+                .rev()
+                .flat_map(|&u| self.model.units[u as usize].phones.iter().copied())
+                .collect();
             if !out.iter().any(|(p, _)| *p == phones) {
                 out.push((phones, lp));
                 if out.len() >= nbest {
@@ -434,7 +518,10 @@ mod tests {
     use crate::phone::{fmt_phones, parse_pron};
 
     fn u(letters: &str, phones: &str) -> Unit {
-        Unit { letters: letters.into(), phones: parse_pron(phones).unwrap() }
+        Unit {
+            letters: letters.into(),
+            phones: parse_pron(phones).unwrap(),
+        }
     }
 
     fn toy() -> G2p {
@@ -467,7 +554,10 @@ mod tests {
         let mut letters: Vec<&str> = k.iter().map(|s| s.letters.as_str()).collect();
         letters.sort();
         assert_eq!(letters, ["c", "k"]);
-        assert!((k[0].cost - 2f32.ln()).abs() < 1e-6, "c and k are equally likely for K");
+        assert!(
+            (k[0].cost - 2f32.ln()).abs() < 1e-6,
+            "c and k are equally likely for K"
+        );
         assert_eq!(g.spellings(&parse_pron("K S").unwrap())[0].letters, "x");
         // Stress collapses: AE2 finds AE1 spellings.
         assert_eq!(g.spellings(&parse_pron("AE2").unwrap())[0].letters, "a");

@@ -65,7 +65,10 @@ impl ModelProfile {
 
     /// Rank of a script among representatives for the same chunk (lower is preferred).
     pub fn preference(&self, s: Script) -> usize {
-        self.script_preference.iter().position(|&p| p == s).unwrap_or(self.script_preference.len())
+        self.script_preference
+            .iter()
+            .position(|&p| p == s)
+            .unwrap_or(self.script_preference.len())
     }
 }
 
@@ -82,7 +85,10 @@ pub fn for_model(id: &str) -> Option<&'static ModelProfile> {
 
 /// Model ids with a profile, for error messages.
 pub fn known_model_ids() -> Vec<&'static str> {
-    PROFILES.iter().flat_map(|p| p.model_ids.iter().copied()).collect()
+    PROFILES
+        .iter()
+        .flat_map(|p| p.model_ids.iter().copied())
+        .collect()
 }
 
 /// `eleven_flash_v2_5`, calibrated on exp0–exp8. exp0 found `eleven_turbo_v2_5` reads the same
@@ -147,7 +153,11 @@ pub static FLASH_V2_5: ModelProfile = ModelProfile {
         class_mismatch: 0.57,
     },
     // Fitted with the weights above. The spelling weight was 0.4 in v4 (fit on exp1–exp3).
-    predict: Predict { nbest: true, risk_scale: 1.3, spelling: 0.52 },
+    predict: Predict {
+        nbest: true,
+        risk_scale: 1.3,
+        spelling: 0.52,
+    },
 };
 
 /// Flash v2.5's scripts, from exp0–exp4:
@@ -170,8 +180,13 @@ fn flash_v2_5_scripts(s: Script) -> ScriptProfile {
         Devanagari | Cyrillic => (Native, 0.1),
         Other => (Unmeasured, 0.1),
     };
-    let default_on = reading == Transliterated && !matches!(s, Ethiopic | Ucas | HangulJamo | Runic);
-    ScriptProfile { reading, risk, default_on }
+    let default_on =
+        reading == Transliterated && !matches!(s, Ethiopic | Ucas | HangulJamo | Runic);
+    ScriptProfile {
+        reading,
+        risk,
+        default_on,
+    }
 }
 
 #[cfg(test)]
@@ -180,9 +195,18 @@ mod tests {
 
     #[test]
     fn finds_profiles_by_model_id() {
-        assert!(std::ptr::eq(for_model("eleven_flash_v2_5").unwrap(), &FLASH_V2_5));
-        assert!(std::ptr::eq(for_model("eleven_turbo_v2_5").unwrap(), &FLASH_V2_5));
-        assert!(for_model("eleven_v4").is_none(), "v4 reads Hangul natively: not calibrated");
+        assert!(std::ptr::eq(
+            for_model("eleven_flash_v2_5").unwrap(),
+            &FLASH_V2_5
+        ));
+        assert!(std::ptr::eq(
+            for_model("eleven_turbo_v2_5").unwrap(),
+            &FLASH_V2_5
+        ));
+        assert!(
+            for_model("eleven_v4").is_none(),
+            "v4 reads Hangul natively: not calibrated"
+        );
     }
 
     #[test]

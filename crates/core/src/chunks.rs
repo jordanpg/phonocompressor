@@ -19,10 +19,15 @@ impl Translit {
     pub fn parse_tsv(text: &str) -> Result<Self, String> {
         let mut map = HashMap::new();
         for (n, line) in text.lines().enumerate() {
-            let (hex, json) = line.split_once('\t').ok_or_else(|| format!("line {}: no tab", n + 1))?;
+            let (hex, json) = line
+                .split_once('\t')
+                .ok_or_else(|| format!("line {}: no tab", n + 1))?;
             let cp = u32::from_str_radix(hex, 16).map_err(|e| format!("line {}: {e}", n + 1))?;
             let ch = char::from_u32(cp).ok_or_else(|| format!("line {}: bad codepoint", n + 1))?;
-            map.insert(ch, unescape_json(json).ok_or_else(|| format!("line {}: bad string {json}", n + 1))?);
+            map.insert(
+                ch,
+                unescape_json(json).ok_or_else(|| format!("line {}: bad string {json}", n + 1))?,
+            );
         }
         Ok(Translit { map })
     }
@@ -142,7 +147,10 @@ pub fn symbol_word(c: char) -> Option<&'static str> {
 
 /// Normalize a raw transliteration. Returns None for chunks the search can't use.
 fn normalize(raw: &str) -> Option<(String, ChunkKind)> {
-    if raw.chars().any(|c| c.is_ascii_digit() || symbol_word(c).is_some()) {
+    if raw
+        .chars()
+        .any(|c| c.is_ascii_digit() || symbol_word(c).is_some())
+    {
         return Some((raw.to_string(), ChunkKind::Phonetic));
     }
     let mut out = String::new();
@@ -176,7 +184,9 @@ impl Trie {
     pub const ROOT: u32 = 0;
 
     pub fn new() -> Self {
-        Trie { nodes: vec![TrieNode::default()] }
+        Trie {
+            nodes: vec![TrieNode::default()],
+        }
     }
 
     pub fn insert(&mut self, symbols: &[u8], chunk: u32) {
@@ -199,7 +209,9 @@ impl Trie {
 
     pub fn step(&self, node: u32, symbol: u8) -> Option<u32> {
         let kids = &self.nodes[node as usize].children;
-        kids.binary_search_by_key(&symbol, |&(c, _)| c).ok().map(|i| kids[i].1)
+        kids.binary_search_by_key(&symbol, |&(c, _)| c)
+            .ok()
+            .map(|i| kids[i].1)
     }
 
     /// Chunk that ends exactly at this node, if any.
@@ -238,20 +250,36 @@ pub struct ChunkSet {
 impl ChunkSet {
     /// Chunks from the scripts `profile` reads by transliteration and `allowed` accepts (for
     /// the model's defaults, `|s| profile.script(s).default_on`).
-    pub fn new(translit: &Translit, profile: &ModelProfile, allowed: impl Fn(Script) -> bool) -> Self {
+    pub fn new(
+        translit: &Translit,
+        profile: &ModelProfile,
+        allowed: impl Fn(Script) -> bool,
+    ) -> Self {
         let mut best: HashMap<String, Chunk> = HashMap::new();
         for (&ch, raw) in &translit.map {
             let script = Script::of(ch);
-            if profile.script(script).reading != ScriptReading::Transliterated || !allowed(script) || ch.is_ascii_uppercase() {
+            if profile.script(script).reading != ScriptReading::Transliterated
+                || !allowed(script)
+                || ch.is_ascii_uppercase()
+            {
                 continue;
             }
-            let Some((latin, kind)) = normalize(raw) else { continue };
-            let cand = Chunk { ch, latin: latin.clone(), script, kind };
+            let Some((latin, kind)) = normalize(raw) else {
+                continue;
+            };
+            let cand = Chunk {
+                ch,
+                latin: latin.clone(),
+                script,
+                kind,
+            };
             // Prefer the model's preferred scripts, then lowercase forms (Armenian `ճ` "ch" over `Ճ` "Ch").
             let caps = |c: char| translit.get(c).chars().any(|x| x.is_ascii_uppercase());
             let rank = |s: Script| profile.preference(s);
             match best.get(&latin) {
-                Some(cur) if (rank(cur.script), caps(cur.ch), cur.ch) <= (rank(script), caps(ch), ch) => {}
+                Some(cur)
+                    if (rank(cur.script), caps(cur.ch), cur.ch) <= (rank(script), caps(ch), ch) => {
+                }
                 _ => {
                     best.insert(latin, cand);
                 }
@@ -278,12 +306,15 @@ mod tests {
     use super::*;
 
     fn translit(pairs: &[(char, &str)]) -> Translit {
-        Translit { map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect() }
+        Translit {
+            map: pairs.iter().map(|&(c, s)| (c, s.to_string())).collect(),
+        }
     }
 
     #[test]
     fn parses_tsv_with_escapes() {
-        let t = Translit::parse_tsv("5B36\t\"Kaka \"\n0022\t\"\\\"\"\n0488\t\"*100.000*\"\n").unwrap();
+        let t =
+            Translit::parse_tsv("5B36\t\"Kaka \"\n0022\t\"\\\"\"\n0488\t\"*100.000*\"\n").unwrap();
         assert_eq!(t.get('嬶'), "Kaka ");
         assert_eq!(t.get('"'), "\"");
         assert_eq!(t.latin("嬶҈"), "Kaka *100.000*");
@@ -304,13 +335,29 @@ mod tests {
         ]);
         let p = &crate::model::FLASH_V2_5;
         let set = ChunkSet::new(&t, p, |s| p.script(s).default_on);
-        let by_latin: HashMap<&str, char> = set.chunks.iter().map(|c| (c.latin.as_str(), c.ch)).collect();
+        let by_latin: HashMap<&str, char> = set
+            .chunks
+            .iter()
+            .map(|c| (c.latin.as_str(), c.ch))
+            .collect();
         assert_eq!(by_latin["a"], 'a', "lowercase Latin, never uppercase");
         assert_eq!(by_latin["ba"], '바', "Hangul preferred over Yi");
-        assert_eq!(by_latin["kaka "], '嬶', "CJK keeps its trailing word boundary");
-        assert_eq!(by_latin[" "], ' ', "space beats comma as the boundary chunk");
-        assert!(!by_latin.contains_key("k"), "Devanagari is read natively, so excluded");
-        assert_eq!(set.chunks.iter().find(|c| c.ch == '҈').unwrap().kind, ChunkKind::Phonetic);
+        assert_eq!(
+            by_latin["kaka "], '嬶',
+            "CJK keeps its trailing word boundary"
+        );
+        assert_eq!(
+            by_latin[" "], ' ',
+            "space beats comma as the boundary chunk"
+        );
+        assert!(
+            !by_latin.contains_key("k"),
+            "Devanagari is read natively, so excluded"
+        );
+        assert_eq!(
+            set.chunks.iter().find(|c| c.ch == '҈').unwrap().kind,
+            ChunkKind::Phonetic
+        );
 
         let walk = |s: &str| s.bytes().try_fold(Trie::ROOT, |n, b| set.trie.step(n, b));
         let ba = walk("ba").unwrap();

@@ -46,8 +46,12 @@ fn key(letters: &[u8], phones: &[Phone]) -> u64 {
 fn unkey(k: u64) -> Unit {
     let nl = ((k >> 40) & 0xF) as usize;
     let np = ((k >> 44) & 0xF) as usize;
-    let letters = (0..nl).map(|i| ((k >> (8 * i)) & 0xFF) as u8 as char).collect();
-    let phones = (0..np).map(|i| Phone::from_code(((k >> (16 + 8 * i)) & 0xFF) as u8)).collect();
+    let letters = (0..nl)
+        .map(|i| ((k >> (8 * i)) & 0xFF) as u8 as char)
+        .collect();
+    let phones = (0..np)
+        .map(|i| Phone::from_code(((k >> (16 + 8 * i)) & 0xFF) as u8))
+        .collect();
     Unit { letters, phones }
 }
 
@@ -91,7 +95,9 @@ pub fn align(words: &[(&str, &[Phone])], iters: usize) -> Vec<Vec<Unit>> {
     // Initialize with how often each unit appears in any lattice.
     let mut prob: Map<f64> = Map::default();
     for &(w, y) in words {
-        edges(w.as_bytes(), y, |_, _, _, _, k| *prob.entry(k).or_default() += 1.0);
+        edges(w.as_bytes(), y, |_, _, _, _, k| {
+            *prob.entry(k).or_default() += 1.0
+        });
     }
     normalize(&mut prob);
 
@@ -106,7 +112,9 @@ pub fn align(words: &[(&str, &[Phone])], iters: usize) -> Vec<Vec<Unit>> {
             let mut beta = vec![0.0f64; (n + 1) * (m + 1)];
             alpha[0] = 1.0;
             // Edges go forward in i, so iterating i ascending gives a valid order.
-            edges(x, y, |i, j, i2, j2, k| alpha[idx(i2, j2)] += alpha[idx(i, j)] * prob[&k]);
+            edges(x, y, |i, j, i2, j2, k| {
+                alpha[idx(i2, j2)] += alpha[idx(i, j)] * prob[&k]
+            });
             let total = alpha[idx(n, m)];
             if total <= 0.0 {
                 continue;
@@ -190,23 +198,45 @@ mod tests {
 
     #[test]
     fn key_roundtrip() {
-        let u = Unit { letters: "ph".into(), phones: parse_pron("F").unwrap() };
+        let u = Unit {
+            letters: "ph".into(),
+            phones: parse_pron("F").unwrap(),
+        };
         assert_eq!(unkey(key(u.letters.as_bytes(), &u.phones)), u);
-        let x = Unit { letters: "x".into(), phones: parse_pron("K S").unwrap() };
+        let x = Unit {
+            letters: "x".into(),
+            phones: parse_pron("K S").unwrap(),
+        };
         assert_eq!(unkey(key(x.letters.as_bytes(), &x.phones)), x);
     }
 
     #[test]
     fn aligns_a_small_corpus() {
         let corpus = [
-            ("cat", "K AE1 T"), ("cab", "K AE1 B"), ("tax", "T AE1 K S"), ("box", "B AA1 K S"),
-            ("phat", "F AE1 T"), ("photo", "F OW1 T OW0"), ("bat", "B AE1 T"), ("fat", "F AE1 T"),
+            ("cat", "K AE1 T"),
+            ("cab", "K AE1 B"),
+            ("tax", "T AE1 K S"),
+            ("box", "B AA1 K S"),
+            ("phat", "F AE1 T"),
+            ("photo", "F OW1 T OW0"),
+            ("bat", "B AE1 T"),
+            ("fat", "F AE1 T"),
         ];
-        let prons: Vec<(String, Vec<Phone>)> =
-            corpus.iter().map(|(w, p)| (w.to_string(), parse_pron(p).unwrap())).collect();
-        let words: Vec<(&str, &[Phone])> = prons.iter().map(|(w, p)| (w.as_str(), p.as_slice())).collect();
+        let prons: Vec<(String, Vec<Phone>)> = corpus
+            .iter()
+            .map(|(w, p)| (w.to_string(), parse_pron(p).unwrap()))
+            .collect();
+        let words: Vec<(&str, &[Phone])> = prons
+            .iter()
+            .map(|(w, p)| (w.as_str(), p.as_slice()))
+            .collect();
         let aligned = align(&words, 5);
-        let show = |u: &[Unit]| u.iter().map(|u| format!("{}:{}", u.letters, phono_core::phone::fmt_phones(&u.phones))).collect::<Vec<_>>().join(" ");
+        let show = |u: &[Unit]| {
+            u.iter()
+                .map(|u| format!("{}:{}", u.letters, phono_core::phone::fmt_phones(&u.phones)))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
         let tax = show(&aligned[2]);
         assert_eq!(tax, "t:T a:AE1 x:K S", "{tax}");
         let phat = show(&aligned[4]);

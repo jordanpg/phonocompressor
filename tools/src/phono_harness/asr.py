@@ -66,7 +66,10 @@ class Transcriber:
         logits = self.whisper(input_features=feats, decoder_input_ids=start).logits[0, -1].float()
         probs = logits[self._lang_ids].softmax(-1)
         p, i = probs.topk(top)
-        return [(self._lang_codes[j], round(float(q), 3)) for q, j in zip(p.tolist(), i.tolist())]
+        return [
+            (self._lang_codes[j], round(float(q), 3))
+            for q, j in zip(p.tolist(), i.tolist(), strict=True)
+        ]
 
     @torch.inference_mode()
     def _whisper_text(self, feats: torch.Tensor, language: str) -> str:

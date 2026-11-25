@@ -159,16 +159,26 @@ struct Layer {
 
 impl Layer {
     fn new() -> Self {
-        Layer { states: HashMap::new() }
+        Layer {
+            states: HashMap::new(),
+        }
     }
 
     /// Insert if it ranks among the best for its state. Returns whether it was kept.
     fn offer(&mut self, e: Entry, cfg: &SearchConfig, paths: &Paths, chunks: &ChunkSet) -> bool {
-        let cap = if e.node == Trie::ROOT { cfg.per_root } else { cfg.per_state };
+        let cap = if e.node == Trie::ROOT {
+            cfg.per_root
+        } else {
+            cfg.per_state
+        };
         let ctx = paths.context(chunks, e.path);
         let v = self.states.entry((e.node, e.k, e.flags, ctx)).or_default();
         if v.len() >= cap {
-            let worst = v.iter().enumerate().max_by(|a, b| a.1.cost.total_cmp(&b.1.cost)).map(|(i, w)| (i, w.cost));
+            let worst = v
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.cost.total_cmp(&b.1.cost))
+                .map(|(i, w)| (i, w.cost));
             match worst {
                 Some((i, c)) if e.cost < c => v[i] = e,
                 _ => return false,
@@ -182,7 +192,11 @@ impl Layer {
     fn drain_sorted(&mut self, beam: usize) -> Vec<Entry> {
         let mut all: Vec<Entry> = self.states.drain().flat_map(|(_, v)| v).collect();
         // Full tie-break: HashMap order must not decide what survives the beam.
-        all.sort_by(|a, b| a.cost.total_cmp(&b.cost).then_with(|| (a.node, a.k, a.flags, a.path).cmp(&(b.node, b.k, b.flags, b.path))));
+        all.sort_by(|a, b| {
+            a.cost
+                .total_cmp(&b.cost)
+                .then_with(|| (a.node, a.k, a.flags, a.path).cmp(&(b.node, b.k, b.flags, b.path)))
+        });
         all.truncate(beam);
         all
     }
@@ -213,19 +227,34 @@ impl<'a> Searcher<'a> {
             let use_phones = match c.kind {
                 ChunkKind::Phonetic => true,
                 // Long whole words (㌀ apartment, ㌖ kilometer) are hard to reach letter by letter.
-                ChunkKind::Spelling => word.len() >= 6 && !word.contains(' ') && engine.lexicon.first(word).is_some(),
+                ChunkKind::Spelling => {
+                    word.len() >= 6 && !word.contains(' ') && engine.lexicon.first(word).is_some()
+                }
             };
             if use_phones {
-                let phones: Vec<Phone> = reader.read(word).into_iter().flat_map(|w| w.phones).collect();
+                let phones: Vec<Phone> = reader
+                    .read(word)
+                    .into_iter()
+                    .flat_map(|w| w.phones)
+                    .collect();
                 if !phones.is_empty() {
-                    phonetic.push(PhoneticChunk { chunk: id as u32, phones });
+                    phonetic.push(PhoneticChunk {
+                        chunk: id as u32,
+                        phones,
+                    });
                 }
             }
             if c.latin == " " {
                 space_chunk = Some(id as u32);
             }
         }
-        Searcher { engine, scorer, near, phonetic, space_chunk }
+        Searcher {
+            engine,
+            scorer,
+            near,
+            phonetic,
+            space_chunk,
+        }
     }
 
     pub fn phonetic_chunks(&self) -> usize {
@@ -273,8 +302,14 @@ impl<'a> Searcher<'a> {
     pub fn search(&self, phrase: &str, cfg: &SearchConfig) -> Vec<Candidate> {
         let target = self.engine.target_of(phrase);
         let generated = self.generate(&target.phones, cfg);
-        let spelled =
-            crate::tile::tile(&self.engine.chunks, self.engine.profile, phrase, cfg.max_codepoints, cfg.spelled_edits, cfg.spelled);
+        let spelled = crate::tile::tile(
+            &self.engine.chunks,
+            self.engine.profile,
+            phrase,
+            cfg.max_codepoints,
+            cfg.spelled_edits,
+            cfg.spelled,
+        );
         // Phonetic candidates first, then spelled ones not already among them.
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let all = generated
@@ -287,11 +322,18 @@ impl<'a> Searcher<'a> {
 
     /// Debugging aid: generation rank (0-based) of the candidate whose transliteration matches
     /// `text`'s, and the number of distinct candidates generated.
-    pub fn generation_rank(&self, phrase: &str, text: &str, cfg: &SearchConfig) -> (Option<usize>, usize) {
+    pub fn generation_rank(
+        &self,
+        phrase: &str,
+        text: &str,
+        cfg: &SearchConfig,
+    ) -> (Option<usize>, usize) {
         let target = self.engine.target_of(phrase);
         let want = self.engine.translit.latin(text).to_lowercase();
         let generated = self.generate_traced(&target.phones, cfg, Some(&want));
-        let rank = generated.iter().position(|(t, _)| self.engine.translit.latin(t).to_lowercase() == want);
+        let rank = generated
+            .iter()
+            .position(|(t, _)| self.engine.translit.latin(t).to_lowercase() == want);
         (rank, generated.len())
     }
 
@@ -301,7 +343,12 @@ impl<'a> Searcher<'a> {
         self.generate_traced(target, cfg, None)
     }
 
-    fn generate_traced(&self, target: &[TargetPhone], cfg: &SearchConfig, trace: Option<&str>) -> Vec<(String, f32)> {
+    fn generate_traced(
+        &self,
+        target: &[TargetPhone],
+        cfg: &SearchConfig,
+        trace: Option<&str>,
+    ) -> Vec<(String, f32)> {
         let node_strings = trace.map(|_| self.trie().node_strings());
         let n = target.len();
         if n == 0 {
@@ -312,7 +359,18 @@ impl<'a> Searcher<'a> {
         let chunks = &self.engine.chunks;
         let mut paths = Paths::default();
         let mut layers: Vec<Layer> = (0..=n).map(|_| Layer::new()).collect();
-        layers[0].offer(Entry { cost: 0.0, node: Trie::ROOT, k: 0, flags: 0, path: NO_PATH }, cfg, &paths, chunks);
+        layers[0].offer(
+            Entry {
+                cost: 0.0,
+                node: Trie::ROOT,
+                k: 0,
+                flags: 0,
+                path: NO_PATH,
+            },
+            cfg,
+            &paths,
+            chunks,
+        );
         let mut goals: Vec<Entry> = Vec::new();
         let mut walked = Vec::new();
         let phonetic_matches = self.phonetic_matches(target);
@@ -327,7 +385,11 @@ impl<'a> Searcher<'a> {
             // At the last position nothing follows, so state merging would only discard finished
             // candidates that differ from cheaper ones in ways only re-ranking can judge.
             if i == n {
-                goals.extend(work.iter().filter(|e| e.node == Trie::ROOT && e.k > 0).copied());
+                goals.extend(
+                    work.iter()
+                        .filter(|e| e.node == Trie::ROOT && e.k > 0)
+                        .copied(),
+                );
             }
             while let Some(e) = work.pop() {
                 let mut next = Vec::new();
@@ -335,26 +397,66 @@ impl<'a> Searcher<'a> {
                     && let Some(chunk) = self.trie().chunk_at(e.node)
                 {
                     let ends_space = self.engine.chunks.get(chunk).latin.ends_with(' ');
-                    let flags = if ends_space { e.flags | FLAG_SPACE } else { e.flags & !FLAG_SPACE };
+                    let flags = if ends_space {
+                        e.flags | FLAG_SPACE
+                    } else {
+                        e.flags & !FLAG_SPACE
+                    };
                     let path = paths.push(e.path, chunk);
-                    next.push(Entry { cost: e.cost + CLOSE_COST, node: Trie::ROOT, k: e.k + 1, flags, path });
+                    next.push(Entry {
+                        cost: e.cost + CLOSE_COST,
+                        node: Trie::ROOT,
+                        k: e.k + 1,
+                        flags,
+                        path,
+                    });
                 }
                 let at_boundary = i > 0 && i < n && target[i].word_start;
                 if e.flags & FLAG_SPACE == 0 && i > 0 && i < n {
                     let space = if at_boundary { 0.0 } else { SPACE_MID_WORD };
                     walked.clear();
-                    self.walk(&mut paths, max, e.node, e.k, e.path, e.cost + space, &[BOUNDARY], &mut walked);
+                    self.walk(
+                        &mut paths,
+                        max,
+                        e.node,
+                        e.k,
+                        e.path,
+                        e.cost + space,
+                        &[BOUNDARY],
+                        &mut walked,
+                    );
                     for &(node, k, path, cost) in &walked {
-                        next.push(Entry { cost, node, k, flags: e.flags | FLAG_SPACE, path });
+                        next.push(Entry {
+                            cost,
+                            node,
+                            k,
+                            flags: e.flags | FLAG_SPACE,
+                            path,
+                        });
                     }
                 }
                 if e.flags & FLAG_SILENT == 0 {
                     for s in g2p.spellings(&[]).iter().take(3) {
                         walked.clear();
                         let cost = e.cost + s.cost * SPELL_W + SILENT_COST;
-                        self.walk(&mut paths, max, e.node, e.k, e.path, cost, s.letters.as_bytes(), &mut walked);
+                        self.walk(
+                            &mut paths,
+                            max,
+                            e.node,
+                            e.k,
+                            e.path,
+                            cost,
+                            s.letters.as_bytes(),
+                            &mut walked,
+                        );
                         for &(node, k, path, cost) in &walked {
-                            next.push(Entry { cost, node, k, flags: (e.flags | FLAG_SILENT) & !FLAG_SPACE, path });
+                            next.push(Entry {
+                                cost,
+                                node,
+                                k,
+                                flags: (e.flags | FLAG_SILENT) & !FLAG_SPACE,
+                                path,
+                            });
                         }
                     }
                 }
@@ -374,15 +476,21 @@ impl<'a> Searcher<'a> {
             if let (Some(want), Some(ns)) = (trace, &node_strings) {
                 let mut best: Option<(String, f32, u8)> = None;
                 for e in &entries {
-                    let closed: String =
-                        paths.chunks(e.path).iter().map(|&c| chunks.get(c).latin.to_lowercase()).collect();
+                    let closed: String = paths
+                        .chunks(e.path)
+                        .iter()
+                        .map(|&c| chunks.get(c).latin.to_lowercase())
+                        .collect();
                     let s = closed + &ns[e.node as usize];
                     if want.starts_with(&s) && best.as_ref().is_none_or(|b| s.len() > b.0.len()) {
                         best = Some((s, e.cost, e.k));
                     }
                 }
                 let worst = entries.last().map(|e| e.cost).unwrap_or(0.0);
-                eprintln!("layer {i:2} ({} entries, worst cost {worst:.2}): longest wanted prefix {best:?}", entries.len());
+                eprintln!(
+                    "layer {i:2} ({} entries, worst cost {worst:.2}): longest wanted prefix {best:?}",
+                    entries.len()
+                );
             }
             if i == n {
                 break;
@@ -393,22 +501,50 @@ impl<'a> Searcher<'a> {
             for e in entries {
                 let flags = e.flags & !(FLAG_SPACE | FLAG_SILENT);
                 // Drop the target phone.
-                let del = Entry { cost: e.cost + self.scorer.del_cost(&t), flags, ..e };
+                let del = Entry {
+                    cost: e.cost + self.scorer.del_cost(&t),
+                    flags,
+                    ..e
+                };
                 layers[i + 1].offer(del, cfg, &paths, chunks);
                 // Spell the next one or two phones (or a near neighbour of a single phone).
                 for len in 1..=g2p.max_phones_per_unit().min(n - i) {
                     let phones: Vec<Phone> = target[i..i + len].iter().map(|t| t.phone).collect();
                     let mut options: Vec<(Vec<Phone>, f32)> = vec![(phones.clone(), 0.0)];
                     if len == 1 {
-                        options.extend(self.near[t.phone.code() as usize].iter().map(|&(q, c)| (vec![q], c)));
+                        options.extend(
+                            self.near[t.phone.code() as usize]
+                                .iter()
+                                .map(|&(q, c)| (vec![q], c)),
+                        );
                     }
                     for (ph, extra) in options {
                         for s in g2p.spellings(&ph).iter().take(cfg.spellings_per_phone) {
                             walked.clear();
                             let cost = e.cost + extra + s.cost * SPELL_W;
-                            self.walk(&mut paths, max, e.node, e.k, e.path, cost, s.letters.as_bytes(), &mut walked);
+                            self.walk(
+                                &mut paths,
+                                max,
+                                e.node,
+                                e.k,
+                                e.path,
+                                cost,
+                                s.letters.as_bytes(),
+                                &mut walked,
+                            );
                             for &(node, k, path, cost) in &walked {
-                                layers[i + len].offer(Entry { cost, node, k, flags, path }, cfg, &paths, chunks);
+                                layers[i + len].offer(
+                                    Entry {
+                                        cost,
+                                        node,
+                                        k,
+                                        flags,
+                                        path,
+                                    },
+                                    cfg,
+                                    &paths,
+                                    chunks,
+                                );
                             }
                         }
                     }
@@ -417,7 +553,13 @@ impl<'a> Searcher<'a> {
                 if e.node == Trie::ROOT && (e.k as usize) < max {
                     for &(j, chunk, c) in &phonetic_matches[i] {
                         let path = paths.push(e.path, chunk);
-                        let ne = Entry { cost: e.cost + c, node: Trie::ROOT, k: e.k + 1, flags, path };
+                        let ne = Entry {
+                            cost: e.cost + c,
+                            node: Trie::ROOT,
+                            k: e.k + 1,
+                            flags,
+                            path,
+                        };
                         layers[j].offer(ne, cfg, &paths, chunks);
                     }
                 }
@@ -435,7 +577,10 @@ impl<'a> Searcher<'a> {
             while chunks.last().is_some_and(|&c| Some(c) == self.space_chunk) {
                 chunks.pop();
             }
-            let text: String = chunks.iter().map(|&c| self.engine.chunks.get(c).ch).collect();
+            let text: String = chunks
+                .iter()
+                .map(|&c| self.engine.chunks.get(c).ch)
+                .collect();
             if text.is_empty() {
                 continue;
             }
@@ -477,13 +622,25 @@ impl<'a> Searcher<'a> {
     }
 
     /// Stage 2: read each candidate the way the TTS would and score it against the target.
-    fn rerank(&self, target: &crate::Target, generated: impl Iterator<Item = (String, f32)>, cfg: &SearchConfig) -> Vec<Candidate> {
+    fn rerank(
+        &self,
+        target: &crate::Target,
+        generated: impl Iterator<Item = (String, f32)>,
+        cfg: &SearchConfig,
+    ) -> Vec<Candidate> {
         let predict = cfg.predict.unwrap_or(self.engine.profile.predict);
         let mut out: Vec<Candidate> = Vec::new();
         for (text, gen_cost) in generated {
             let (latin, words) = self.engine.read(&text);
             let fidelity = self.engine.predict_read(&text, &words, target, &predict);
-            out.push(Candidate { codepoints: text.chars().count(), text, latin, words, fidelity, gen_cost });
+            out.push(Candidate {
+                codepoints: text.chars().count(),
+                text,
+                latin,
+                words,
+                fidelity,
+                gen_cost,
+            });
         }
         let rank = |c: &Candidate| c.fidelity - cfg.codepoint_cost * c.codepoints as f32;
         out.sort_by(|a, b| {

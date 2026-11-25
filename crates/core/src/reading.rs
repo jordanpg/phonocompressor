@@ -38,7 +38,10 @@ enum Token {
     Letters(String),
     /// A digit run. `glued`: letters follow with no separator (`3the`), which the TTS handles
     /// unpredictably (see [`ReaderParams::glued_number_drop`]).
-    Number { text: String, glued: bool },
+    Number {
+        text: String,
+        glued: bool,
+    },
     /// A lone `s` right after a number or an initialism (`2s`, `PCs`): a plural ending.
     Plural,
     Symbol(char),
@@ -54,7 +57,8 @@ enum Token {
 /// A single capital inside a run stays put: exp5 heard `tHe` as "the". Returns
 /// (piece, is_capitals) spans.
 fn split_caps(run: &[char]) -> Vec<(usize, usize, bool)> {
-    let mixed = run.iter().any(|c| c.is_ascii_lowercase()) && run.iter().any(|c| c.is_ascii_uppercase());
+    let mixed =
+        run.iter().any(|c| c.is_ascii_lowercase()) && run.iter().any(|c| c.is_ascii_uppercase());
     if !mixed {
         return vec![(0, run.len(), false)];
     }
@@ -62,7 +66,9 @@ fn split_caps(run: &[char]) -> Vec<(usize, usize, bool)> {
     let (mut i, mut start) = (0, 0);
     while i < run.len() {
         if run[i].is_ascii_uppercase() {
-            let j = (i..run.len()).find(|&k| !run[k].is_ascii_uppercase()).unwrap_or(run.len());
+            let j = (i..run.len())
+                .find(|&k| !run[k].is_ascii_uppercase())
+                .unwrap_or(run.len());
             let trailing_letter = j - i == 1 && j == run.len() && i >= 2;
             if j - i >= 2 || trailing_letter {
                 if i > start {
@@ -84,7 +90,16 @@ fn split_caps(run: &[char]) -> Vec<(usize, usize, bool)> {
 
 fn tokenize(latin: &str) -> Vec<Token> {
     // Curly apostrophes read like straight ones (`you’re`).
-    let chars: Vec<char> = latin.chars().map(|c| if matches!(c, '\u{2019}' | '\u{2018}') { '\'' } else { c }).collect();
+    let chars: Vec<char> = latin
+        .chars()
+        .map(|c| {
+            if matches!(c, '\u{2019}' | '\u{2018}') {
+                '\''
+            } else {
+                c
+            }
+        })
+        .collect();
     let mut out = Vec::new();
     let mut i = 0;
     // The previous token was a number or capitals and nothing separates it from here.
@@ -111,13 +126,18 @@ fn tokenize(latin: &str) -> Vec<Token> {
             let start = i;
             while i < chars.len()
                 && (chars[i].is_ascii_digit()
-                    || (matches!(chars[i], '.' | ',') && chars.get(i + 1).is_some_and(|d| d.is_ascii_digit())))
+                    || (matches!(chars[i], '.' | ',')
+                        && chars.get(i + 1).is_some_and(|d| d.is_ascii_digit())))
             {
                 i += 1;
             }
-            let plural = chars.get(i) == Some(&'s') && !chars.get(i + 1).is_some_and(|c| c.is_ascii_alphabetic());
+            let plural = chars.get(i) == Some(&'s')
+                && !chars.get(i + 1).is_some_and(|c| c.is_ascii_alphabetic());
             let glued = chars.get(i).is_some_and(|c| c.is_ascii_alphabetic()) && !plural;
-            out.push(Token::Number { text: chars[start..i].iter().collect(), glued });
+            out.push(Token::Number {
+                text: chars[start..i].iter().collect(),
+                glued,
+            });
             after_count = true;
         } else {
             if symbol_word(c).is_some() {
@@ -131,10 +151,30 @@ fn tokenize(latin: &str) -> Vec<Token> {
 }
 
 const ONES: [&str; 20] = [
-    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
-    "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+    "zero",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
 ];
-const TENS: [&str; 10] = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const TENS: [&str; 10] = [
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+];
 
 fn below_thousand(n: u64, out: &mut Vec<&'static str>) {
     if n >= 100 {
@@ -159,7 +199,13 @@ pub fn number_words(n: u64) -> Vec<&'static str> {
         out.push("zero");
         return out;
     }
-    for (scale, name) in [(1_000_000_000_000, "trillion"), (1_000_000_000, "billion"), (1_000_000, "million"), (1_000, "thousand"), (1, "")] {
+    for (scale, name) in [
+        (1_000_000_000_000, "trillion"),
+        (1_000_000_000, "billion"),
+        (1_000_000, "million"),
+        (1_000, "thousand"),
+        (1, ""),
+    ] {
         let part = (n / scale) % 1000;
         if part > 0 {
             below_thousand(part, &mut out);
@@ -190,7 +236,10 @@ fn number_token_words(tok: &str) -> Vec<&'static str> {
         if i == 0 {
             out.extend(g.parse::<u64>().map(number_words).unwrap_or_default());
         } else {
-            out.extend(g.chars().map(|d| ONES[d.to_digit(10).unwrap_or(0) as usize]));
+            out.extend(
+                g.chars()
+                    .map(|d| ONES[d.to_digit(10).unwrap_or(0) as usize]),
+            );
         }
     }
     out
@@ -233,7 +282,12 @@ impl Reader<'_> {
         let mut it = nbest.into_iter();
         let phones = it.next().map(|(p, _)| p).unwrap_or_default();
         let alternatives = it.map(|(p, lp)| (p, (lp - best_lp).exp() as f32)).collect();
-        Word { text: w.to_string(), phones, source: Source::G2p, alternatives }
+        Word {
+            text: w.to_string(),
+            phones,
+            source: Source::G2p,
+            alternatives,
+        }
     }
 
     /// Split a letter run into dictionary words where that covers it better than reading it
@@ -249,17 +303,29 @@ impl Reader<'_> {
             if best[i].0.is_infinite() {
                 continue;
             }
-            let onset = if i > 0 && !b"aeiouy".contains(&bytes[i - 1]) && b"aeiou".contains(&bytes[i]) {
-                p.split_onset
-            } else {
-                0.0
-            };
+            let onset =
+                if i > 0 && !b"aeiouy".contains(&bytes[i - 1]) && b"aeiou".contains(&bytes[i]) {
+                    p.split_onset
+                } else {
+                    0.0
+                };
             for j in i + 1..=n {
                 let piece = &w[i..j];
-                let lone = if piece.len() == 1 && n > 1 { p.split_lone_letter } else { 0.0 };
+                let lone = if piece.len() == 1 && n > 1 {
+                    p.split_lone_letter
+                } else {
+                    0.0
+                };
                 let g2p_cost = 1.0 + p.split_g2p_letter * piece.len() as f32 + lone + onset;
-                let dict_cost = (piece.len() >= 3 && has_vowel(piece) && self.lexicon.first(piece).is_some())
-                    .then_some(1.0 + if piece.len() == 3 { p.split_short_word } else { 0.0 } + onset);
+                let dict_cost =
+                    (piece.len() >= 3 && has_vowel(piece) && self.lexicon.first(piece).is_some())
+                        .then_some(
+                            1.0 + if piece.len() == 3 {
+                                p.split_short_word
+                            } else {
+                                0.0
+                            } + onset,
+                        );
                 let (cost, dict) = match dict_cost {
                     Some(d) if d <= g2p_cost => (d, true),
                     _ => (g2p_cost, false),
@@ -283,26 +349,51 @@ impl Reader<'_> {
     fn letters(&self, w: &str, out: &mut Vec<Word>) {
         if w.contains('\'') {
             if let Some(p) = self.lexicon.first(w) {
-                out.push(Word { text: w.to_string(), phones: p.to_vec(), source: Source::Dictionary, alternatives: vec![] });
+                out.push(Word {
+                    text: w.to_string(),
+                    phones: p.to_vec(),
+                    source: Source::Dictionary,
+                    alternatives: vec![],
+                });
                 return;
             }
             let bare: String = w.chars().filter(|&c| c != '\'').collect();
             return self.letters(&bare, out);
         }
         if let Some(p) = self.lexicon.first(w) {
-            out.push(Word { text: w.to_string(), phones: p.to_vec(), source: Source::Dictionary, alternatives: vec![] });
+            out.push(Word {
+                text: w.to_string(),
+                phones: p.to_vec(),
+                source: Source::Dictionary,
+                alternatives: vec![],
+            });
         } else if !has_vowel(w) {
             // No vowel letters: read as an initialism (`tm` → T M).
             let phones = w
                 .chars()
-                .flat_map(|c| self.lexicon.first(&c.to_string()).map(|p| p.to_vec()).unwrap_or_default())
+                .flat_map(|c| {
+                    self.lexicon
+                        .first(&c.to_string())
+                        .map(|p| p.to_vec())
+                        .unwrap_or_default()
+                })
                 .collect();
-            out.push(Word { text: w.to_string(), phones, source: Source::Letters, alternatives: vec![] });
+            out.push(Word {
+                text: w.to_string(),
+                phones,
+                source: Source::Letters,
+                alternatives: vec![],
+            });
         } else {
             for (piece, dict) in self.segment(w) {
                 if dict {
                     let phones = self.lexicon.first(piece).unwrap_or_default().to_vec();
-                    out.push(Word { text: piece.to_string(), phones, source: Source::Dictionary, alternatives: vec![] });
+                    out.push(Word {
+                        text: piece.to_string(),
+                        phones,
+                        source: Source::Dictionary,
+                        alternatives: vec![],
+                    });
                 } else {
                     out.push(self.g2p_word_nbest(piece));
                 }
@@ -328,20 +419,40 @@ impl Reader<'_> {
                         // One word, so the n-best expectation can drop it as a whole.
                         let phones = words.iter().flat_map(|w| self.word(w)).collect();
                         let text = words.join(" ");
-                        out.push(Word { text, phones, source: Source::Dictionary, alternatives: vec![(vec![], self.params.glued_number_drop)] });
+                        out.push(Word {
+                            text,
+                            phones,
+                            source: Source::Dictionary,
+                            alternatives: vec![(vec![], self.params.glued_number_drop)],
+                        });
                     } else {
                         for w in words {
-                            out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
+                            out.push(Word {
+                                text: w.to_string(),
+                                phones: self.word(w),
+                                source: Source::Dictionary,
+                                alternatives: vec![],
+                            });
                         }
                     }
                 }
                 Token::Plural => {
                     let last = out.last().and_then(|w| w.phones.last().copied());
-                    out.push(Word { text: "s".into(), phones: plural_ending(last), source: Source::Dictionary, alternatives: vec![] });
+                    out.push(Word {
+                        text: "s".into(),
+                        phones: plural_ending(last),
+                        source: Source::Dictionary,
+                        alternatives: vec![],
+                    });
                 }
                 Token::Symbol(c) => {
                     let w = symbol_word(c).unwrap_or_default();
-                    out.push(Word { text: w.to_string(), phones: self.word(w), source: Source::Dictionary, alternatives: vec![] });
+                    out.push(Word {
+                        text: w.to_string(),
+                        phones: self.word(w),
+                        source: Source::Dictionary,
+                        alternatives: vec![],
+                    });
                 }
             }
         }
@@ -370,7 +481,10 @@ mod tests {
         assert_eq!(number_words(100_000).join(" "), "one hundred thousand");
         assert_eq!(number_words(21).join(" "), "twenty one");
         assert_eq!(number_words(1_000_005).join(" "), "one million five");
-        assert_eq!(number_token_words("100.000").join(" "), "one hundred thousand");
+        assert_eq!(
+            number_token_words("100.000").join(" "),
+            "one hundred thousand"
+        );
         assert_eq!(number_token_words("3.14").join(" "), "three point one four");
     }
 
@@ -379,7 +493,9 @@ mod tests {
             .into_iter()
             .map(|t| match t {
                 Token::Letters(w) => format!("L:{w}"),
-                Token::Number { text, glued } => format!("N:{text}{}", if glued { "+" } else { "" }),
+                Token::Number { text, glued } => {
+                    format!("N:{text}{}", if glued { "+" } else { "" })
+                }
                 Token::Plural => "P".into(),
                 Token::Symbol(c) => format!("S:{c}"),
             })
@@ -388,7 +504,10 @@ mod tests {
 
     #[test]
     fn tokenizes() {
-        assert_eq!(toks("*100.000*apartment's @ x-y"), ["N:100.000", "L:apartment's", "S:@", "L:x", "L:y"]);
+        assert_eq!(
+            toks("*100.000*apartment's @ x-y"),
+            ["N:100.000", "L:apartment's", "S:@", "L:x", "L:y"]
+        );
     }
 
     #[test]
@@ -396,8 +515,14 @@ mod tests {
         assert_eq!(toks("checkhimPC"), ["L:checkhim", "L:pc"]);
         assert_eq!(toks("tHe PCs"), ["L:the", "L:pc", "P"]);
         assert_eq!(toks("CHECK"), ["L:check"]);
-        assert_eq!(toks("yurE nexT nO aM"), ["L:yur", "L:e", "L:nex", "L:t", "L:no", "L:am"]);
+        assert_eq!(
+            toks("yurE nexT nO aM"),
+            ["L:yur", "L:e", "L:nex", "L:t", "L:no", "L:am"]
+        );
         assert_eq!(toks("are2s"), ["L:are", "N:2", "P"]);
-        assert_eq!(toks("3the 2sa no2"), ["N:3+", "L:the", "N:2+", "L:sa", "L:no", "N:2"]);
+        assert_eq!(
+            toks("3the 2sa no2"),
+            ["N:3+", "L:the", "N:2+", "L:sa", "L:no", "N:2"]
+        );
     }
 }

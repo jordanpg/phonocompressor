@@ -113,7 +113,10 @@ fn from_coords(base: &Params, x: &[f32]) -> Params {
 
 fn predictions(engine: &mut Engine, answers: &[Answer], p: &Params) -> Vec<f32> {
     engine.weights = p.weights.clone();
-    answers.iter().map(|a| engine.predict_read(&a.text, &a.words, &a.target, &p.predict)).collect()
+    answers
+        .iter()
+        .map(|a| engine.predict_read(&a.text, &a.words, &a.target, &p.predict))
+        .collect()
 }
 
 fn softplus(x: f32) -> f32 {
@@ -135,7 +138,10 @@ fn loss(pred: &[f32], pairs: &[&Pair]) -> f32 {
 /// `phono calibrate` does.
 fn ranking(pred: &[f32], pairs: &[&Pair]) -> (usize, usize) {
     let sel: Vec<&&Pair> = pairs.iter().filter(|p| p.dt.abs() >= RANK_MARGIN).collect();
-    let right = sel.iter().filter(|p| (pred[p.a] - pred[p.b]) * p.dt > 0.0).count();
+    let right = sel
+        .iter()
+        .filter(|p| (pred[p.a] - pred[p.b]) * p.dt > 0.0)
+        .count();
     (right, sel.len())
 }
 
@@ -155,7 +161,12 @@ fn make_pairs(answers: &[Answer], kind: TruthKind) -> Vec<Pair> {
         for (b, y) in answers.iter().enumerate().skip(a + 1) {
             let dt = x.truths[kind as usize] - y.truths[kind as usize];
             if x.phrase == y.phrase && dt.abs() >= MIN_PAIR {
-                pairs.push(Pair { a, b, dt, phrase: x.phrase });
+                pairs.push(Pair {
+                    a,
+                    b,
+                    dt,
+                    phrase: x.phrase,
+                });
             }
         }
     }
@@ -171,7 +182,14 @@ fn splitmix(mut x: u64) -> u64 {
 
 /// Coordinate descent in log space from `start` over the `free` coordinates, halving the step
 /// when none improves.
-fn fit(engine: &mut Engine, answers: &[Answer], pairs: &[&Pair], start: &Params, lambda: f32, free: &[bool]) -> (Params, usize) {
+fn fit(
+    engine: &mut Engine,
+    answers: &[Answer],
+    pairs: &[&Pair],
+    start: &Params,
+    lambda: f32,
+    free: &[bool],
+) -> (Params, usize) {
     let x0 = coords(start);
     let objective = |engine: &mut Engine, x: &[f32]| {
         let pred = predictions(engine, answers, &from_coords(start, x));
@@ -229,21 +247,37 @@ pub enum TruthKind {
     Whisper,
 }
 
-pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -> Result<(), String> {
+pub fn run(
+    engine: &mut Engine,
+    path: &PathBuf,
+    heard: &Heard,
+    opts: &FitOpts,
+) -> Result<(), String> {
     let clips: Vec<Clip> = load_clips(path, engine.profile)?;
     let truth_scorer = Scorer::with_weights(&engine.dist, Weights::HAND);
     // Distinct answers, truth averaged over seeds and over experiments that reused a clip.
     for name in &opts.fix {
         if !NAMES.contains(&name.as_str()) {
-            return Err(format!("--fix: no parameter {name:?} (have {})", NAMES.join(", ")));
+            return Err(format!(
+                "--fix: no parameter {name:?} (have {})",
+                NAMES.join(", ")
+            ));
         }
     }
-    let free: Vec<bool> = NAMES.iter().map(|n| !opts.fix.iter().any(|f| f == n)).collect();
+    let free: Vec<bool> = NAMES
+        .iter()
+        .map(|n| !opts.fix.iter().any(|f| f == n))
+        .collect();
     let mut by_answer: BTreeMap<(String, String), ([f32; 3], usize, String)> = BTreeMap::new();
     for c in &clips {
         let (actual, whisper) = clip_truth(engine, &truth_scorer, c, heard);
-        let e = by_answer.entry((c.target.clone(), c.text.clone())).or_insert(([0.0; 3], 0, c.exp.clone()));
-        for (t, v) in e.0.iter_mut().zip([(actual + whisper) / 2.0, actual, whisper]) {
+        let e = by_answer
+            .entry((c.target.clone(), c.text.clone()))
+            .or_insert(([0.0; 3], 0, c.exp.clone()));
+        for (t, v) in
+            e.0.iter_mut()
+                .zip([(actual + whisper) / 2.0, actual, whisper])
+        {
             *t += v;
         }
         e.1 += 1;
@@ -267,8 +301,14 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
     }
     let pairs = make_pairs(&answers, opts.truth);
     let all: Vec<&Pair> = pairs.iter().collect();
-    let hand = Params { weights: Weights::HAND, predict: Predict::HAND };
-    let truths: Vec<f32> = answers.iter().map(|a| a.truths[opts.truth as usize]).collect();
+    let hand = Params {
+        weights: Weights::HAND,
+        predict: Predict::HAND,
+    };
+    let truths: Vec<f32> = answers
+        .iter()
+        .map(|a| a.truths[opts.truth as usize])
+        .collect();
     let hand_pred = predictions(engine, &answers, &hand);
     let (r, n) = ranking(&hand_pred, &all);
     println!(
@@ -321,14 +361,19 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
                 let (r, n) = ranking(&pred, &test);
                 rr += r;
                 rt += n;
-                test_loss += loss(&pred, &test) * test.iter().map(|p| p.dt.abs()).sum::<f32>() / total_w;
+                test_loss +=
+                    loss(&pred, &test) * test.iter().map(|p| p.dt.abs()).sum::<f32>() / total_w;
             }
             per_repeat.push(100.0 * rr as f32 / rt.max(1) as f32);
             right += rr;
             total += rt;
         }
         test_loss /= opts.repeats as f32;
-        let spread = per_repeat.iter().map(|v| format!("{v:.1}")).collect::<Vec<_>>().join(" ");
+        let spread = per_repeat
+            .iter()
+            .map(|v| format!("{v:.1}"))
+            .collect::<Vec<_>>()
+            .join(" ");
         println!(
             "  λ {lambda:<6} held-out ranking {:.1}% [{spread}], loss {test_loss:.4}  ({evals} evaluations)",
             100.0 * right as f32 / total.max(1) as f32
@@ -339,10 +384,20 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
     }
     let lambda = best_lambda.0;
 
-    let last_exp = answers.iter().map(|a| a.first_exp.clone()).max().unwrap_or_default();
+    let last_exp = answers
+        .iter()
+        .map(|a| a.first_exp.clone())
+        .max()
+        .unwrap_or_default();
     let is_new = |i: usize| answers[i].first_exp == last_exp;
-    let train: Vec<&Pair> = pairs.iter().filter(|p| !is_new(p.a) && !is_new(p.b)).collect();
-    let test: Vec<&Pair> = pairs.iter().filter(|p| is_new(p.a) || is_new(p.b)).collect();
+    let train: Vec<&Pair> = pairs
+        .iter()
+        .filter(|p| !is_new(p.a) && !is_new(p.b))
+        .collect();
+    let test: Vec<&Pair> = pairs
+        .iter()
+        .filter(|p| is_new(p.a) || is_new(p.b))
+        .collect();
     let (fitted, _) = fit(engine, &answers, &train, &hand, lambda, &free);
     let pred = predictions(engine, &answers, &fitted);
     let (hr, hn) = ranking(&hand_pred, &test);
@@ -364,7 +419,9 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
         loss(&pred, &all),
         pearson(&pred, &truths)
     );
-    println!("\nin-sample ranking of the same two weight sets under each truth (pairs at |Δ| ≥ {RANK_MARGIN}):");
+    println!(
+        "\nin-sample ranking of the same two weight sets under each truth (pairs at |Δ| ≥ {RANK_MARGIN}):"
+    );
     for kind in [TruthKind::Mean, TruthKind::Phones, TruthKind::Whisper] {
         let kp = make_pairs(&answers, kind);
         let kp: Vec<&Pair> = kp.iter().collect();
@@ -376,13 +433,27 @@ pub fn run(engine: &mut Engine, path: &PathBuf, heard: &Heard, opts: &FitOpts) -
             100.0 * fr as f32 / fn_.max(1) as f32
         );
     }
-    println!("\n{:<16} {:>7} {:>7} {:>8}", "parameter", "hand", "fitted", "default");
-    let current = Params { weights: engine.profile.weights.clone(), predict: engine.profile.predict };
+    println!(
+        "\n{:<16} {:>7} {:>7} {:>8}",
+        "parameter", "hand", "fitted", "default"
+    );
+    let current = Params {
+        weights: engine.profile.weights.clone(),
+        predict: engine.profile.predict,
+    };
     for (i, name) in NAMES.iter().enumerate() {
-        println!("{name:<16} {:>7.3} {:>7.3} {:>8.3}", get(&hand, i), get(&fitted, i), get(&current, i));
+        println!(
+            "{name:<16} {:>7.3} {:>7.3} {:>8.3}",
+            get(&hand, i),
+            get(&fitted, i),
+            get(&current, i)
+        );
     }
     let (r, n) = ranking(&predictions(engine, &answers, &current), &all);
-    println!("current defaults (in-sample): ranking {r}/{n} ({:.1}%)", 100.0 * r as f32 / n as f32);
+    println!(
+        "current defaults (in-sample): ranking {r}/{n} ({:.1}%)",
+        100.0 * r as f32 / n as f32
+    );
     engine.weights = engine.profile.weights.clone();
     Ok(())
 }

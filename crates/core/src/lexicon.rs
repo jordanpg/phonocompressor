@@ -19,9 +19,12 @@ impl Lexicon {
             if line.is_empty() {
                 continue;
             }
-            let (head, pron) = line.split_once(' ').ok_or_else(|| format!("line {}: no pronunciation", n + 1))?;
+            let (head, pron) = line
+                .split_once(' ')
+                .ok_or_else(|| format!("line {}: no pronunciation", n + 1))?;
             let word = head.split('(').next().unwrap_or(head).to_lowercase();
-            let phones = parse_pron(pron).ok_or_else(|| format!("line {}: bad phones {pron:?}", n + 1))?;
+            let phones =
+                parse_pron(pron).ok_or_else(|| format!("line {}: bad phones {pron:?}", n + 1))?;
             lex.words.entry(word).or_default().push(phones);
         }
         Ok(lex)
@@ -33,7 +36,10 @@ impl Lexicon {
 
     /// First (most common) pronunciation.
     pub fn first(&self, word: &str) -> Option<&[Phone]> {
-        self.words.get(word).and_then(|v| v.first()).map(|p| p.as_slice())
+        self.words
+            .get(word)
+            .and_then(|v| v.first())
+            .map(|p| p.as_slice())
     }
 
     pub fn len(&self) -> usize {
@@ -51,8 +57,14 @@ mod tests {
 
     #[test]
     fn parses_variants_and_comments() {
-        let lex = Lexicon::parse_cmudict("read R EH1 D\nread(2) R IY1 D\naalen AE1 L AH0 N # place, german\n").unwrap();
+        let lex = Lexicon::parse_cmudict(
+            "read R EH1 D\nread(2) R IY1 D\naalen AE1 L AH0 N # place, german\n",
+        )
+        .unwrap();
         assert_eq!(lex.get("read").unwrap().len(), 2);
-        assert_eq!(crate::phone::fmt_phones(lex.first("aalen").unwrap()), "AE1 L AH0 N");
+        assert_eq!(
+            crate::phone::fmt_phones(lex.first("aalen").unwrap()),
+            "AE1 L AH0 N"
+        );
     }
 }

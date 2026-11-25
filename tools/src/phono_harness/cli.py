@@ -1,11 +1,11 @@
 """phono-harness CLI. Normally invoked through mise tasks (see mise.toml):
 
-    mise run harness:credits                 credit usage this period            (API, free)
-    mise run harness:models                  TTS models and cost multipliers     (API, free)
-    mise run harness:synth exp0              estimate cost of uncached clips     (dry run)
-    mise run harness:synth exp0 --spend      ...and actually synthesize them     (API, costs credits)
-    mise run harness:transcribe exp0         local ASR on cached clips           (GPU, free)
-    mise run harness:report exp0             markdown report to tools/results/
+mise run harness:credits                 credit usage this period            (API, free)
+mise run harness:models                  TTS models and cost multipliers     (API, free)
+mise run harness:synth exp0              estimate cost of uncached clips     (dry run)
+mise run harness:synth exp0 --spend      ...and actually synthesize them     (API, costs credits)
+mise run harness:transcribe exp0         local ASR on cached clips           (GPU, free)
+mise run harness:report exp0             markdown report to tools/results/
 """
 
 from __future__ import annotations
@@ -54,9 +54,13 @@ def cmd_models(_args) -> None:
 def cmd_voices(_args) -> None:
     from .elevenlabs import Client
 
-    for v in sorted(Client().voices(), key=lambda v: (v.get("category") or "", v.get("name") or "")):
+    for v in sorted(
+        Client().voices(), key=lambda v: (v.get("category") or "", v.get("name") or "")
+    ):
         labels = v.get("labels") or {}
-        desc = ", ".join(f"{k}={labels[k]}" for k in ("language", "accent", "gender", "age") if labels.get(k))
+        desc = ", ".join(
+            f"{k}={labels[k]}" for k in ("language", "accent", "gender", "age") if labels.get(k)
+        )
         print(f"{v['voice_id']}  {v.get('category', '?'):12} {v.get('name', '')[:28]:28} {desc}")
 
 
@@ -82,7 +86,9 @@ def cmd_synth(args) -> None:
 
     estimate = sum(cost(r) for _, r in todo)
     remaining = client.remaining_credits()
-    print(f"estimated cost ≤ {estimate:.0f} credits (budget {exp.max_credits}, remaining {remaining})")
+    print(
+        f"estimated cost ≤ {estimate:.0f} credits (budget {exp.max_credits}, remaining {remaining})"
+    )
     if estimate > exp.max_credits or estimate > remaining:
         raise SystemExit("refusing: estimate exceeds the experiment budget or remaining credits")
     if not args.spend:
@@ -158,7 +164,9 @@ def cmd_report(args) -> None:
     asr_by = {}  # (case id, model, seed) -> asr dict | None
     for c, req in exp.requests():
         asr_by[(c.id, req.model_id, req.seed)] = (
-            cache.read_json(cache.asr_path(req.key, ASR_VERSION)) if cache.has_clip(req.key) else None
+            cache.read_json(cache.asr_path(req.key, ASR_VERSION))
+            if cache.has_clip(req.key)
+            else None
         )
     has_targets = any(c.target for c in exp.cases)
 
@@ -180,10 +188,14 @@ def cmd_report(args) -> None:
                 rows = [(c, asr_by[(c.id, model, seed)]) for c in exp.cases if c.target]
                 done = [(c, a) for c, a in rows if a is not None]
                 silent = sum(1 for _, a in done if a.get("silent"))
-                sims = [_sim(a.get("en", ""), c.target) if not a.get("silent") else 0.0 for c, a in done]
+                sims = [
+                    _sim(a.get("en", ""), c.target) if not a.get("silent") else 0.0 for c, a in done
+                ]
                 good = sum(1 for s in sims if s >= 0.8)
                 ms = f"{mean(sims):.2f}" if sims else "—"
-                lines.append(f"| {model} | {seed} | {len(done)} | {silent} | {ms} | {good}/{len(done)} |")
+                lines.append(
+                    f"| {model} | {seed} | {len(done)} | {silent} | {ms} | {good}/{len(done)} |"
+                )
         if len(exp.seeds) > 1:
             lines += ["", "Seed agreement (same model, transcripts across seeds):", ""]
             for model in exp.models:
@@ -193,7 +205,9 @@ def cmd_report(args) -> None:
                     if all(t is not None and not t.get("silent") for t in texts):
                         first = texts[0]["en"]
                         agree["sim"].append(min(_sim(first, t["en"]) for t in texts[1:]))
-                        agree["exact"].append(all(_letters(t["en"]) == _letters(first) for t in texts))
+                        agree["exact"].append(
+                            all(_letters(t["en"]) == _letters(first) for t in texts)
+                        )
                 if agree["sim"]:
                     lines.append(
                         f"- {model}: mean cross-seed sim {mean(agree['sim']):.2f}, "
@@ -231,7 +245,13 @@ def cmd_report(args) -> None:
                     langs = " ".join(f"{code} {p:.2f}" for code, p in asr["languages"])
                     native = asr.get("native")
                     native_s = f"{native['language']}: {native['text']}" if native else ""
-                    cells = [f"{asr['duration_s']}", langs, asr["en"], native_s, f"`{asr['phones']}`"]
+                    cells = [
+                        f"{asr['duration_s']}",
+                        langs,
+                        asr["en"],
+                        native_s,
+                        f"`{asr['phones']}`",
+                    ]
                     sim = f"{_sim(asr['en'], case.target):.2f}" if case.target else ""
                 if case.target:
                     cells.insert(3, sim)
@@ -268,8 +288,16 @@ def cmd_export_clips(args) -> None:
                 asr = cache.read_json(cache.asr_path(req.key, ASR_VERSION))
                 if not case.target or asr is None or req.apply_text_normalization is not None:
                     continue
-                cells = [exp.name, case.id, str(req.seed), req.model_id, case.text, case.target,
-                         asr.get("en", ""), asr.get("phones", "")]
+                cells = [
+                    exp.name,
+                    case.id,
+                    str(req.seed),
+                    req.model_id,
+                    case.text,
+                    case.target,
+                    asr.get("en", ""),
+                    asr.get("phones", ""),
+                ]
                 f.write("\t".join(clean(c) for c in cells) + "\n")
                 rows += 1
     print(f"wrote {rows} clips to {out}")
@@ -301,8 +329,11 @@ def cmd_translit_table(args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="phono-harness", description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        prog="phono-harness",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("credits").set_defaults(func=cmd_credits)
     sub.add_parser("models").set_defaults(func=cmd_models)

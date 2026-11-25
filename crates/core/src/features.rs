@@ -30,12 +30,19 @@ fn parse_value(v: &str) -> Option<u8> {
 impl FeatureTable {
     pub fn parse_tsv(text: &str) -> Result<Self, String> {
         let mut lines = text.lines();
-        let header: Vec<&str> = lines.next().ok_or("empty feature table")?.split('\t').collect();
+        let header: Vec<&str> = lines
+            .next()
+            .ok_or("empty feature table")?
+            .split('\t')
+            .collect();
         if header.first() != Some(&"segment") {
             return Err(format!("unexpected header: {:?}", header.first()));
         }
         let names: Vec<String> = header[1..].iter().map(|s| s.to_string()).collect();
-        let mut table = FeatureTable { names, ..Default::default() };
+        let mut table = FeatureTable {
+            names,
+            ..Default::default()
+        };
         for (n, line) in lines.enumerate() {
             let cols: Vec<&str> = line.split('\t').collect();
             if cols.len() != table.names.len() + 1 {
@@ -107,7 +114,12 @@ const IPA_ALIASES: &[(&str, &str)] = &[("ɚ", "ə˞"), ("ɝ", "ə˞"), ("g", "ɡ
 
 impl FeatureSpace {
     pub fn new(table: FeatureTable) -> Self {
-        let index = table.segments.iter().enumerate().map(|(i, s)| (s.clone(), i)).collect();
+        let index = table
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (s.clone(), i))
+            .collect();
         let weights: Vec<f32> = table.names.iter().map(|n| feature_weight(n)).collect();
         let vowel_weights = table
             .names
@@ -120,7 +132,13 @@ impl FeatureSpace {
             })
             .collect();
         let syllabic = table.names.iter().position(|n| n == "syllabic");
-        FeatureSpace { table, index, weights, vowel_weights, syllabic }
+        FeatureSpace {
+            table,
+            index,
+            weights,
+            vowel_weights,
+            syllabic,
+        }
     }
 
     pub fn segment(&self, ipa: &str) -> Option<usize> {
@@ -129,7 +147,12 @@ impl FeatureSpace {
 
     /// Override one feature's weight (for calibration experiments).
     pub fn set_weight(&mut self, name: &str, weight: f32) -> Result<(), String> {
-        let i = self.table.names.iter().position(|n| n == name).ok_or_else(|| format!("no feature {name:?}"))?;
+        let i = self
+            .table
+            .names
+            .iter()
+            .position(|n| n == name)
+            .ok_or_else(|| format!("no feature {name:?}"))?;
         self.weights[i] = weight;
         Ok(())
     }
@@ -148,7 +171,8 @@ impl FeatureSpace {
 
     /// Syllabic (+ at the start): vowels and syllabic consonants.
     pub fn is_vowel(&self, seg: usize) -> bool {
-        self.syllabic.is_some_and(|f| self.table.values[seg * self.table.names.len() + f] & 3 == 1)
+        self.syllabic
+            .is_some_and(|f| self.table.values[seg * self.table.names.len() + f] & 3 == 1)
     }
 
     pub fn is_rhotic(&self, seg: usize) -> bool {
@@ -176,7 +200,11 @@ impl FeatureSpace {
     /// [`FeatureSpace::segment_distance`] with a custom rhotic-mismatch cost.
     pub fn segment_distance_with(&self, a: usize, b: usize, rhotic_mismatch: f32) -> f32 {
         if self.is_vowel(a) && self.is_vowel(b) {
-            let rhotic = if self.is_rhotic(a) != self.is_rhotic(b) { rhotic_mismatch } else { 0.0 };
+            let rhotic = if self.is_rhotic(a) != self.is_rhotic(b) {
+                rhotic_mismatch
+            } else {
+                0.0
+            };
             (self.vowel_distance(a, b) + rhotic).min(1.0)
         } else {
             self.distance(a, b)
@@ -188,7 +216,10 @@ impl FeatureSpace {
             return 0.0;
         }
         let n = self.table.names.len();
-        let (ra, rb) = (&self.table.values[a * n..(a + 1) * n], &self.table.values[b * n..(b + 1) * n]);
+        let (ra, rb) = (
+            &self.table.values[a * n..(a + 1) * n],
+            &self.table.values[b * n..(b + 1) * n],
+        );
         let (mut d, mut total) = (0.0, 0.0);
         for ((&x, &y), &w) in ra.iter().zip(rb).zip(weights) {
             if x != 0 || y != 0 {
@@ -203,9 +234,16 @@ impl FeatureSpace {
     /// stray punctuation are dropped; unknown multi-character tokens are split greedily into
     /// the longest known segments. Characters that match nothing are skipped.
     pub fn parse_ipa_token(&self, token: &str) -> Vec<usize> {
-        let cleaned: String = token.chars().filter(|c| !c.is_ascii_digit() && !matches!(c, '.' | 'ˈ' | 'ˌ')).collect();
+        let cleaned: String = token
+            .chars()
+            .filter(|c| !c.is_ascii_digit() && !matches!(c, '.' | 'ˈ' | 'ˌ'))
+            .collect();
         let lookup = |s: &str| {
-            let s = IPA_ALIASES.iter().find(|&&(from, _)| from == s).map(|&(_, to)| to).unwrap_or(s);
+            let s = IPA_ALIASES
+                .iter()
+                .find(|&&(from, _)| from == s)
+                .map(|&(_, to)| to)
+                .unwrap_or(s);
             self.segment(s)
         };
         if let Some(id) = lookup(&cleaned) {
@@ -284,9 +322,15 @@ mod tests {
         let pb = s.distance(id("p"), id("b"));
         let pt = s.distance(id("p"), id("t"));
         let pa = s.distance(id("p"), id("a"));
-        assert!(pb < pa && pt < pa, "voicing and place both well below major class: {pb} {pt} {pa}");
+        assert!(
+            pb < pa && pt < pa,
+            "voicing and place both well below major class: {pb} {pt} {pa}"
+        );
         let contour = s.distance(id("a"), id("aɪ"));
-        assert!(contour > 0.0 && contour < pb, "a diphthong is close to its first vowel: {contour}");
+        assert!(
+            contour > 0.0 && contour < pb,
+            "a diphthong is close to its first vowel: {contour}"
+        );
     }
 
     #[test]

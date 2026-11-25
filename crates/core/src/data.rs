@@ -24,9 +24,13 @@ impl Data {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, String> {
-        let data: Data = postcard::from_bytes(bytes).map_err(|e| format!("corrupt data file: {e}"))?;
+        let data: Data =
+            postcard::from_bytes(bytes).map_err(|e| format!("corrupt data file: {e}"))?;
         if data.version != FORMAT_VERSION {
-            return Err(format!("data file version {} != expected {FORMAT_VERSION}; rebuild it", data.version));
+            return Err(format!(
+                "data file version {} != expected {FORMAT_VERSION}; rebuild it",
+                data.version
+            ));
         }
         Ok(data)
     }

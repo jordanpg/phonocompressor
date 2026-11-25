@@ -112,7 +112,10 @@ impl Phone {
 }
 
 pub fn is_vowel_base(base: u8) -> bool {
-    matches!(ARPABET[base as usize].as_bytes()[0], b'A' | b'E' | b'I' | b'O' | b'U')
+    matches!(
+        ARPABET[base as usize].as_bytes()[0],
+        b'A' | b'E' | b'I' | b'O' | b'U'
+    )
 }
 
 impl fmt::Display for Phone {
@@ -138,7 +141,11 @@ pub fn parse_pron(s: &str) -> Option<Vec<Phone>> {
 
 /// Format phones as space-separated ARPAbet.
 pub fn fmt_phones(phones: &[Phone]) -> String {
-    phones.iter().map(|p| p.to_string()).collect::<Vec<_>>().join(" ")
+    phones
+        .iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]
