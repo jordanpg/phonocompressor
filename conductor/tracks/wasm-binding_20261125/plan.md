@@ -35,7 +35,7 @@ Give the core a way to switch model and scripts without decoding the data again,
 
 ### Tasks
 
-- [~] Task 2.1: Add an `Engine` method that switches the model profile and allowed scripts by rebuilding the `ChunkSet` and weights, plus script lookup by name with an error listing valid names; reimplement `allow_all_scripts` on it. Tests: only allowed scripts in the chunk set, switching back restores the default, unknown name errors ([#15](https://github.com/jordanpg/phonocompressor/issues/15))
+- [x] Task 2.1: Add an `Engine` method that switches the model profile and allowed scripts by rebuilding the `ChunkSet` and weights, plus script lookup by name with an error listing valid names; reimplement `allow_all_scripts` on it. Tests: only allowed scripts in the chunk set, switching back restores the default, unknown name errors ([#15](https://github.com/jordanpg/phonocompressor/issues/15))
 - [ ] Task 2.2: Move `fmt_phones` from `phono-cli` into `phono-core`; add `--json` (`text`, `latin`, `phones`, `score`, `codepoints` per result) and `--scripts <names>` to `phono compress` ([#16](https://github.com/jordanpg/phonocompressor/issues/16))
 
 ### Verification
