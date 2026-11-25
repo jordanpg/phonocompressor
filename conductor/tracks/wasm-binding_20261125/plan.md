@@ -53,13 +53,13 @@ Create the crate and export the engine with typed options and results.
 
 - [x] Task 3.1: Create `crates/wasm` (`cdylib`, `wasm-bindgen`) in the workspace; install `wasm-bindgen-cli` with mise, pinned to the crate's version; add a `wasm:build` task that runs `wasm-bindgen --target web` into a gitignored directory; check new dependencies' licenses and update `THIRD_PARTY.md` if needed ([#17](https://github.com/jordanpg/phonocompressor/issues/17))
   - Output goes to `target/wasm-pkg` (already gitignored). Review: Task 1.1's `check:wasm` was renamed `wasm:check`, so every wasm task is `wasm:<name>`; it now builds `phono-wasm` too.
-- [~] Task 3.2: Export a constructor from the data file's bytes (`Uint8Array`) and `compress(phrase, { model, maxCodepoints, topN, allowedScripts })` → `[{ text, latin, phones, score }]`, with the CLI's defaults; choose how to generate the TypeScript types (license and size checked); validate input with messages in the product-guidelines style; keep mapping and validation in plain Rust with native unit tests ([#18](https://github.com/jordanpg/phonocompressor/issues/18))
+- [x] Task 3.2: Export a constructor from the data file's bytes (`Uint8Array`) and `compress(phrase, { model, maxCodepoints, topN, allowedScripts })` → `[{ text, latin, phones, score }]`, with the CLI's defaults; choose how to generate the TypeScript types (license and size checked); validate input with messages in the product-guidelines style; keep mapping and validation in plain Rust with native unit tests ([#18](https://github.com/jordanpg/phonocompressor/issues/18))
   - Types: `tsify` 0.5.8 (MIT OR Apache-2.0; `tsify-next` is deprecated in its favour), `Ts<T>` at the boundary. Options are read field by field, not with `Ts::to_rust`, because serde-wasm-bindgen ignores unknown keys (a typo would be silently dropped) and its type errors don't name the field. Ranges: `maxCodepoints` 1–30, `topN` 1–50, whole numbers. Also rejected: a phrase with nothing to pronounce (`!!!`), which the CLI answers with an empty list. `model::profile` now gives the CLI and the binding one unknown-model message.
 
 ### Verification
 
-- [ ] `mise run wasm:build` produces `.wasm`, `.js` and `.d.ts`; the `.d.ts` has typed `compress` options and results (no `any`)
-- [ ] Native tests for validation and mapping pass; clippy is clean
+- [x] `mise run wasm:build` produces `.wasm`, `.js` and `.d.ts`; the `.d.ts` has typed `compress` options and results (no `any`)
+- [x] Native tests for validation and mapping pass; clippy is clean
 
 ## Phase 4: Parity with the CLI
 
@@ -67,7 +67,7 @@ Show the wasm build gives the same guesses as `phono compress`.
 
 ### Tasks
 
-- [ ] Task 4.1: Commit public phrases and option sets (defaults, a smaller budget, a larger `topN`, all scripts; never `sample/messages.json`); pin Node in `mise.toml`; add a Node script (`initSync`, reads `phono.bin` from disk) and a `wasm:parity` task that compares it with `phono compress --json`: same text in the same order, scores within 1e-4; it fails loudly without `phono.bin` or the build ([#19](https://github.com/jordanpg/phonocompressor/issues/19))
+- [~] Task 4.1: Commit public phrases and option sets (defaults, a smaller budget, a larger `topN`, all scripts; never `sample/messages.json`); pin Node in `mise.toml`; add a Node script (`initSync`, reads `phono.bin` from disk) and a `wasm:parity` task that compares it with `phono compress --json`: same text in the same order, scores within 1e-4; it fails loudly without `phono.bin` or the build ([#19](https://github.com/jordanpg/phonocompressor/issues/19))
 
 ### Verification
 
