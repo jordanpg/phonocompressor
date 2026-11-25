@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-25T18:30:00Z",
+  "updated": "2026-11-25T19:00:00Z",
   "issue": 14,
   "parent_issue": 1,
   "task_issues": {
@@ -26,10 +26,11 @@
     "total": 9,
     "completed": 1
   },
-  "current_phase": 1,
-  "current_task": "1.1",
+  "current_phase": 2,
+  "current_task": "2.1",
   "commits": [
     "4710f8f: build(mise): add wasm32 target and check:wasm (wasm-binding_20261125)",
-    "4c5814f: docs(conductor): point wasm32 gate at check:wasm (wasm-binding_20261125)"
+    "4c5814f: docs(conductor): point wasm32 gate at check:wasm (wasm-binding_20261125)",
+    "d946a94: feat(core): switch profile and scripts in place (wasm-binding_20261125)"
   ]
 }
