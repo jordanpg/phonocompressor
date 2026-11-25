@@ -23,11 +23,11 @@ Prove `phono-core` builds for `wasm32-unknown-unknown`, and make the check one c
 
 ### Tasks
 
-- [~] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `check:wasm` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
+- [x] Task 1.1: Add `wasm32-unknown-unknown` to `targets` on `rust` in `mise.toml`; build `phono-core` for wasm32 and fix anything that doesn't compile; add a `check:wasm` mise task; drop the "not installed" note from the wasm32 gate in `workflow.md` ([#2](https://github.com/jordanpg/phonocompressor/issues/2))
 
 ### Verification
 
-- [ ] `mise run check:wasm` passes after `mise install`; `mise run fmt:check`, `mise run lint` and `cargo test --workspace` pass
+- [x] `mise run check:wasm` passes after `mise install`; `mise run fmt:check`, `mise run lint` and `cargo test --workspace` pass
 
 ## Phase 2: Core and CLI support
 
