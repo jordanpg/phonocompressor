@@ -278,8 +278,8 @@ def cmd_export_clips(args) -> None:
 def cmd_translit_table(args) -> None:
     """Dump unidecode's output for every BMP codepoint as TSV: hex codepoint, JSON-quoted output.
 
-    The Rust builder reads this. It is generated rather than committed because Python unidecode
-    is GPL-2.0+ (see docs/PLAN.md, Data and licenses).
+    Dev only, for comparing against the shipped (deunicode) table. Python unidecode is
+    GPL-2.0+, so this output never feeds the data file (see docs/PLAN.md, Data and licenses).
     """
     import json
     from pathlib import Path

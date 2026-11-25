@@ -15,15 +15,16 @@ UV_PROJECT_ENVIRONMENT = "{{env.HOME}}/.cache/phonocompressor/tools-venv"
 
 # --- Data file for the Rust engine (data/generated/, not committed) ---
 
-[tasks."data:translit"]
-description = "Export unidecode's transliteration table (GPL tool output; generated, not committed)"
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness translit-table ../data/generated/translit.tsv"
-
 [tasks.data]
-description = "Build data/generated/phono.bin: Phoible features, CMUdict, G2P model, transliteration"
-depends = ["data:translit"]
+description = "Build data/generated/phono.bin: Phoible features, CMUdict, G2P model, transliteration (deunicode)"
 run = "cargo run --release -p phono-builder"
+
+# Dev only: unidecode (GPL) output for diffing against the shipped table. Never feeds phono.bin
+# unless you pass it to the builder with --translit by hand.
+[tasks."dev:translit-unidecode"]
+description = "Export Python unidecode's table to data/generated/translit-unidecode.tsv, for comparison only"
+dir = "{{config_root}}/tools"
+run = "uv run phono-harness translit-table ../data/generated/translit-unidecode.tsv"
 
 [tasks.phono]
 description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"

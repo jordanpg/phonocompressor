@@ -8,7 +8,7 @@ This project searches for short strings of exotic characters whose TTS reading l
 
 ## How it works
 
-The TTS models on ElevenLabs' 2.5 generation (Flash v2.5, Turbo v2.5) don't read unfamiliar scripts in their native language. They **transliterate** each character into Latin letters (the same table as Python's [`unidecode`](https://pypi.org/project/Unidecode/)), then read the result as English spelling. `딧잇` becomes "dis·is" and is read as "this is"; `㌀` becomes "apartment". The engine exploits that:
+The TTS models on ElevenLabs' 2.5 generation (Flash v2.5, Turbo v2.5) don't read unfamiliar scripts in their native language. They **transliterate** each character into Latin letters (a table equivalent to Python's [`unidecode`](https://pypi.org/project/Unidecode/); we build ours from Rust's [`deunicode`](https://crates.io/crates/deunicode)), then read the result as English spelling. `딧잇` becomes "dis·is" and is read as "this is"; `㌀` becomes "apartment". The engine exploits that:
 
 ```
 English phrase
@@ -114,6 +114,7 @@ The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.de
 |---|---|---|
 | Phoible | phone distance | CC BY 4.0 |
 | CMUdict | English pronunciations | BSD-style |
-| `unidecode` | transliteration table (dev tooling; output is generated, not committed) | GPL-2.0+ |
+| [`deunicode`](https://crates.io/crates/deunicode) | transliteration table, built by `phono-build` | BSD-3-Clause |
+| Python `unidecode` | dev comparison only (`mise run dev:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
-Generated data lives in `data/generated/` and is not committed. Because `unidecode` is GPL, the plan is to move the shipped table to the BSD-licensed `deunicode` before distributing it (see PLAN.md). This repository has no license file yet.
+Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The code is licensed MIT OR Apache-2.0.

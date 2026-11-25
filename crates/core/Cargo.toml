@@ -3,6 +3,7 @@ name = "phono-core"
 description = "Phonetic compression core: phone features, English G2P, transliteration chunks, scoring and search"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 serde.workspace = true

@@ -1,0 +1,80 @@
+name = "exp10"
+description = """
+Probe of the codepoints where Rust `deunicode` and Python `unidecode` disagree inside scripts the
+search can use (docs/PLAN.md, "Transliteration source", step 1). Kana: unidecode says shi/chi/tsu,
+deunicode says si/ti/tu. Han: five characters get different readings. If the TTS follows
+unidecode, add an override in crates/builder/src/translit.rs; if it follows deunicode, nothing to
+do. Same model, voice and seeds as exp1-exp9.
+Run 2026-11-25 (22 clips): the TTS followed unidecode on the three kana pairs and four of the five
+Han characters (U+4E48, U+4EC0, U+65C5, U+672F); U+4EF7 split between the two. See docs/PLAN.md.
+"""
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 60
+
+[[cases]]
+id = "shi_hira"
+text = "しま"
+target = "shima"
+t = "unidecode vs deunicode differ on し"
+
+[[cases]]
+id = "chi_hira"
+text = "ちか"
+target = "chika"
+t = "unidecode vs deunicode differ on ち"
+
+[[cases]]
+id = "tsu_hira"
+text = "つき"
+target = "tsuki"
+t = "unidecode vs deunicode differ on つ"
+
+[[cases]]
+id = "shi_kata"
+text = "シマ"
+target = "shima"
+t = "unidecode vs deunicode differ on シ"
+
+[[cases]]
+id = "chi_kata"
+text = "チカ"
+target = "chika"
+t = "unidecode vs deunicode differ on チ"
+
+[[cases]]
+id = "tsu_kata"
+text = "ツキ"
+target = "tsuki"
+t = "unidecode vs deunicode differ on ツ"
+
+[[cases]]
+id = "han_yao"
+text = "么"
+target = "yao / me"
+t = "unidecode vs deunicode differ on 么"
+
+[[cases]]
+id = "han_shi"
+text = "什"
+target = "shi / shen"
+t = "unidecode vs deunicode differ on 什"
+
+[[cases]]
+id = "han_jie"
+text = "价"
+target = "jie / jia"
+t = "unidecode vs deunicode differ on 价"
+
+[[cases]]
+id = "han_lu"
+text = "旅"
+target = "lu / lv"
+t = "unidecode vs deunicode differ on 旅"
+
+[[cases]]
+id = "han_zhu"
+text = "术"
+target = "zhu / shu"
+t = "unidecode vs deunicode differ on 术"

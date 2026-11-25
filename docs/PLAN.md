@@ -1012,7 +1012,7 @@ where `model` is an ElevenLabs model id with a profile (default `eleven_flash_v2
 | Phoible features | phone distance | CC-BY 4.0 (attribution required) |
 | CMUdict | English pronunciations | BSD-style |
 | Unihan | CJK readings (model N) | Unicode License |
-| Transliteration table | chunk inventory | Today generated from Python `unidecode`, which is **GPL-2.0+**. **Decision (2026-11-25): move to Rust `deunicode` (BSD-3)**; see "Transliteration source" below. |
+| Transliteration table | chunk inventory | Built by `phono-build` from Rust `deunicode` (BSD-3) plus our own overrides. Python `unidecode` (**GPL-2.0+**) is a dev-only comparison; see "Transliteration source" below. |
 
 ### Transliteration source: move from `unidecode` to `deunicode`
 
@@ -1021,7 +1021,57 @@ crate (BSD-3). The goal is a browser-only web tool, so we will distribute the
 table inside the WASM bundle, and we also want to publish the tables on GitHub.
 Shipping tables derived from GPL-2.0+ `unidecode` would pull the bundle and the
 published tables under the GPL, which blocks a permissive repo license
-(MIT OR Apache-2.0 is the plan). Not started.
+(MIT OR Apache-2.0 is the plan).
+
+**Status (2026-11-25): steps 1–4 and 6 done on branch `worktree-deunicode`; step 5 only as
+attribution (`THIRD_PARTY.md`), the table itself is not published yet.**
+
+Step 1 table diff (BMP; `phono-build --dump-translit` vs `mise run dev:translit-unidecode`):
+- 40,557 codepoints in unidecode, 54,893 in deunicode. 40,172 are identical (99.1%); 383
+  differ; unidecode has 2 that deunicode lacks (U+007F, U+30FC); deunicode adds 14,338
+  (7,153 CJK, 954 Arabic, Vai, Tai, Kangxi, …), almost all in scripts the Flash profile
+  doesn't use.
+- Of the 383 differences, 198 are Braille and about 35 Hebrew; the rest are symbols, chess
+  pieces, currency and a few letters. Only these fall in scripts the search uses:
+  - **Kana:** し/シ `shi`→`si`, ち/チ `chi`→`ti`, つ/ツ `tsu`→`tu` (deunicode is Kunrei-style;
+    unidecode is Hepburn for these three but `hu` for フ, so neither is consistent).
+  - **Han:** 么, 什, 价, 旅, 术 (readings below).
+  - **Latin:** `ŋ`/`Ŋ` have their cases swapped; U+0404 `Є` is `E` rather than `Ie`.
+
+Steps 3–4: the builder builds the table from `deunicode` (`crates/builder/src/translit.rs`), so
+`mise run data` no longer needs Python. `--translit FILE` loads a TSV instead, for
+comparisons. With only the table swapped (no overrides):
+- `phono eval`: all 34 answers byte-identical, mean fidelity 0.961 vs community 0.843, ours ≥
+  community on 33/34, both as before.
+- `phono calibrate` on `clips-all9.tsv` (580 clips): output identical.
+
+**exp10** (2026-11-25, Flash v2.5, same voice, 2 seeds, 22 clips, about 22 credits;
+`tools/results/exp10.md`) probed the disputed kana and Han. No sample message or clip used
+them. The TTS followed unidecode in 8 of 9 codepoints, as read from the recognized phones:
+
+| char | deunicode | unidecode | heard (seed 1 / 2) | override |
+|---|---|---|---|---|
+| し シ | `si` | `shi` | `ʃ i` / `ʃ i` | `shi` |
+| ち チ | `ti` | `chi` | `tʃ i` / `tʃ i` | `chi` |
+| つ ツ | `tu` | `tsu` | `s k iː` / `ts k iː` | `tsu` (weaker: vowel swallowed, never a bare `t`) |
+| 么 | `Me ` | `Yao ` | `j aː` / `j ɑ` | `Yao ` |
+| 什 | `Shen ` | `Shi ` | `s. i` / `s. i` | `Shi ` |
+| 旅 | `Lv ` | `Lu ` | `l uː` / `l uː` | `Lu ` |
+| 术 | `Shu ` | `Zhu ` | `dʒ uː` / `dʒ i` | `Zhu ` |
+| 价 | `Jia ` | `Jie ` | `dʒ aː` / `dʒ i` | none (seeds split) |
+
+The ten overrides are in `OVERRIDES` in `translit.rs`, each justified by these clips. The
+trailing space and capital on the Han entries follow `deunicode`'s CJK entries (and exp1's
+"Kaka "); exp10 can't test them, since each character was played alone. With the overrides:
+- the 34 sample answers are still byte-identical, and `calibrate` is still identical (no clip
+  uses these characters);
+- the table matches unidecode on 40,182 codepoints (was 40,172) and the chunk inventory is
+  13,187 (was 13,189 without overrides, 13,095 under unidecode);
+- the kana and Han chunks rank low in the profile's script preference, so this mostly protects
+  scoring of other people's texts and future phrases.
+
+The other 373 differences are in scripts the Flash profile doesn't search (Braille, Hebrew,
+symbols) or are Latin oddities (`ŋ`/`Ŋ` swapped, `Є`); none are measured.
 
 To do:
 

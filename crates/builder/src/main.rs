@@ -5,6 +5,7 @@
 //! are held out to report accuracy; they stay in the lexicon, so nothing is lost at runtime.
 
 mod align;
+mod translit;
 
 use clap::Parser;
 use phono_core::chunks::{ChunkKind, ChunkSet, Translit};
@@ -23,9 +24,13 @@ struct Args {
     phoible: PathBuf,
     #[arg(long, default_value = "cmudict/cmudict.dict")]
     cmudict: PathBuf,
-    /// Written by `mise run data:translit` (Python unidecode; not committed, GPL).
-    #[arg(long, default_value = "data/generated/translit.tsv")]
-    translit: PathBuf,
+    /// Read the transliteration table from this TSV instead of building it from `deunicode`
+    /// (for comparing sources; the shipped table never comes from here).
+    #[arg(long)]
+    translit: Option<PathBuf>,
+    /// Also write the transliteration table actually used to this TSV.
+    #[arg(long)]
+    dump_translit: Option<PathBuf>,
     #[arg(long, default_value = "data/generated/phono.bin")]
     out: PathBuf,
     /// EM iterations for the letter–phone aligner.
@@ -51,7 +56,13 @@ fn main() -> Result<(), String> {
     let lexicon = Lexicon::parse_cmudict(&read(&args.cmudict)?)?;
     println!("cmudict: {} words", lexicon.len());
 
-    let translit = Translit::parse_tsv(&read(&args.translit)?)?;
+    let translit = match &args.translit {
+        Some(path) => Translit::parse_tsv(&read(path)?)?,
+        None => translit::from_deunicode(),
+    };
+    if let Some(path) = &args.dump_translit {
+        std::fs::write(path, translit::to_tsv(&translit)).map_err(|e| format!("{}: {e}", path.display()))?;
+    }
     // Chunk stats for the default model; the data file itself doesn't depend on the model.
     let profile = phono_core::model::DEFAULT;
     let chunks = ChunkSet::new(&translit, profile, |s| profile.script(s).default_on);

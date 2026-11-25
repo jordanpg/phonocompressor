@@ -1,21 +1,21 @@
 //! Transliteration table and the chunk inventory the search tiles with.
 //!
 //! Reading model T (docs/PLAN.md): the TTS turns each codepoint into a Latin chunk (as Python
-//! `unidecode` does) and reads the concatenation as English. A *chunk* is the Latin string of
+//! `unidecode` and Rust `deunicode` do) and reads the concatenation as English. A *chunk* is the Latin string of
 //! one codepoint; the search picks one representative codepoint per distinct chunk.
 
 use crate::model::{ModelProfile, ScriptReading};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Raw transliteration of each codepoint (unidecode output), e.g. `嬶` → `"Kaka "`.
+/// Raw transliteration of each codepoint (the builder's table, from `deunicode`), e.g. `嬶` → `"Kaka "`.
 #[derive(Serialize, Deserialize, Default)]
 pub struct Translit {
     pub map: HashMap<char, String>,
 }
 
 impl Translit {
-    /// Parse the TSV written by `phono-harness translit-table`: `HEX<TAB>"json string"`.
+    /// Parse a TSV table: `HEX<TAB>"json string"` (what `phono-build --dump-translit` writes).
     pub fn parse_tsv(text: &str) -> Result<Self, String> {
         let mut map = HashMap::new();
         for (n, line) in text.lines().enumerate() {
