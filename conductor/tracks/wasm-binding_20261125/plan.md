@@ -80,8 +80,8 @@ Run the binding in real browsers, off the main thread, and record what it costs.
 
 ### Tasks
 
-- [~] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
-- [ ] Task 5.2: Measure in Chrome and Firefox: start-up time (fetch and decode), time per phrase for the parity phrases at defaults, `.wasm` and `phono.bin` sizes raw and gzip; record in `docs/PLAN.md` and a comment on #1; open a speed-tuning issue if time per phrase is well above native ([#21](https://github.com/jordanpg/phonocompressor/issues/21))
+- [x] Task 5.1: Plain HTML/JS page with phrase, budget and top N inputs; a module Web Worker fetches the `.wasm` and `phono.bin`, initializes once and runs `compress()` per request; list text, Latin, phones and score; show errors and keep the input; add a `wasm:serve` task (`.wasm` served as `application/wasm`) ([#20](https://github.com/jordanpg/phonocompressor/issues/20))
+- [~] Task 5.2: Measure in Chrome and Firefox: start-up time (fetch and decode), time per phrase for the parity phrases at defaults, `.wasm` and `phono.bin` sizes raw and gzip; record in `docs/PLAN.md` and a comment on #1; open a speed-tuning issue if time per phrase is well above native ([#21](https://github.com/jordanpg/phonocompressor/issues/21))
 - [ ] Task 5.3: Document the binding: PLAN.md (Phase 3 status, fetch-not-embed decision, repo layout line), README (`wasm:build`, `wasm:parity`, `wasm:serve`), `tech-stack.md` (`crates/wasm` row, new tools, decision-log entry) and `workflow.md` (`wasm:check` and `wasm:parity` gates) ([#22](https://github.com/jordanpg/phonocompressor/issues/22))
 
 ### Verification
