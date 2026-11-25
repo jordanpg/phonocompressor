@@ -27,7 +27,11 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [x] [Build the WASM binding](./tracks/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 9/9 tasks, complete.
+_None. Run `/conductor:new-track` to start one._
+
+## Archived Tracks
+
+- [x] [Build the WASM binding](./tracks/_archive/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 9/9 tasks, complete.
 
 ## Project Status
 

@@ -42,5 +42,6 @@
     "f6328c6: test(wasm): add a ?bench mode to the test page (wasm-binding_20261125)",
     "2d60c4e: docs(plan): record wasm browser measurements (wasm-binding_20261125)",
     "fd71b94: docs(wasm): document the binding and its tasks (wasm-binding_20261125)"
-  ]
+  ],
+  "archived": "2026-11-25"
 }
