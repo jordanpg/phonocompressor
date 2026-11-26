@@ -11,6 +11,7 @@ An experiment is a list of cases (text + predictions) crossed with models and se
     # or several files: a text already seen for the same phrase is dropped
     # cases_from = ["data/generated/ours-v1.json", "data/generated/ours-v2.json"]
     # cases_exclude = "sample/messages.json"  # optional: drop texts listed here too
+    # cases_keys = "tools/experiments/exp15.keys"  # optional: keep only these message keys
 
     [[cases]]
     id = "dis_is"
@@ -67,8 +68,24 @@ def _phrase_key(case: Case) -> tuple[str, str]:
     return (" ".join(case.target.lower().split()), case.text)
 
 
-def cases_from_files(paths: str | list[str], exclude: str | list[str] = ()) -> list[Case]:
+def load_keys(path: str) -> set[str]:
+    """Message keys from a file (relative to the repo root): one per line, or the last
+    tab-separated field (so `tools/library-keys.tsv` works); `#` comments skipped."""
+    lines = (REPO_ROOT / path).read_text(encoding="utf-8").splitlines()
+    return {
+        line.rsplit("\t", 1)[-1].strip()
+        for line in lines
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+
+def cases_from_files(
+    paths: str | list[str], exclude: str | list[str] = (), keys: set[str] | None = None
+) -> list[Case]:
     """Cases from one or more message files (paths relative to the repo root), in order.
+
+    With `keys`, only messages under those keys are read from any file (case ids are
+    `msg<key>`), so a committed key list can pick cases out of gitignored files.
 
     With several files, a text already seen for the same phrase is dropped, and so is one
     listed in an `exclude` file (e.g. a replay leaving out texts another experiment already
@@ -83,6 +100,8 @@ def cases_from_files(paths: str | list[str], exclude: str | list[str] = ()) -> l
     cases = []
     for p in paths:
         for c in cases_from_messages(REPO_ROOT / p):
+            if keys is not None and c.id.removeprefix("msg") not in keys:
+                continue
             if len(paths) > 1 or exclude:
                 if _phrase_key(c) in seen:
                     continue
@@ -128,7 +147,8 @@ def load(name_or_path: str) -> Experiment:
         path = EXPERIMENTS_DIR / f"{name_or_path}.toml"
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     cases = [Case(**c) for c in data.get("cases", [])]
-    cases += cases_from_files(data.get("cases_from", []), data.get("cases_exclude", []))
+    keys = load_keys(data["cases_keys"]) if "cases_keys" in data else None
+    cases += cases_from_files(data.get("cases_from", []), data.get("cases_exclude", []), keys)
     ids = [c.id for c in cases]
     if len(ids) != len(set(ids)):
         raise SystemExit(f"{path}: duplicate case ids")
