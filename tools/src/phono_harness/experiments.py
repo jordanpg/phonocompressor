@@ -8,6 +8,9 @@ An experiment is a list of cases (text + predictions) crossed with models and se
     seeds = [1]
     max_credits = 400          # synth refuses to run if the estimate exceeds this
     cases_from = "sample/messages.json"   # optional: community messages (target = "spoken")
+    # or several files: a text already seen for the same phrase is dropped
+    # cases_from = ["data/generated/ours-v1.json", "data/generated/ours-v2.json"]
+    # cases_exclude = "sample/messages.json"  # optional: drop texts listed here too
 
     [[cases]]
     id = "dis_is"
@@ -22,7 +25,7 @@ from __future__ import annotations
 
 import json
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .cache import REPO_ROOT
@@ -50,6 +53,37 @@ def cases_from_messages(path: Path) -> list[Case]:
         for item in data
         for key, m in item.items()
     ]
+
+
+def _phrase_key(case: Case) -> tuple[str, str]:
+    return (" ".join(case.target.lower().split()), case.text)
+
+
+def cases_from_files(paths: str | list[str], exclude: str | list[str] = ()) -> list[Case]:
+    """Cases from one or more message files (paths relative to the repo root), in order.
+
+    With several files, a text already seen for the same phrase is dropped, and so is one
+    listed in an `exclude` file (e.g. a replay leaving out texts another experiment already
+    covers). A kept case whose id an earlier file used gets the file's stem as a suffix, e.g.
+    `msg8_ours-v2`. A single file keeps every case and id as before."""
+    if isinstance(paths, str):
+        paths = [paths]
+    if isinstance(exclude, str):
+        exclude = [exclude]
+    seen = {_phrase_key(c) for p in exclude for c in cases_from_messages(REPO_ROOT / p)}
+    ids: set[str] = set()
+    cases = []
+    for p in paths:
+        for c in cases_from_messages(REPO_ROOT / p):
+            if len(paths) > 1 or exclude:
+                if _phrase_key(c) in seen:
+                    continue
+                seen.add(_phrase_key(c))
+            if c.id in ids:
+                c = replace(c, id=f"{c.id}_{Path(p).stem}")
+            ids.add(c.id)
+            cases.append(c)
+    return cases
 
 
 @dataclass(frozen=True)
@@ -86,8 +120,7 @@ def load(name_or_path: str) -> Experiment:
         path = EXPERIMENTS_DIR / f"{name_or_path}.toml"
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     cases = [Case(**c) for c in data.get("cases", [])]
-    if "cases_from" in data:  # path relative to the repo root
-        cases += cases_from_messages(REPO_ROOT / data["cases_from"])
+    cases += cases_from_files(data.get("cases_from", []), data.get("cases_exclude", []))
     ids = [c.id for c in cases]
     if len(ids) != len(set(ids)):
         raise SystemExit(f"{path}: duplicate case ids")
