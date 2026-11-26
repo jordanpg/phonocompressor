@@ -343,7 +343,8 @@ def cmd_fetch_library(args) -> None:
         raise SystemExit(f"{library.URL_ENV} is not set (it comes from fnox via the mise task)")
     out = Path(args.out)
     table = library.load_key_table(Path(args.keys))
-    items = library.build(library.fetch(url), table)
+    overrides = library.load_overrides(Path(args.targets))
+    items = library.build(library.fetch(url), table, overrides)
     added, changed, removed = library.diff(library.read(out), items)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(library.dumps(items), encoding="utf-8")
@@ -352,9 +353,13 @@ def cmd_fetch_library(args) -> None:
     print(f"wrote {len(items)} entries to {out}")
     print(f"new {len(added)}, changed {len(changed)}, removed {len(removed)} since the last fetch")
     print(f"hand-picked keys present: {picked}/{len(table)}")
+    by_rule, by_override, unused = library.target_stats(items, overrides)
+    print(f"targets: {by_rule} cleaned by rule, {by_override} from {Path(args.targets).name}")
     print(f"content hash {library.content_hash(items)}")
     if removed:
         print("removed keys: " + " ".join(removed))
+    if unused:
+        print("overrides with no entry: " + " ".join(unused))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -385,6 +390,7 @@ def main(argv: list[str] | None = None) -> None:
     fl = sub.add_parser("fetch-library")
     fl.add_argument("--out", default=str(library.OUT_PATH))
     fl.add_argument("--keys", default=str(library.KEYS_PATH))
+    fl.add_argument("--targets", default=str(library.OVERRIDES_PATH))
     fl.set_defaults(func=cmd_fetch_library)
     r = sub.add_parser("report")
     r.add_argument("experiment")

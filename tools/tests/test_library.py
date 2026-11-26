@@ -42,7 +42,16 @@ def test_hand_picked_keep_their_key_others_keyed_from_uuid():
 
 def test_clean_entry_drops_submitter_and_score_and_keeps_field_order():
     cleaned = library.clean_entry(entry(U1))
-    assert list(cleaned) == list(library.KEEP)
+    assert list(cleaned) == [
+        "id",
+        "unicode",
+        "spoken",
+        "target",
+        "notes",
+        "characters",
+        "createdAt",
+        "updatedAt",
+    ]
     assert "submittedBy" not in cleaned and "score" not in cleaned
 
 
@@ -123,3 +132,71 @@ def test_output_has_one_entry_per_line_with_key_first():
 
 def test_read_missing_file_is_empty(tmp_path):
     assert library.read(tmp_path / "nope.json") == []
+
+
+# --- targets ---
+
+
+@pytest.mark.parametrize(
+    ("spoken", "target"),
+    [
+        ("plain words", "plain words"),
+        ("(aside) the blue kettle", "the blue kettle"),
+        ("ends with an aside (lol)", "ends with an aside"),
+        ("koko('s) stiff", "koko's stiff"),  # attached to a word: optional letters, kept
+        ("cat/dog house", "cat"),  # a/b: the first alternative
+        ("cat / dog", "cat"),
+        ("100k cats", "100,000 cats"),
+        ("5K steps", "5,000 steps"),
+        ("100,000 cats", "100,000 cats"),
+        ("1/2 cup", "1/2 cup"),  # a slash between digits is not an alternative
+        ("ok kk 3kg", "ok kk 3kg"),  # only a bare <digits>k token
+        ("  spaced   out  ", "spaced out"),
+        ("(only an aside)", "(only an aside)"),  # nothing left: keep the label
+    ],
+)
+def test_clean_target_rules(spoken, target):
+    assert library.clean_target(spoken) == target
+
+
+def test_overrides_parse_tsv(tmp_path):
+    p = tmp_path / "targets.tsv"
+    p.write_text("# key<TAB>target\n\nu1\tgreen lamp\n8\tblue door\n", encoding="utf-8")
+    assert library.load_overrides(p) == {"u1": "green lamp", "8": "blue door"}
+    assert library.load_overrides(tmp_path / "missing.tsv") == {}
+
+
+def test_build_adds_target_after_spoken():
+    [item] = library.build([entry(U1, spoken="100k cats")], {U1: "8"})
+    fields = item["8"]
+    assert fields["target"] == "100,000 cats"
+    assert list(fields)[:4] == ["id", "unicode", "spoken", "target"]
+
+
+def test_override_beats_rule():
+    items = library.build([entry(U1, spoken="cat/dog house")], {U1: "8"}, {"8": "dog house"})
+    assert items[0]["8"]["target"] == "dog house"
+
+
+def test_target_stats_count_rules_overrides_and_unused():
+    items = library.build(
+        [entry(U1, spoken="100k"), entry(U2, spoken="plain"), entry(U3, spoken="x/y")],
+        {U1: "8"},
+        {"u3333abcd": "y", "gone": "z"},
+    )
+    assert library.target_stats(items, {"u3333abcd": "y", "gone": "z"}) == (1, 1, ["gone"])
+
+
+def test_cases_prefer_target_and_fall_back_to_spoken(tmp_path):
+    p = tmp_path / "m.json"
+    p.write_text(
+        json.dumps(
+            [
+                {"1": {"unicode": "a", "spoken": "a b", "target": "ay bee"}},
+                {"2": {"unicode": "c", "spoken": "c d"}},
+                {"3": {"unicode": "e", "spoken": "e f", "target": ""}},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert [c.target for c in cases_from_messages(p)] == ["ay bee", "c d", "e f"]

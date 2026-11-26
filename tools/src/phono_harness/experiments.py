@@ -7,7 +7,7 @@ An experiment is a list of cases (text + predictions) crossed with models and se
     models = ["eleven_flash_v2_5", ...]
     seeds = [1]
     max_credits = 400          # synth refuses to run if the estimate exceeds this
-    cases_from = "sample/messages.json"   # optional: community messages (target = "spoken")
+    cases_from = "sample/messages.json"   # optional: community messages (target, else spoken)
     # or several files: a text already seen for the same phrase is dropped
     # cases_from = ["data/generated/ours-v1.json", "data/generated/ours-v2.json"]
     # cases_exclude = "sample/messages.json"  # optional: drop texts listed here too
@@ -46,10 +46,18 @@ class Case:
 
 
 def cases_from_messages(path: Path) -> list[Case]:
-    """Community sample messages: [{"<n>": {"unicode": ..., "spoken": ..., "notes": ...}}, ...]."""
+    """Community sample messages: [{"<n>": {"unicode": ..., "spoken": ..., "notes": ...}}, ...].
+
+    The case's target is the entry's `target` (library.json) when set, else its `spoken` label.
+    """
     data = json.loads(path.read_text(encoding="utf-8"))
     return [
-        Case(id=f"msg{key}", text=m["unicode"], target=m["spoken"], note=m.get("notes") or "")
+        Case(
+            id=f"msg{key}",
+            text=m["unicode"],
+            target=m.get("target") or m["spoken"],
+            note=m.get("notes") or "",
+        )
         for item in data
         for key, m in item.items()
     ]

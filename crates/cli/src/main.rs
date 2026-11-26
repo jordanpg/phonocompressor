@@ -130,7 +130,8 @@ enum Command {
         #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
         lambdas: Vec<f32>,
     },
-    /// Score the community sample messages and compress their phrases.
+    /// Score the community sample messages and compress their phrases (each entry's `target`,
+    /// else its `spoken` label).
     Eval {
         #[arg(default_value = "sample/messages.json")]
         messages: PathBuf,
@@ -362,47 +363,34 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
-/// Minimal reader for the community messages file: [{"<id>": {"unicode": .., "spoken": ..}}, ..].
+/// Reads a reference messages file: `[{"<key>": {"unicode": .., "spoken": .., "target": ..}}, ..]`.
+/// Returns `(key, unicode, phrase)` in file order, where the phrase is the entry's `target`
+/// (set by `//tools:fetch-library`) or, when that is missing or empty, its `spoken` label.
 fn load_messages(path: &PathBuf) -> Result<Vec<(String, String, String)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let mut out = Vec::new();
-    // Pull "unicode" and "spoken" string fields in order; ids are the keys before them.
-    let mut rest = text.as_str();
-    while let Some(pos) = rest.find("\"unicode\"") {
-        let before = &rest[..pos];
-        let id = before
-            .rfind("\": {")
-            .and_then(|e| before[..e].rfind('"').map(|s| before[s + 1..e].to_string()));
-        rest = &rest[pos..];
-        let unicode = json_string_field(rest, "unicode").ok_or("bad unicode field")?;
-        let spoken = json_string_field(rest, "spoken").ok_or("bad spoken field")?;
-        out.push((id.unwrap_or_default(), unicode, spoken));
-        rest = &rest[9..];
-    }
-    Ok(out)
+    parse_messages(&text).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn json_string_field(s: &str, name: &str) -> Option<String> {
-    let start = s.find(&format!("\"{name}\""))?;
-    let after = &s[start + name.len() + 2..];
-    let q = after.find('"')?;
-    let mut out = String::new();
-    let mut chars = after[q + 1..].chars();
-    while let Some(c) = chars.next() {
-        match c {
-            '"' => return Some(out),
-            '\\' => match chars.next()? {
-                'n' => out.push('\n'),
-                'u' => {
-                    let hex: String = chars.by_ref().take(4).collect();
-                    out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
-                }
-                other => out.push(other),
-            },
-            c => out.push(c),
+fn parse_messages(text: &str) -> Result<Vec<(String, String, String)>, String> {
+    let items: Vec<serde_json::Map<String, serde_json::Value>> =
+        serde_json::from_str(text).map_err(|e| e.to_string())?;
+    let field = |m: &serde_json::Value, name: &str| {
+        m.get(name)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+    let mut out = Vec::new();
+    for item in &items {
+        for (key, m) in item {
+            let unicode = field(m, "unicode").ok_or(format!("{key}: no unicode field"))?;
+            let phrase = field(m, "target")
+                .or_else(|| field(m, "spoken"))
+                .ok_or(format!("{key}: no spoken field"))?;
+            out.push((key.clone(), unicode, phrase));
         }
     }
-    None
+    Ok(out)
 }
 
 fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(), String> {
@@ -418,10 +406,10 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         "{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}",
         "id", "phrase", "theirs", "", "ours", ""
     );
-    for (id, unicode, spoken) in &messages {
-        let target = engine.target_of(spoken);
+    for (id, unicode, phrase) in &messages {
+        let target = engine.target_of(phrase);
         let their = engine.predict(unicode, &target, &engine.profile.predict);
-        let best = searcher.search(spoken, &cfg);
+        let best = searcher.search(phrase, &cfg);
         let (our_text, our) = best
             .first()
             .map(|c| (c.text.clone(), c.fidelity))
@@ -433,12 +421,12 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         }
         println!(
             "{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
-            truncate(spoken, 28)
+            truncate(phrase, 28)
         );
         exported.push(format!(
             "  {{\"{id}\": {{\"unicode\": {}, \"spoken\": {}, \"notes\": \"phono top-1, predicted {our:.3} (community {their:.3})\"}}}}",
             json_quote(&our_text),
-            json_quote(spoken)
+            json_quote(phrase)
         ));
     }
     if let Some(out) = export {
@@ -762,4 +750,31 @@ fn calibrate(
         let _ = words;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_messages;
+
+    #[test]
+    fn messages_prefer_target_and_fall_back_to_spoken() {
+        let text = r#"[
+            {"8": {"id": "x", "unicode": "ab", "spoken": "a/b", "target": "a", "notes": ""}},
+            {"u1": {"unicode": "cd", "spoken": "c d", "characters": [{"unicodeName": "C"}]}},
+            {"3": {"unicode": "ef", "spoken": "e f", "target": ""}}
+        ]"#;
+        let got = parse_messages(text).unwrap();
+        let want = [("8", "ab", "a"), ("u1", "cd", "c d"), ("3", "ef", "e f")];
+        assert_eq!(got.len(), want.len());
+        for ((k, u, p), (wk, wu, wp)) in got.iter().zip(want) {
+            assert_eq!((k.as_str(), u.as_str(), p.as_str()), (wk, wu, wp));
+        }
+    }
+
+    #[test]
+    fn messages_need_unicode_and_a_phrase() {
+        assert!(parse_messages(r#"[{"1": {"spoken": "a"}}]"#).is_err());
+        assert!(parse_messages(r#"[{"1": {"unicode": "a"}}]"#).is_err());
+        assert!(parse_messages("not json").is_err());
+    }
 }

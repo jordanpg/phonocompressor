@@ -7,7 +7,9 @@ Keys stay stable across re-fetches. The hand-picked entries keep their keys thro
 committed UUID → key table (`tools/library-keys.tsv`, no message content). Every other entry
 is keyed `u` + the first 8 hex digits of its UUID, so later inserts renumber nothing.
 
-Submitter fields and the vote count are dropped. The library URL comes from the environment
+Each entry gets a `target`, the phrase it is scored against: `spoken` cleaned by the rules in
+`clean_target`, or a hand-written override from gitignored `sample/targets.tsv`
+(`key<TAB>target`). Overrides win. Submitter fields and the vote count are dropped. The library URL comes from the environment
 (`PHONO_LIBRARY_URL`, set from fnox by the mise task) and is never printed: the repo is public.
 """
 
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from .cache import REPO_ROOT
@@ -22,10 +25,32 @@ from .cache import REPO_ROOT
 URL_ENV = "PHONO_LIBRARY_URL"
 KEYS_PATH = REPO_ROOT / "tools" / "library-keys.tsv"
 OUT_PATH = REPO_ROOT / "sample" / "library.json"
+OVERRIDES_PATH = REPO_ROOT / "sample" / "targets.tsv"
 
-# Fields kept from each entry, in this order. The CLI's minimal loader needs "unicode" before
-# "spoken", and the key's object must open with a plain string field.
+# Fields kept from each entry, in this order; `target` is added after "spoken".
 KEEP = ("id", "unicode", "spoken", "notes", "characters", "createdAt", "updatedAt")
+
+_ALTERNATIVE = re.compile(r"\s*(?<=[^\W\d_]|\s)/(?=\s*[^\W\d_])")  # a/b, not 1/2
+_ATTACHED_PAREN = re.compile(r"(?<=\w)\(([^()]*)\)")  # koko('s): optional letters
+_ASIDE = re.compile(r"\([^()]*\)")  # (aside) on its own
+_THOUSANDS = re.compile(r"\b(\d+)[kK]\b")  # 100k
+
+
+def clean_target(spoken: str) -> str:
+    """The label as a phrase to score against: written-for-people forms made into sound.
+
+    - `a/b` alternatives: keep the first (`/` between digits is left alone);
+    - a parenthetical attached to a word keeps its letters (`koko('s)` → `koko's`);
+      one standing alone is an aside and is dropped;
+    - `100k` → `100,000`, which the reader says as a number.
+    If nothing is left, the label is kept as is.
+    """
+    s = _ALTERNATIVE.split(spoken, maxsplit=1)[0]
+    s = _ATTACHED_PAREN.sub(r"\1", s)
+    s = _ASIDE.sub(" ", s)
+    s = _THOUSANDS.sub(r"\1,000", s)
+    s = " ".join(s.split())
+    return s or " ".join(spoken.split())
 
 
 def load_key_table(path: Path) -> dict[str, str]:
@@ -40,17 +65,41 @@ def load_key_table(path: Path) -> dict[str, str]:
     return table
 
 
+def load_overrides(path: Path) -> dict[str, str]:
+    """Key → target, from a TSV of `key<TAB>target` lines. A missing file means no overrides."""
+    if not path.exists():
+        return {}
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        key, target = line.split("\t", 1)
+        out[key.strip()] = target.strip()
+    return out
+
+
 def entry_key(uuid: str, table: dict[str, str]) -> str:
     return table.get(uuid) or "u" + uuid.replace("-", "")[:8].lower()
 
 
-def clean_entry(entry: dict) -> dict:
-    """Keep only the KEEP fields, in order. Missing strings become "", missing lists []."""
-    return {f: entry.get(f, [] if f == "characters" else "") for f in KEEP}
+def clean_entry(entry: dict, target: str | None = None) -> dict:
+    """Keep only the KEEP fields, in order, with `target` after "spoken".
+
+    Missing strings become "", missing lists []. The target defaults to the rule-cleaned label.
+    """
+    out = {}
+    for f in KEEP:
+        out[f] = entry.get(f, [] if f == "characters" else "")
+        if f == "spoken":
+            out["target"] = target or clean_target(out["spoken"])
+    return out
 
 
-def build(entries: list[dict], table: dict[str, str]) -> list[dict[str, dict]]:
+def build(
+    entries: list[dict], table: dict[str, str], overrides: dict[str, str] | None = None
+) -> list[dict[str, dict]]:
     """Cleaned, keyed entries, oldest first (ties broken by UUID)."""
+    overrides = overrides or {}
     seen: dict[str, str] = {}
     out = []
     for e in sorted(entries, key=lambda e: (e.get("createdAt", ""), e["id"])):
@@ -58,8 +107,19 @@ def build(entries: list[dict], table: dict[str, str]) -> list[dict[str, dict]]:
         if key in seen:
             raise ValueError(f"key {key} is shared by {seen[key]} and {e['id']}")
         seen[key] = e["id"]
-        out.append({key: clean_entry(e)})
+        out.append({key: clean_entry(e, overrides.get(key))})
     return out
+
+
+def target_stats(items: list[dict[str, dict]], overrides: dict[str, str]):
+    """(targets changed by rule, targets from an override, override keys with no entry)."""
+    entries = as_map(items)
+    by_override = sum(1 for k in entries if k in overrides)
+    by_rule = sum(
+        1 for k, v in entries.items() if k not in overrides and v["target"] != v["spoken"]
+    )
+    unused = [k for k in overrides if k not in entries]
+    return by_rule, by_override, unused
 
 
 def as_map(items: list[dict[str, dict]]) -> dict[str, dict]:
