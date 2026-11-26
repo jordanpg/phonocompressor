@@ -4,7 +4,7 @@
 //! [`Engine::compress`] per phrase. This crate only checks options and marshals between
 //! JavaScript and [`phono_core`], which does the work. The checking and mapping are plain Rust
 //! ([`Request`], [`compress`], [`Guess`]) so they have native tests; the `#[wasm_bindgen]` layer
-//! only converts types and errors. Build with `mise run wasm:build`.
+//! only converts types and errors. Build with `mise run //crates/wasm:build`.
 //!
 //! TypeScript types for the options and results come from `tsify`'s derive (`Ts<T>` at the
 //! boundary). Options are read field by field rather than through `Ts::to_rust`:

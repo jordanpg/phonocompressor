@@ -6,7 +6,7 @@
 // floating point may differ in the last bits). Exits 1 on any difference, 2 if an input is
 // missing.
 //
-// Usage: mise run wasm:parity (builds both sides first), or
+// Usage: mise run //crates/wasm:parity (builds both sides first), or
 //   node crates/wasm/parity/parity.mjs [--skew-wasm '{"topN": 3}']
 // --skew-wasm merges extra options into the wasm side only, to check that a difference fails.
 
@@ -27,12 +27,12 @@ const skew = flags["skew-wasm"] ? JSON.parse(flags["skew-wasm"]) : {};
 
 function need(path, fix) {
   if (!existsSync(path)) {
-    console.error(`wasm:parity: ${path} not found; ${fix}`);
+    console.error(`parity: ${path} not found; ${fix}`);
     process.exit(2);
   }
 }
 need(DATA, "run `mise run data`");
-need(`${PKG}/phono_wasm.js`, "run `mise run wasm:build`");
+need(`${PKG}/phono_wasm.js`, "run `mise run //crates/wasm:build`");
 need(CLI, "run `cargo build --release -p phono-cli`");
 
 /** `phono compress --json` arguments for a case's options. */
@@ -124,7 +124,7 @@ for (const { phrase, options = {} } of cases) {
 
 console.log(
   failed === 0
-    ? `wasm:parity: all ${cases.length} cases match`
-    : `wasm:parity: ${failed} of ${cases.length} cases differ`,
+    ? `parity: all ${cases.length} cases match`
+    : `parity: ${failed} of ${cases.length} cases differ`,
 );
 process.exit(failed === 0 ? 0 : 1);

@@ -17,7 +17,7 @@ async function fetchBytes(url, fix) {
 const ready = (async () => {
   const t0 = performance.now();
   const [wasm, data] = await Promise.all([
-    fetchBytes("./pkg/phono_wasm_bg.wasm", "run `mise run wasm:build`"),
+    fetchBytes("./pkg/phono_wasm_bg.wasm", "run `mise run //crates/wasm:build`"),
     fetchBytes("./phono.bin", "run `mise run data`"),
   ]);
   const fetchMs = since(t0);
