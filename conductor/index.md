@@ -27,7 +27,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [ ] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): probe, community and replay runs on `eleven_multilingual_v2`, its `ModelProfile` with fitted weights, and a live check. 0/9 tasks.
+- [ ] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): probe, community and replay runs on `eleven_multilingual_v2`, its `ModelProfile` with fitted weights, and a live check. 8/9 tasks.
 
 ## Archived Tracks
 
@@ -35,7 +35,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 ## Project Status
 
-- Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`.
+- Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`; `eleven_multilingual_v2` has a calibrated profile too (`--model`).
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
 - Phase 3: WASM binding built (`wasm-binding_20261125`); the front end and deploy are next.
 

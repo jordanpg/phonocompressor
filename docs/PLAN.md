@@ -205,10 +205,13 @@ showed to be most reliable.
 - the fitted scorer weights.
 
 Target phones, phone distances and the search are the same for every model.
-Only `eleven_flash_v2_5` (which also covers `eleven_turbo_v2_5`) has a
-profile. A new model needs an exp0-style probe and a community-message run
-to get one. Models that read scripts natively (v3, v4) also need reading
-model N.
+Two models have profiles: `eleven_flash_v2_5` (the default, also covering
+`eleven_turbo_v2_5`) and, since exp11–exp14, `eleven_multilingual_v2`. Its
+profile differs in the script table (kana native; risks for `҈`, syllabics,
+Ethiopic, conjoining jamo), the symbol words (`@` silent) and
+`glued_number_drop`; the rest is Flash's. A new model needs an exp0-style
+probe, a community-message run and a replay of earlier answers to get one.
+Models that read scripts natively (v3, v4) also need reading model N.
 
 ## Repo layout
 
@@ -1283,16 +1286,24 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
    boundary, the reader was right about `& # = / ⅔`, and Flash v2.5 doesn't
    normalize by default. Small reader fixes it suggests, none searchable
    today: `½` → "half", `×` not "ex", `$`+digits → "dollars".
-7. **Supporting another model.** Each one needs:
+7. **Supporting another model.** Multilingual v2 is done (exp11–exp14,
+   track `multilingual-v2_20261125`): its profile ships, level with Flash's
+   answers on that model and ahead of the community's. Each further model
+   needs:
    - an exp0-style probe;
    - a community-message run (exp1-style);
    - a new `ModelProfile` with its script table, reader constants and
      `phono fit --model <id>` weights.
 
    Two more things come with it:
-   - Move the capital-letter rules, plurals and number grouping from
+   - ~~Move the capital-letter rules, plurals and number grouping from
      `reading.rs` into profile data once a second model's clips disagree
-     with them.
+     with them.~~ Checked on Multilingual v2: its clips disagree with the
+     `@` symbol word and the glued-digit drop, which are now profile data
+     (`ReaderParams::symbol_words`, `glued_number_drop`). The capital,
+     plural and number-grouping rules agree, so they stay shared. The cheap
+     order for the next model: probe, community run, replay, then
+     `phono fit --prior profile`.
    - v3 and v4 need reading model N (Phase 2). exp0 found v4 reads Hangul as
      Korean, so that needs a Korean reader for Hangul runs: sounds change
      across syllables (`딧잇` → [디싣], heard "did it"). Per-character
@@ -1498,6 +1509,7 @@ To do:
 
 - ~~Which ElevenLabs model to standardize on.~~ Phase 0 picked Flash
   v2.5, and since v6.2 other models can get their own profiles (item 7).
+  Multilingual v2 has one since exp14; Flash stays the default.
   The real voice is still unmeasured: the free-tier API can't use Voice
   Library voices, so the harness uses premade Adam.
 - Whether a space between pseudo-words is worth its codepoint
