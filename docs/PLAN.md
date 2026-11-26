@@ -1207,6 +1207,51 @@ For comparison, Flash's clips: v6 weights 83.7% in-sample, a fresh fit
 Flash's `phono eval` is byte-identical. Multilingual v2 `calibrate`: 167/210
 (79.5%), Pearson 0.544 / Spearman 0.600.
 
+**exp14 result (real TTS, 2026-11-25, 46 credits; 2842/10000 used after):
+the Multilingual v2 profile's answers beat the community's on that model,
+by about as much as Flash's answers do, and no more.** The profile's top
+answer for each of the 34 phrases × 2 seeds on `eleven_multilingual_v2`
+(`phono --model eleven_multilingual_v2 eval --export
+data/generated/ours-mv2.json`; `tools/experiments/exp14.toml`,
+`tools/results/exp14.md`). 60 of the 68 clips were cached from exp13, since
+only 4 answers were new. Truth as in `calibrate`, all on Multilingual v2:
+
+| answers | phone fidelity | Whisper similarity | ≥ community (of 34) | harness sim (per seed) |
+|---|---|---|---|---|
+| community (exp12) | 0.739 | 0.734 | – | 0.77 / 0.78 |
+| Flash profile, v6 answers (exp13) | 0.779 | 0.803 | 28 | – |
+| Flash profile, v6.1 answers (exp13/exp14) | 0.775 | 0.798 | 28 | – |
+| **Multilingual v2 profile (exp14)** | **0.774** | **0.803** | **27** | **0.84 / 0.84** |
+
+On Flash, for scale: community 0.791 / 0.847, v6 answers 0.844 / 0.900
+(exp7).
+
+- **Against the community on this model:** +0.035 phone fidelity and +0.07
+  Whisper similarity, the same margins as Flash's answers have here. No
+  silent clips; 17/34 transcripts identical across seeds (community: 14/34).
+- **Against Flash's answers on this model: level.** Three answers differ
+  from v6.1's:
+  - `very moldy frog` drops its kana: truth 0.90 either way, but Whisper now
+    hears "Very moldy frog." on both seeds ("Very Moldafrog." once before).
+  - `what are thoooose` uses a glued `2` that this model reads: 0.34 → 0.42
+    ("Otare2 OS").
+  - `kaka chucks dung at joe mama` swaps `@` for `앝`: 0.72 → 0.70 ("Kakachuk
+    Dungajui Mama"); the "at" is still lost.
+- **Below the community on 7 phrases.** The biggest gaps are `what are
+  thoooose` (0.62 vs 0.42, no /ð/ chunk, as on Flash), `no rizz` (`노 리z`
+  "Norris", 0.75 vs 0.63) and `check him pc` (`c헻k힘 ㍶` "Check in PC" on one
+  seed). The rest are within 0.03 (`toe`: `퇴` → "two").
+- `calibrate` on exp11–exp14 (`clips-mv2b.tsv`, 406 clips; exp14 repeats 60
+  exp13 clips): 180/227 within-phrase pairs (79.3%), Pearson 0.561. The
+  profile still over-predicts its own answers (0.952 predicted, 0.774 / 0.803
+  heard): this model's noise floor isn't in the scorer.
+
+So the profile ships. It is a correct description of the model (kana not
+searched, `@` silent, glued digits read, `҈` risky) and doesn't cost any
+quality against Flash's answers, but on these 34 phrases it doesn't gain
+any either. The model reads everything about 0.07 worse than Flash, whoever
+wrote the text.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
