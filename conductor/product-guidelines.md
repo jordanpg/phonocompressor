@@ -55,7 +55,7 @@ Calibration fits the ElevenLabs free tier (10,000 credits/month).
 
 - **Do:** Cache every clip by every parameter that affects the audio. Dry-run by default. Set `max_credits` on every experiment.
 - **Do:** Reuse existing clips before synthesizing new ones.
-- **Don't:** Run `harness:synth --spend` without the user's explicit go-ahead.
+- **Don't:** Run `//tools:synth --spend` without the user's explicit go-ahead.
 - **Don't:** Synthesize clips that a cached clip already answers.
 
 ### 4. License-clean distribution

@@ -11,7 +11,7 @@ The data it is built from has its own terms.
 
 `deunicode`'s table is a descendant of Text::Unidecode's, the same ancestor as Python's
 `unidecode`. We rely on the crate's declared BSD-3-Clause license, and compare against Python
-`unidecode` (GPL-2.0+) only in development (`mise run dev:translit-unidecode`). Its output never
+`unidecode` (GPL-2.0+) only in development (`mise run //tools:translit-unidecode`). Its output never
 goes into `data/generated/phono.bin`. The builder reads that table only if you pass `--translit`
 by hand.
 

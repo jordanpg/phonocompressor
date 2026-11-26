@@ -4,7 +4,7 @@ Universal coding principles that apply across all languages and frameworks.
 
 ## phonocompressor overrides
 
-Where this section disagrees with the generic guidance below, this section wins. The repo's tool configs (`rustfmt.toml`, `[tool.ruff]` in `tools/pyproject.toml`, the `fmt`/`fmt:check`/`lint` tasks in `mise.toml`) win over both.
+Where this section disagrees with the generic guidance below, this section wins. The repo's tool configs (`rustfmt.toml`, `[tool.ruff]` in `tools/pyproject.toml`, the `fmt`/`fmt:check`/`lint` tasks in the root and `tools/` `mise.toml`) win over both.
 
 - **Formatting and line length** come from the formatters, not from this guide: rustfmt defaults (100 columns) for Rust, ruff with `line-length = 100` for Python. Run `mise run fmt`.
 - **Comments say why, and cite evidence.** Constants and rules that came from measurement name the experiment, e.g. `// Voicing: raised from 1.0 after exp2 (g/k, d/t swaps misheard).` A tuned number with no source is a smell.

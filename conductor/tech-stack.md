@@ -44,7 +44,7 @@ Build profiles: dependencies build at `opt-level = 2` and the workspace at `opt-
 
 ## Python harness (`tools/`)
 
-Package `phono-harness` 0.1.0, built with `uv_build`, run through mise tasks. Its virtualenv lives in `~/.cache/phonocompressor/tools-venv` (`UV_PROJECT_ENVIRONMENT`).
+Package `phono-harness` 0.1.0, built with `uv_build`, run through the mise tasks in `tools/mise.toml` (`//tools:…`). Its virtualenv lives in `~/.cache/phonocompressor/tools-venv` (`UV_PROJECT_ENVIRONMENT`, set in `tools/mise.toml`).
 
 | Dependency | Purpose |
 |---|---|
@@ -61,7 +61,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 - **TypeScript + Svelte + Vite.** A single-page tool with a small amount of interactive state (phrase, budget, model, results). Svelte compiles away most of its runtime, which keeps the bundle small next to a multi-megabyte data file.
 - **Engine binding:** `crates/wasm` (built). `new Engine(bytes)` with `phono.bin`'s bytes, then
   `engine.compress(phrase, { model, maxCodepoints, topN, allowedScripts }) → [{ text, latin, phones, score }]`.
-  `mise run wasm:build` writes the `--target web` package and its `.d.ts` to `target/wasm-pkg`.
+  `mise run //crates/wasm:build` writes the `--target web` package and its `.d.ts` to `target/wasm-pkg`.
 - Run the engine in a Web Worker. Measured (PLAN.md, Phase 3): ready in about 0.4 s after the
   download, 2–6 s for a first search (1.1–1.8× native), faster on repeats. The download is
   mostly `phono.bin` (7.5 MB gzipped).
@@ -71,7 +71,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 - **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file). No server.
 - **Code distribution:** GitHub (`jordanpg/phonocompressor`), with submodules.
-- **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`harness:credits`, `harness:models`, `harness:voices`, `harness:synth`). `fnox.toml` is gitignored.
+- **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`//tools:credits`, `//tools:models`, `//tools:voices`, `//tools:synth`). `fnox.toml` is gitignored.
 - **CI:** none yet. `mise run fmt:check` and `mise run lint` are written to be CI-ready.
 - **Issue tracking:** GitHub Issues on the public repo, planned on the private user project `phonocompressor` (#8), which is linked to the repo. Managed with the `gh` CLI (2.105; needs the `project` scope). Issue types: Feature, Bug, Task. Board fields: Status, Priority, Size, Iteration. See `workflow.md`.
 
@@ -79,9 +79,9 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 | Tool | Purpose | Config |
 |---|---|---|
-| mise (≥ 2026.10.4) | Installs Rust (with the wasm32 target), uv, fnox, Node and the wasm-bindgen CLI; runs all tasks | `mise.toml` |
-| wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
-| Node 26 (LTS) | Runs the parity check (`wasm:parity`) and the test page server (`wasm:serve`) | `mise.toml` |
+| mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node and the wasm-bindgen CLI (`mise install --monorepo`); runs all tasks | `mise.toml` (root), `tools/mise.toml`, `crates/wasm/mise.toml` |
+| wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `crates/wasm/mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
+| Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`) and the test page server (`//crates/wasm:serve`); later `web/` | `mise.toml` (root) |
 | cargo | Rust build and tests | `Cargo.toml` |
 | uv | Python env and runs | `tools/pyproject.toml`, `tools/uv.lock` |
 | fnox | Secret injection | `fnox.toml` (gitignored) |
@@ -96,10 +96,10 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Rust unit tests | `cargo test` (inline `#[cfg(test)] mod tests`) | `cargo test --workspace` |
 | Engine regression | `phono eval` over the 34 sample messages (`sample/`, gitignored) | `mise run phono eval` |
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
-| Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run harness:…` (spends credits) |
-| wasm32 build | `phono-core` and `phono-wasm` build for `wasm32-unknown-unknown` | `mise run wasm:check` |
-| Binding vs. CLI | Node runs `crates/wasm/parity/cases.json` through both and compares | `mise run wasm:parity` |
-| Binding in a browser | Test page with the engine in a Web Worker; `/?bench` times it | `mise run wasm:serve` |
+| Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run //tools:…` (spends credits) |
+| wasm32 build | `phono-core` and `phono-wasm` build for `wasm32-unknown-unknown` | `mise run //crates/wasm:check` |
+| Binding vs. CLI | Node runs `crates/wasm/parity/cases.json` through both and compares | `mise run //crates/wasm:parity` |
+| Binding in a browser | Test page with the engine in a Web Worker; `/?bench` times it | `mise run //crates/wasm:serve` |
 | Python tests | none yet | — |
 | Front end | to be chosen with the web tool | — |
 
@@ -165,13 +165,23 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 **Consequences:** `phono_wasm.d.ts` has typed `CompressOptions` and `Guess` with no `any`. The conversion layer is about 3% of the `.wasm`'s code.
 
+### mise monorepo layout for tasks
+
+**Date:** 2026-11-25 · **Status:** accepted ([#24](https://github.com/jordanpg/phonocompressor/issues/24))
+
+**Context:** One flat `mise.toml` held the tasks of three projects (Rust workspace, `tools/` harness, `crates/wasm`), and the web front end would add a fourth.
+
+**Decision:** Use mise's monorepo layout. The root keeps shared tools, fnox secrets and workspace tasks (`data`, `phono`, `fmt`, `fmt:check`, `lint`); `tools/` and `crates/wasm/` (later `web/`) have their own `mise.toml`, and their tasks are named by path (`//tools:synth`, `//crates/wasm:build`). No aliases for the old names. The harness tasks share a task template for `uv run phono-harness`.
+
+**Consequences:** Root `fmt`, `fmt:check` and `lint` run cargo, then each project's task of the same name (`depends_post = ["//...:fmt"]`), so a new project only adds its own tasks. mise forbids `secrets` in templates, so each API task lists the key itself. The wasm32 target stays on the root `rust`, because a second `rust@stable` request with other options breaks `mise install --monorepo`. Plain `mise install` only installs the root's tools; use `--monorepo`. Inside a project directory, a bare task name only finds that project's tasks.
+
 ## Version requirements
 
 | Component | Minimum | Notes |
 |---|---|---|
 | Rust | stable with edition 2024 (1.85+) | Installed by mise |
 | Python | 3.13 | `requires-python = ">=3.13"`, ruff `target-version = "py313"` |
-| mise | 2026.10.4 | Older versions reject `secrets` on a task |
-| wasm target | `wasm32-unknown-unknown` | For `phono-core` and `crates/wasm`; `targets` on `rust` in `mise.toml` |
+| mise | 2026.11.7 | Older versions reject `secrets` on a task (before 2026.10.4) or can't find a project's own task templates from another project |
+| wasm target | `wasm32-unknown-unknown` | For `phono-core` and `crates/wasm`; `targets` on `rust` in the root `mise.toml` |
 | wasm-bindgen | 0.2.130, exactly | The crate and the CLI must match |
 | Node | 26 | Parity check and test page server |
