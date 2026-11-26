@@ -26,7 +26,7 @@
     "completed": 8
   },
   "current_phase": 4,
-  "current_task": "4.1",
+  "current_task": "4.2",
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11",
@@ -37,6 +37,8 @@
     "f9b5115: feat(model): add Multilingual v2 profile",
     "0a2e983: feat(reader): symbol words and glued digits in profile data",
     "34b3632: feat(cli): fit --prior profile",
-    "7b4a87e: feat(model): Multilingual v2 script risks"
+    "7b4a87e: feat(model): Multilingual v2 script risks",
+    "e11136f: exp: add exp14",
+    "949f598: exp: write up exp14"
   ]
 }
