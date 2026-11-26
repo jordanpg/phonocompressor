@@ -22,20 +22,20 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 ### Tasks
 
 - [x] Task 1.1: Add the library URL to fnox and a `//tools:fetch-library` task that writes `sample/library.json` in the `[{"<key>": {…}}]` shape. Drop `submittedBy`, keep `id`, `unicode`, `spoken`, `notes`, scripts and timestamps, keep the 34's keys through a UUID → key table, key the rest from their UUID, and print the count, new and changed entries, and a hash. Tests run on synthetic fixtures, with no library content. ([#40](https://github.com/jordanpg/phonocompressor/issues/40))
-- [~] Task 1.2: Add `target`, built from rules plus the gitignored `sample/targets.tsv` overrides, at fetch time. `load_messages` (CLI) and `cases_from_messages` (harness) prefer `target` over `spoken`. Tests cover each rule and the fallback. ([#41](https://github.com/jordanpg/phonocompressor/issues/41))
+- [x] Task 1.2: Add `target`, built from rules plus the gitignored `sample/targets.tsv` overrides, at fetch time. `load_messages` (CLI) and `cases_from_messages` (harness) prefer `target` over `spoken`. Tests cover each rule and the fallback. ([#41](https://github.com/jordanpg/phonocompressor/issues/41))
 
 ### Verification
 
-- [ ] A re-fetch keeps every key. The 34 keep their keys and still match `sample/messages.json`.
-- [ ] `phono eval sample/messages.json` gives unchanged output.
-- [ ] `git status` shows nothing from `sample/`, and the URL appears in no tracked file.
-- [ ] Gates pass.
+- [x] A re-fetch keeps every key. The 34 keep their keys and still match `sample/messages.json`.
+- [x] `phono eval sample/messages.json` gives unchanged output.
+- [x] `git status` shows nothing from `sample/`, and the URL appears in no tracked file.
+- [x] Gates pass.
 
 ## Phase 2: Offline baseline
 
 ### Tasks
 
-- [ ] Task 2.1: Add a `--by-script` summary to `phono eval` (mean community and ours per script, using the core's script lookup) and a `--subset <keys file>` filter. Run it on the library and write the baseline into PLAN.md: overall, the 34 vs the rest, per script, and the lowest-scoring community cases by key. ([#42](https://github.com/jordanpg/phonocompressor/issues/42))
+- [~] Task 2.1: Add a `--by-script` summary to `phono eval` (mean community and ours per script, using the core's script lookup) and a `--subset <keys file>` filter. Run it on the library and write the baseline into PLAN.md: overall, the 34 vs the rest, per script, and the lowest-scoring community cases by key. ([#42](https://github.com/jordanpg/phonocompressor/issues/42))
 
 ### Verification
 
