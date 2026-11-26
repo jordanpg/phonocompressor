@@ -1058,6 +1058,44 @@ measures). Per source, predicted / actual phones / Whisper:
 Flash's weights over-predict on this model by about 0.15 to 0.2. That is the
 gap the profile's fit and reader checks (tasks 3.1–3.3) work on.
 
+**Multilingual v2 vs Flash v2.5 on the same texts (2026-11-25, no credits).**
+The 160 texts both models have clips for (34 community messages and the 126
+replayed answers; Flash's from `clips-all9.tsv`), each scored with
+`calibrate`'s truth (mean of phone and Whisper measures, over 2 seeds):
+
+| | Flash v2.5 | Multilingual v2 |
+|---|---|---|
+| mean truth, all 160 texts | 0.782 | 0.702 |
+| community messages (34) | 0.819 | 0.736 |
+| engine answers (126) | 0.772 | 0.693 |
+| seed 1 vs seed 2 truth (Pearson) | 0.82 | 0.79 |
+| phrases where some engine answer ≥ the community's | 25/34 | 28/34 |
+
+- **Same behaviour, lower level.** Both kinds of text lose about 0.08, so the
+  model is uniformly harder to hear, not worse on one kind of text.
+- **The models agree on what works.** Per-text truth correlates 0.73 between
+  them (Spearman 0.73), close to each model's own seed-to-seed ceiling.
+  Within a phrase, of the 164 answer pairs both models separate by 0.05 or
+  more, 134 (82%) are in the same order.
+- **What differs is specific:** kana read natively (the one script change the
+  search notices; Cyrillic and Devanagari were already native on Flash),
+  glued digits read rather than dropped, `+` and `@` not read as words, `҈`
+  unstable, and more noise overall (Whisper hears English on about 60% of
+  clips vs 99%).
+- **Prediction:** Flash's profile ranks 76.7% of Multilingual v2's
+  within-phrase pairs right vs 83.7% of Flash's own, and correlates 0.50 vs
+  0.77 with truth. Flash's figures are in-sample (its weights were fitted on
+  those clips), so the true gap is smaller.
+
+Expectation for the profile: the script table, the reader rules above and a
+recalibrated level can fix specific losses and stop the CLI overstating its
+confidence. They can't fix the model's noise floor. The v6 fit gained about
+3 points of held-out ranking on Flash's 227 pairs; with 210 pairs here,
+expect about as much. The profile should beat reusing Flash's and the
+community's messages on this model, but not reach Flash's level. If the fit
+barely beats Flash's weights, ship Flash's weights with the script and rule
+changes, and treat exp14 as a sanity check.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
