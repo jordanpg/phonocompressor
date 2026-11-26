@@ -2,9 +2,9 @@
   "id": "community-library_20261126",
   "title": "Use the full community sample library",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-11-26T00:00:00Z",
-  "updated": "2026-11-26T00:00:00Z",
+  "updated": "2026-11-26T12:00:00Z",
   "issue": 39,
   "task_issues": {
     "1.1": 40,
@@ -23,5 +23,8 @@
   "tasks": {
     "total": 8,
     "completed": 0
-  }
+  },
+  "current_phase": 1,
+  "current_task": "1.1",
+  "commits": []
 }

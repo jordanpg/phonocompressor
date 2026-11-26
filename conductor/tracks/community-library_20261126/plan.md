@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#39](https://github.com/jordanpg/phonocompressor/issues/39)
 **Created:** 2026-11-26
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -21,7 +21,7 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 
 ### Tasks
 
-- [ ] Task 1.1: Add the library URL to fnox and a `//tools:fetch-library` task that writes `sample/library.json` in the `[{"<key>": {…}}]` shape. Drop `submittedBy`, keep `id`, `unicode`, `spoken`, `notes`, scripts and timestamps, keep the 34's keys through a UUID → key table, key the rest from their UUID, and print the count, new and changed entries, and a hash. Tests run on synthetic fixtures, with no library content. ([#40](https://github.com/jordanpg/phonocompressor/issues/40))
+- [~] Task 1.1: Add the library URL to fnox and a `//tools:fetch-library` task that writes `sample/library.json` in the `[{"<key>": {…}}]` shape. Drop `submittedBy`, keep `id`, `unicode`, `spoken`, `notes`, scripts and timestamps, keep the 34's keys through a UUID → key table, key the rest from their UUID, and print the count, new and changed entries, and a hash. Tests run on synthetic fixtures, with no library content. ([#40](https://github.com/jordanpg/phonocompressor/issues/40))
 - [ ] Task 1.2: Add `target`, built from rules plus the gitignored `sample/targets.tsv` overrides, at fetch time. `load_messages` (CLI) and `cases_from_messages` (harness) prefer `target` over `spoken`. Tests cover each rule and the fallback. ([#41](https://github.com/jordanpg/phonocompressor/issues/41))
 
 ### Verification
