@@ -120,9 +120,12 @@ enum Command {
         /// What to fit against.
         #[arg(long, value_enum, default_value_t = fit::TruthKind::Mean)]
         truth: fit::TruthKind,
-        /// Hold these parameters at their hand-set values (comma-separated names).
+        /// Hold these parameters at their starting values (comma-separated names).
         #[arg(long, value_delimiter = ',')]
         fix: Vec<String>,
+        /// Start from, and regularize towards, the hand-set weights or the model profile's.
+        #[arg(long, value_enum, default_value_t = fit::Prior::Hand)]
+        prior: fit::Prior,
         /// L2 pull towards the hand-set weights (log space); cross-validation picks among these.
         #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
         lambdas: Vec<f32>,
@@ -336,6 +339,7 @@ fn main() -> Result<(), String> {
             truth,
             fix,
             lambdas,
+            prior,
         } => {
             let mut engine = engine;
             let opts = fit::FitOpts {
@@ -344,6 +348,7 @@ fn main() -> Result<(), String> {
                 lambdas,
                 truth,
                 fix,
+                prior,
             };
             fit::run(
                 &mut engine,

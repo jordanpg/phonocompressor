@@ -232,8 +232,19 @@ pub struct FitOpts {
     pub repeats: usize,
     pub lambdas: Vec<f32>,
     pub truth: TruthKind,
-    /// Parameters held at their hand-set values.
+    /// Parameters held at their starting values (see `prior`).
     pub fix: Vec<String>,
+    /// Where the fit starts and what the L2 term pulls towards.
+    pub prior: Prior,
+}
+
+/// Starting point and regularization centre of a fit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum Prior {
+    /// v1–v5's hand-set weights (`Weights::HAND`, `Predict::HAND`), as v6 was fitted.
+    Hand,
+    /// The model profile's current weights, e.g. Flash v2.5's for a new model's first fit.
+    Profile,
 }
 
 /// Which measure of what the TTS produced to fit against.
@@ -305,11 +316,22 @@ pub fn run(
         weights: Weights::HAND,
         predict: Predict::HAND,
     };
+    let base = match opts.prior {
+        Prior::Hand => hand.clone(),
+        Prior::Profile => Params {
+            weights: engine.profile.weights.clone(),
+            predict: engine.profile.predict,
+        },
+    };
     let truths: Vec<f32> = answers
         .iter()
         .map(|a| a.truths[opts.truth as usize])
         .collect();
-    let hand_pred = predictions(engine, &answers, &hand);
+    let label = match opts.prior {
+        Prior::Hand => "hand-set",
+        Prior::Profile => "profile",
+    };
+    let hand_pred = predictions(engine, &answers, &base);
     let (r, n) = ranking(&hand_pred, &all);
     println!(
         "{} clips → {} distinct answers to {} phrases; {} within-phrase pairs (|Δ| ≥ {MIN_PAIR}), {n} at |Δ| ≥ {RANK_MARGIN}",
@@ -319,7 +341,7 @@ pub fn run(
         pairs.len()
     );
     println!(
-        "hand-set: ranking {r}/{n} ({:.1}%), loss {:.4}, pearson over answers {:.3}",
+        "{label}: ranking {r}/{n} ({:.1}%), loss {:.4}, pearson over answers {:.3}",
         100.0 * r as f32 / n as f32,
         loss(&hand_pred, &all),
         pearson(&hand_pred, &truths)
@@ -340,7 +362,7 @@ pub fn run(
 
     let mut best_lambda = (opts.lambdas[0], f32::MAX);
     println!(
-        "\ncross-validation, {} folds by phrase × {} repeats (held-out pairs only; hand-set: {:.1}%, loss {:.4}):",
+        "\ncross-validation, {} folds by phrase × {} repeats (held-out pairs only; {label}: {:.1}%, loss {:.4}):",
         opts.folds,
         opts.repeats,
         100.0 * r as f32 / n as f32,
@@ -355,7 +377,7 @@ pub fn run(
             for k in 0..opts.folds {
                 let train: Vec<&Pair> = pairs.iter().filter(|p| fold_of[p.phrase] != k).collect();
                 let test: Vec<&Pair> = pairs.iter().filter(|p| fold_of[p.phrase] == k).collect();
-                let (fitted, e) = fit(engine, &answers, &train, &hand, lambda, &free);
+                let (fitted, e) = fit(engine, &answers, &train, &base, lambda, &free);
                 evals += e;
                 let pred = predictions(engine, &answers, &fitted);
                 let (r, n) = ranking(&pred, &test);
@@ -398,19 +420,19 @@ pub fn run(
         .iter()
         .filter(|p| is_new(p.a) || is_new(p.b))
         .collect();
-    let (fitted, _) = fit(engine, &answers, &train, &hand, lambda, &free);
+    let (fitted, _) = fit(engine, &answers, &train, &base, lambda, &free);
     let pred = predictions(engine, &answers, &fitted);
     let (hr, hn) = ranking(&hand_pred, &test);
     let (fr, fn_) = ranking(&pred, &test);
     println!(
-        "\nnew in {last_exp} (fit on the rest, λ {lambda}): hand-set {hr}/{hn} ({:.1}%) loss {:.4}; fitted {fr}/{fn_} ({:.1}%) loss {:.4}",
+        "\nnew in {last_exp} (fit on the rest, λ {lambda}): {label} {hr}/{hn} ({:.1}%) loss {:.4}; fitted {fr}/{fn_} ({:.1}%) loss {:.4}",
         100.0 * hr as f32 / hn.max(1) as f32,
         loss(&hand_pred, &test),
         100.0 * fr as f32 / fn_.max(1) as f32,
         loss(&pred, &test)
     );
 
-    let (fitted, _) = fit(engine, &answers, &all, &hand, lambda, &free);
+    let (fitted, _) = fit(engine, &answers, &all, &base, lambda, &free);
     let pred = predictions(engine, &answers, &fitted);
     let (r, n) = ranking(&pred, &all);
     println!(
@@ -428,7 +450,7 @@ pub fn run(
         let (hr, hn) = ranking(&hand_pred, &kp);
         let (fr, fn_) = ranking(&pred, &kp);
         println!(
-            "  {kind:?}: hand-set {hr}/{hn} ({:.1}%), fitted {fr}/{fn_} ({:.1}%)",
+            "  {kind:?}: {label} {hr}/{hn} ({:.1}%), fitted {fr}/{fn_} ({:.1}%)",
             100.0 * hr as f32 / hn.max(1) as f32,
             100.0 * fr as f32 / fn_.max(1) as f32
         );
