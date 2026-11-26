@@ -17,7 +17,7 @@
 
 ## Rust workspace
 
-Cargo workspace, `resolver = "3"`, version 0.1.0, license `MIT OR Apache-2.0`.
+Cargo workspace, `resolver = "3"`, version 0.1.0, license `Apache-2.0`.
 
 | Crate | Binary | Purpose | Dependencies |
 |---|---|---|---|
@@ -124,7 +124,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 **Decision:** Build the table from `deunicode` (BSD-3) in Rust, with ten overrides justified by exp10 clips. Keep `unidecode` for dev comparisons only.
 
-**Consequences:** The repo can be MIT OR Apache-2.0. The 34 sample answers and `calibrate` output were unchanged. `mise run data` no longer needs Python.
+**Consequences:** The repo is Apache-2.0. The 34 sample answers and `calibrate` output were unchanged. `mise run data` no longer needs Python.
 
 ### Svelte + Vite for the web tool
 

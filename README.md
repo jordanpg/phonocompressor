@@ -143,4 +143,4 @@ The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.de
 | [`deunicode`](https://crates.io/crates/deunicode) | transliteration table, built by `phono-build` | BSD-3-Clause |
 | Python `unidecode` | dev comparison only (`mise run //tools:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
-Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed MIT OR Apache-2.0.
+Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed Apache-2.0.
