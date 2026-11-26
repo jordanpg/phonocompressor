@@ -994,6 +994,42 @@ So task 3.2 has candidates: `glued_number_drop` (probably near 0 for this
 model), the trailing-capital rule, and the `+`/`@` symbol words. Each needs
 the exp12–exp13 clips before it moves into the profile.
 
+**exp12 result (real TTS, 2026-11-25, 334 credits; 1552/10000 used after):
+the community messages on Multilingual v2 are read by transliteration, but
+less well and less steadily than on Flash v2.5.** exp1's 34 messages × 2
+seeds on `eleven_multilingual_v2`, same voice (`tools/experiments/exp12.toml`;
+`tools/results/exp12.md`, gitignored like exp1's). Measured with
+`phono calibrate`'s truth, so the numbers sit next to exp1's:
+
+| run | model | phone fidelity | Whisper similarity | Whisper says English | silent | identical across seeds |
+|---|---|---|---|---|---|---|
+| exp1 | Flash v2.5 | 0.791 | 0.847 | 67/68 | 0 | 16/34 |
+| exp12 | Multilingual v2 | 0.739 | 0.734 | 41/68 | 0 | 14/34 |
+
+(exp1's phone fidelity is 0.791 here and 0.783 in the exp3 table; `calibrate`
+has changed since. Both rows above come from the current build.) The harness
+report's difflib similarity is 0.77 / 0.78 per seed, against exp1's 0.86 /
+0.88, with 17 and 19 of 34 messages at 0.8 or more (exp1: 24 and 24).
+
+- **No silent clips**, and the phones are unidecode's chunks read as English
+  (`ꀂꀑꊂꌟ` "Iowa sucks" /aː j ɔ w a s a k s/, `ꀠddꏒꀊm` "Bad dream" in exp11).
+  So the model still reads these texts by transliteration.
+- **Language ID is not English on 27 of 68 clips** (Japanese 6, Swedish 4,
+  then Polish, Welsh and others, one each or two), against 1 of 68 on Flash.
+  These are mostly pseudo-word messages and the audio is noisier (accents
+  drift between words). The Whisper English transcript still matches the
+  phones, so this doesn't mean the model reads the text as another language.
+- **18 messages are 0.05 or more worse than on Flash, 4 better** (mean of
+  phone and Whisper truth per message). The biggest drops are `҈ꃑ쿰이s`
+  ("100,000 fat kumis" → "What I would have thought, Miss?" / "100% of the fat
+  comes"), `ꄫꀔ` ("toe" → "two"), `ꀂꀑꊂꌟ` (seed 1 "ayahuasks") and `҈㌖㌐ꂶ동`.
+  Messages with `҈` are the worst: its reading varies a lot here (exp11:
+  "Hander a thousand" / "100,000").
+- 6 messages are exactly right on both seeds (Flash: 9).
+
+Decision: exp13 waits for the user's go-ahead, since the track's stop point
+(non-English language ID) is met on its face.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
