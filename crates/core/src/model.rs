@@ -192,8 +192,7 @@ const FLASH_PREDICT: Predict = Predict {
 
 /// `eleven_multilingual_v2`, probed in exp11 and calibrated on exp11–exp13 (338 clips). It reads
 /// most scripts by transliteration like Flash v2.5, but less clearly (mean truth 0.70 vs 0.78
-/// on the same 160 texts). Reader constants, weights and prediction settings are Flash's until
-/// tasks 3.2–3.3 check them against this model's clips.
+/// on the same 160 texts).
 pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
     model_ids: &["eleven_multilingual_v2"],
     scripts: multilingual_v2_scripts,
@@ -210,8 +209,15 @@ pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
         // `&` → "and" in 5 of 6 clips and `%` → "percent" ×2, as on Flash. `+` was read once
         // in 2 clips (`you+me` /j p s m e/, "You, me"): too few to move it.
         symbol_words: &[('&', "and"), ('+', "plus"), ('%', "percent")],
+        // Split costs: moving each one down and up (e.g. onset 0.5, 1.5) left `calibrate`
+        // within 158–162 of 210 within-phrase pairs, so they stay Flash's.
         ..FLASH_READER
     },
+    // Flash's weights. `phono fit --model eleven_multilingual_v2 --prior profile --fix
+    // sub_scale,vowel_sub_scale` on the 338 clips: held-out within-phrase ranking 78.8–80.8%
+    // (5 folds by phrase × 4, λ 0–0.03) against 79.5% for these weights (measured on the
+    // same clips the risks above were set from). Fitted weights lowered the pooled correlation
+    // (0.574 → 0.536) and made losing an onset cost 2.9 (here 1.22), so they are not used.
     weights: FLASH_WEIGHTS,
     predict: FLASH_PREDICT,
 };
