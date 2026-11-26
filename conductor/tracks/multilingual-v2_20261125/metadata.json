@@ -19,14 +19,14 @@
   },
   "phases": {
     "total": 4,
-    "completed": 2
+    "completed": 3
   },
   "tasks": {
     "total": 9,
-    "completed": 7
+    "completed": 8
   },
-  "current_phase": 3,
-  "current_task": "3.3",
+  "current_phase": 4,
+  "current_task": "4.1",
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11",
@@ -35,6 +35,8 @@
     "11a3659: exp: write up exp12",
     "93a2971: exp: write up exp13",
     "f9b5115: feat(model): add Multilingual v2 profile",
-    "0a2e983: feat(reader): symbol words and glued digits in profile data"
+    "0a2e983: feat(reader): symbol words and glued digits in profile data",
+    "34b3632: feat(cli): fit --prior profile",
+    "7b4a87e: feat(model): Multilingual v2 script risks"
   ]
 }

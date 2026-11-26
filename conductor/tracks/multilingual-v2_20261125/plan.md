@@ -58,11 +58,11 @@ Build the profile, move the reader rules its clips disagree with, then fit the w
 
 - [x] Task 3.1: Add `MULTILINGUAL_V2` to `model.rs` and `PROFILES`: script table and preference order from exp11; Flash's reader constants and weights copied for now. Tests first (id resolves, katakana `Native`, default-on scripts). Baseline `phono calibrate --model eleven_multilingual_v2` ([#31](https://github.com/jordanpg/phonocompressor/issues/31))
 - [x] Task 3.2: Check the capital-letter rules, plurals, number grouping, glued-number drop and split costs against Multilingual v2's clips. Rules they disagree with become profile data, tests first. Flash's `phono eval` byte-identical; `calibrate` recorded for both models ([#32](https://github.com/jordanpg/phonocompressor/issues/32))
-- [~] Task 3.3: `phono fit --model eleven_multilingual_v2` with substitution scales held (as in v6); put the weights and `predict` in the profile with a comment on their source; report in-sample and held-out ranking next to Flash's weights ([#33](https://github.com/jordanpg/phonocompressor/issues/33))
+- [x] Task 3.3: `phono fit --model eleven_multilingual_v2` with substitution scales held (as in v6); put the weights and `predict` in the profile with a comment on their source; report in-sample and held-out ranking next to Flash's weights ([#33](https://github.com/jordanpg/phonocompressor/issues/33))
 
 ### Verification
 
-- [ ] Gates pass (fmt, clippy, tests, `wasm:check`); Flash's `phono eval` unchanged; `phono --model eleven_multilingual_v2 compress` works
+- [x] Gates pass (fmt, clippy, tests, `wasm:check`); Flash's `phono eval` unchanged; `phono --model eleven_multilingual_v2 compress` works
 
 ## Phase 4: Live check and integration (exp14)
 
@@ -70,7 +70,7 @@ Check the answers the profile actually gives, then hook it into parity and the d
 
 ### Tasks
 
-- [ ] Task 4.1: exp14: `phono eval --model eleven_multilingual_v2 --export` → the profile's top answers × 2 seeds; report; write-up against exp12's community numbers; a follow-up issue if it falls short ([#34](https://github.com/jordanpg/phonocompressor/issues/34))
+- [~] Task 4.1: exp14: `phono eval --model eleven_multilingual_v2 --export` → the profile's top answers × 2 seeds; report; write-up against exp12's community numbers; a follow-up issue if it falls short ([#34](https://github.com/jordanpg/phonocompressor/issues/34))
 - [ ] Task 4.2: Add a Multilingual v2 case to `crates/wasm/parity/cases.json` and run `wasm:parity`; update PLAN.md (model profiles, item 7, open questions), product.md (status, scope), tech-stack.md (decision log), the README and the conductor index ([#35](https://github.com/jordanpg/phonocompressor/issues/35))
 
 ### Verification
