@@ -1,6 +1,6 @@
 # Third-party data and software
 
-The code in this repository is licensed MIT OR Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`).
+The code in this repository is licensed Apache-2.0 (`LICENSE-APACHE`).
 The data it is built from has its own terms.
 
 | Component | Used for | License | Notes |
