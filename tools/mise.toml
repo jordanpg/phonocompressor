@@ -1,0 +1,70 @@
+# ElevenLabs test harness (phono-harness). Tasks run in tools/, e.g. `mise run //tools:synth exp9`,
+# or `mise run :synth exp9` from inside tools/.
+
+[env]
+UV_PROJECT_ENVIRONMENT = "{{env.HOME}}/.cache/phonocompressor/tools-venv"
+
+# Each harness task sets only its subcommand. mise doesn't allow `secrets` in a template, so the
+# tasks that call the ElevenLabs API list the key themselves; no other task receives it.
+[task_templates.harness]
+run = "uv run phono-harness {{ vars.cmd }}"
+
+[tasks.credits]
+description = "Show ElevenLabs credit usage this period (free API call)"
+extends = "harness"
+vars = { cmd = "credits" }
+secrets = ["ELEVENLABS_API_KEY"]
+
+[tasks.models]
+description = "List ElevenLabs TTS models and cost multipliers (free API call)"
+extends = "harness"
+vars = { cmd = "models" }
+secrets = ["ELEVENLABS_API_KEY"]
+
+[tasks.voices]
+description = "List voices this account can use (free API call)"
+extends = "harness"
+vars = { cmd = "voices" }
+secrets = ["ELEVENLABS_API_KEY"]
+
+[tasks.synth]
+description = "Synthesize an experiment's uncached clips: dry run unless --spend"
+extends = "harness"
+vars = { cmd = "synth" }
+secrets = ["ELEVENLABS_API_KEY"]
+
+[tasks.transcribe]
+description = "Run local ASR (Whisper + wav2vec2 phones) on an experiment's cached clips"
+extends = "harness"
+vars = { cmd = "transcribe" }
+
+[tasks.export]
+description = "Export transcribed clips with targets for `phono calibrate` (gitignored output)"
+extends = "harness"
+vars = { cmd = "export-clips exp1 exp2 --out ../data/generated/clips.tsv" }
+
+[tasks.report]
+description = "Write a markdown report for an experiment to tools/results/"
+extends = "harness"
+vars = { cmd = "report" }
+
+# Dev only: unidecode (GPL) output for diffing against the shipped table. Never feeds phono.bin
+# unless you pass it to the builder with --translit by hand.
+[tasks.translit-unidecode]
+description = "Dev only: export Python unidecode's table to data/generated/translit-unidecode.tsv, for comparison"
+extends = "harness"
+vars = { cmd = "translit-table ../data/generated/translit-unidecode.tsv" }
+
+# --- Formatting & linting (ruff); the root fmt, fmt:check and lint run these too ---
+
+[tasks.fmt]
+description = "Format Python (ruff format + import sorting)"
+run = ["uvx ruff format .", "uvx ruff check --select I --fix ."]
+
+[tasks."fmt:check"]
+description = "Check Python formatting without changing files"
+run = "uvx ruff format --check ."
+
+[tasks.lint]
+description = "Lint Python (ruff check)"
+run = "uvx ruff check ."

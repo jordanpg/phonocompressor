@@ -15,7 +15,7 @@ serde = { version = "1", features = ["derive"] }
 postcard = { version = "1", features = ["alloc"] }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
-# Exact pin: must equal the wasm-bindgen CLI version in mise.toml.
+# Exact pin: must equal the wasm-bindgen CLI version in crates/wasm/mise.toml.
 wasm-bindgen = "=0.2.130"
 
 # The builder trains the G2P model; keep debug builds usable for it.
