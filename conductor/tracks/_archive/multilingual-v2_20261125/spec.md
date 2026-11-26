@@ -3,7 +3,7 @@
 **Track ID:** multilingual-v2_20261125
 **Type:** Feature
 **Created:** 2026-11-25
-**Status:** Draft
+**Status:** Complete
 **Issue:** [#6 Calibrate a second ElevenLabs model](https://github.com/jordanpg/phonocompressor/issues/6)
 
 ## Summary
@@ -28,18 +28,18 @@ As a chat viewer whose stream's TTS uses Multilingual v2, I want to choose that 
 
 ## Acceptance Criteria
 
-- [ ] **Probe (exp11).** exp0's cases plus new cases for what exp0 left open (hiragana, kana, the other scripts, numbers, capitals, plurals, symbols) run on Multilingual v2 at 2 seeds. They are transcribed, reported, and written up in PLAN.md with a draft script table.
-- [ ] **Community baseline (exp12).** The 34 community messages × 2 seeds on Multilingual v2, reported, with Whisper similarity and phone fidelity written up next to Flash v2.5's exp1.
-- [ ] **Fit data (exp13).** The 126 earlier engine answers × 2 seeds on Multilingual v2, exported with exp12 as one clips file for that model.
-- [ ] **Profile.** A `MULTILINGUAL_V2` profile for `eleven_multilingual_v2`:
+- [x] **Probe (exp11).** exp0's cases plus new cases for what exp0 left open (hiragana, kana, the other scripts, numbers, capitals, plurals, symbols) run on Multilingual v2 at 2 seeds. They are transcribed, reported, and written up in PLAN.md with a draft script table.
+- [x] **Community baseline (exp12).** The 34 community messages × 2 seeds on Multilingual v2, reported, with Whisper similarity and phone fidelity written up next to Flash v2.5's exp1.
+- [x] **Fit data (exp13).** The 126 earlier engine answers × 2 seeds on Multilingual v2, exported with exp12 as one clips file for that model.
+- [x] **Profile.** A `MULTILINGUAL_V2` profile for `eleven_multilingual_v2`:
   - script table and preference order from exp11;
   - reader constants checked against its clips;
   - weights from `phono fit --model eleven_multilingual_v2`, with held-out ranking reported next to Flash's weights.
 
   It is in `PROFILES`, so `--model eleven_multilingual_v2` and the binding's `model` option work. Flash v2.5 stays the default.
-- [ ] **Reader rules.** The capital-letter rules, plurals and number grouping are each checked against Multilingual v2's clips. A rule they disagree with becomes profile data, with tests. A rule they agree with stays, and PLAN.md says so. Flash v2.5's `phono eval` output stays byte-identical.
-- [ ] **Live check (exp14).** The new profile's top answer for each of the 34 phrases × 2 seeds on Multilingual v2. Whisper similarity and phone fidelity are recorded against exp12's community numbers. The profile ships either way; if it falls short, a follow-up issue says where.
-- [ ] **Parity and docs.** `wasm:parity` has a Multilingual v2 case and passes. PLAN.md, product.md, tech-stack.md and the README name the new model.
+- [x] **Reader rules.** The capital-letter rules, plurals and number grouping are each checked against Multilingual v2's clips. A rule they disagree with becomes profile data, with tests. A rule they agree with stays, and PLAN.md says so. Flash v2.5's `phono eval` output stays byte-identical.
+- [x] **Live check (exp14).** The new profile's top answer for each of the 34 phrases × 2 seeds on Multilingual v2. Whisper similarity and phone fidelity are recorded against exp12's community numbers. The profile ships either way; if it falls short, a follow-up issue says where.
+- [x] **Parity and docs.** `wasm:parity` has a Multilingual v2 case and passes. PLAN.md, product.md, tech-stack.md and the README name the new model.
 
 ## Dependencies
 

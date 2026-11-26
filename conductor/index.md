@@ -27,9 +27,11 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [ ] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): probe, community and replay runs on `eleven_multilingual_v2`, its `ModelProfile` with fitted weights, and a live check. 8/9 tasks.
+_None._
 
 ## Archived Tracks
+
+- [x] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/_archive/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): exp11–exp14 on `eleven_multilingual_v2` and its `ModelProfile` (own script table, symbol words and glued-digit rule; Flash's weights after a fit found no held-out gain). 9/9 tasks, complete.
 
 - [x] [Build the WASM binding](./tracks/_archive/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 9/9 tasks, complete.
 

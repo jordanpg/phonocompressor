@@ -2,9 +2,9 @@
   "id": "multilingual-v2_20261125",
   "title": "Calibrate a second ElevenLabs model (Multilingual v2)",
   "type": "feature",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-11-25T00:00:00Z",
-  "updated": "2026-11-25T00:00:00Z",
+  "updated": "2026-11-26T00:00:00Z",
   "issue": 6,
   "task_issues": {
     "1.1": 27,
@@ -19,14 +19,14 @@
   },
   "phases": {
     "total": 4,
-    "completed": 3
+    "completed": 4
   },
   "tasks": {
     "total": 9,
-    "completed": 8
+    "completed": 9
   },
   "current_phase": 4,
-  "current_task": "4.2",
+  "current_task": null,
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11",
@@ -39,6 +39,7 @@
     "34b3632: feat(cli): fit --prior profile",
     "7b4a87e: feat(model): Multilingual v2 script risks",
     "e11136f: exp: add exp14",
-    "949f598: exp: write up exp14"
+    "949f598: exp: write up exp14",
+    "bd0a8ff: docs: name Multilingual v2"
   ]
 }

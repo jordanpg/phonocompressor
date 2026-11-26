@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#6](https://github.com/jordanpg/phonocompressor/issues/6)
 **Created:** 2026-11-25
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -71,18 +71,18 @@ Check the answers the profile actually gives, then hook it into parity and the d
 ### Tasks
 
 - [x] Task 4.1: exp14: `phono eval --model eleven_multilingual_v2 --export` → the profile's top answers × 2 seeds; report; write-up against exp12's community numbers; a follow-up issue if it falls short ([#34](https://github.com/jordanpg/phonocompressor/issues/34))
-- [~] Task 4.2: Add a Multilingual v2 case to `crates/wasm/parity/cases.json` and run `wasm:parity`; update PLAN.md (model profiles, item 7, open questions), product.md (status, scope), tech-stack.md (decision log), the README and the conductor index ([#35](https://github.com/jordanpg/phonocompressor/issues/35))
+- [x] Task 4.2: Add a Multilingual v2 case to `crates/wasm/parity/cases.json` and run `wasm:parity`; update PLAN.md (model profiles, item 7, open questions), product.md (status, scope), tech-stack.md (decision log), the README and the conductor index ([#35](https://github.com/jordanpg/phonocompressor/issues/35))
 
 ### Verification
 
-- [ ] `wasm:parity` passes; the docs name both calibrated models
+- [x] `wasm:parity` passes; the docs name both calibrated models
 
 ## Final Verification
 
-- [ ] All acceptance criteria met
-- [ ] Tests passing
-- [ ] Documentation updated
-- [ ] Ready for review
+- [x] All acceptance criteria met
+- [x] Tests passing
+- [x] Documentation updated
+- [x] Ready for review
 
 ---
 
