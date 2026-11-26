@@ -6,6 +6,7 @@ rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }  # wasm32 fo
 uv = "latest"
 # Must equal the `wasm-bindgen` crate version pinned in Cargo.toml.
 "github:wasm-bindgen/wasm-bindgen" = "0.2.130"
+"github:EmbarkStudios/cargo-about" = "0.9.3"  # third-party notices for the web bundle
 node = "26"                 # LTS; runs the wasm parity check
 
 [settings]
@@ -64,11 +65,17 @@ description = "Check that phono-core and phono-wasm build for wasm32-unknown-unk
 run = "cargo build -p phono-core -p phono-wasm --target wasm32-unknown-unknown"
 
 [tasks."wasm:build"]
-description = "Build the browser binding into target/wasm-pkg (.wasm, .js, .d.ts; wasm-bindgen --target web)"
+description = "Build the browser binding into target/wasm-pkg (.wasm, .js, .d.ts, notices; wasm-bindgen --target web)"
+depends = ["wasm:notices"]
 run = [
   "cargo build -p phono-wasm --release --target wasm32-unknown-unknown",
   "wasm-bindgen --target web --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/phono_wasm.wasm",
 ]
+
+# The license gate for the bundle: fails on a crate license not accepted in crates/wasm/about.toml.
+[tasks."wasm:notices"]
+description = "Write target/wasm-pkg/third-party-notices.html: licenses of the .wasm's crates (cargo-about) and phono.bin's data; --out"
+run = "node crates/wasm/notices.mjs"
 
 [tasks."wasm:parity"]
 description = "Check the wasm binding gives the same guesses as `phono compress --json` (Node; needs phono.bin)"

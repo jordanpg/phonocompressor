@@ -1,0 +1,29 @@
+# cargo-about config for the web bundle's third-party notices (crates/wasm/notices.mjs,
+# `mise run wasm:notices`). The script asks for phono-wasm's dependencies on wasm32 only, so the
+# builder's and CLI's crates aren't considered.
+
+# Tried in order: a dual-licensed crate is listed under the first one it allows. A crate that none
+# of these satisfy fails the build. Check a new license against conductor/product-guidelines.md
+# ("License-clean distribution") before adding it here.
+accepted = ["MIT", "Apache-2.0", "Unicode-3.0"]
+targets = ["wasm32-unknown-unknown"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+# phono-wasm is ours (LICENSE-MIT, LICENSE-APACHE); notices.mjs drops phono-core the same way.
+private = { ignore = true }
+
+# tsify packages its licenses as LICENSE_MIT / LICENSE_APACHE, which cargo-about doesn't find, so
+# it would fall back to a template MIT text with no copyright line. The checksums pin the files of
+# the locked version: a tsify update that changes them fails here until they are re-checked.
+[tsify.clarify]
+license = "MIT OR Apache-2.0"
+
+[[tsify.clarify.files]]
+path = "LICENSE_MIT"
+license = "MIT"
+checksum = "23b988ff99c59aba4e37e7709d3d2102096203bb83a077cbc1aad04dd7a77244"
+
+[[tsify.clarify.files]]
+path = "LICENSE_APACHE"
+license = "Apache-2.0"
+checksum = "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
