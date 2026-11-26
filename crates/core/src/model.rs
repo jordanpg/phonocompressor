@@ -153,6 +153,9 @@ const FLASH_READER: ReaderParams = ReaderParams {
     // exp2–exp5 heard the digit in 5 of 10 clips with a number glued to letters (`3the`,
     // `2eut`). Plural `2s` was read both times.
     glued_number_drop: 1.0,
+    // exp9: `&` → "and". `@` between words → "at" in 11 of 14 harness clips (clips-all9);
+    // at the end of a text it was silent.
+    symbol_words: crate::chunks::SYMBOL_WORDS,
 };
 
 // v6: deletion and insertion costs fitted by `phono fit` on 408 harness clips (exp1–exp6),
@@ -197,7 +200,18 @@ pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
     // exp11 found no transliterated script that reads worse than its neighbours in Flash's
     // order, so the order is the same.
     script_preference: SCRIPT_PREFERENCE,
-    reader: FLASH_READER,
+    reader: ReaderParams {
+        // exp11–exp13: a digit glued to letters was read in 11 of 12 clips (`3the` "three the"
+        // ×2, `3ᕞ ጔ` "three the gwee"), the 12th unclear. Flash dropped it in about half.
+        glued_number_drop: 0.1,
+        // `@` was never read "at": 0 of 14 clips across 7 texts, against most mid-phrase clips
+        // on Flash (11 of 14 between words: `chuxdung@joMama` "dung at Joe Mama" there,
+        // "Dunga Joe Mama" here).
+        // `&` → "and" in 5 of 6 clips and `%` → "percent" ×2, as on Flash. `+` was read once
+        // in 2 clips (`you+me` /j p s m e/, "You, me"): too few to move it.
+        symbol_words: &[('&', "and"), ('+', "plus"), ('%', "percent")],
+        ..FLASH_READER
+    },
     weights: FLASH_WEIGHTS,
     predict: FLASH_PREDICT,
 };
@@ -336,6 +350,23 @@ mod tests {
             p.script(Script::CyrillicNumber).risk > FLASH_V2_5.script(Script::CyrillicNumber).risk
         );
         assert!(p.preference(Script::Hangul) < p.preference(Script::Yi));
+    }
+
+    #[test]
+    fn reader_symbols_are_known_symbols() {
+        for p in PROFILES {
+            for &(c, w) in p.reader.symbol_words {
+                assert_eq!(crate::chunks::symbol_word(c), Some(w), "{}: {c}", p.id());
+            }
+        }
+    }
+
+    #[test]
+    fn multilingual_v2_reads_glued_numbers() {
+        // exp11–exp13: a digit glued to letters was read in 11 of 12 clips, the 12th unclear
+        // (Flash: about half).
+        assert!(MULTILINGUAL_V2.reader.glued_number_drop < 0.2);
+        assert_eq!(FLASH_V2_5.reader.glued_number_drop, 1.0);
     }
 
     #[test]

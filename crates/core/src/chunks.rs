@@ -286,9 +286,12 @@ pub struct Chunk {
     pub kind: ChunkKind,
 }
 
-const SYMBOL_WORDS: &[(char, &str)] = &[('@', "at"), ('&', "and"), ('+', "plus"), ('%', "percent")];
+/// Symbols some model reads as a word. A chunk containing one is read through the reader (see
+/// `normalize`); whether a model actually voices it is [`crate::reading::ReaderParams::symbol_words`].
+pub const SYMBOL_WORDS: &[(char, &str)] =
+    &[('@', "at"), ('&', "and"), ('+', "plus"), ('%', "percent")];
 
-/// Word a symbol is read as, if any.
+/// Word a symbol is read as by some model, if any.
 pub fn symbol_word(c: char) -> Option<&'static str> {
     SYMBOL_WORDS.iter().find(|&&(s, _)| s == c).map(|&(_, w)| w)
 }
