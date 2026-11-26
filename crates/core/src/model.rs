@@ -80,7 +80,7 @@ impl ModelProfile {
 }
 
 /// Every calibrated profile.
-pub static PROFILES: &[&ModelProfile] = &[&FLASH_V2_5];
+pub static PROFILES: &[&ModelProfile] = &[&FLASH_V2_5, &MULTILINGUAL_V2];
 
 /// The profile used when none is named: the model the community writes for.
 pub static DEFAULT: &ModelProfile = &FLASH_V2_5;
@@ -113,69 +113,120 @@ pub fn known_model_ids() -> Vec<&'static str> {
 pub static FLASH_V2_5: ModelProfile = ModelProfile {
     model_ids: &["eleven_flash_v2_5", "eleven_turbo_v2_5"],
     scripts: flash_v2_5_scripts,
-    script_preference: &[
-        Script::Latin,
-        Script::Hangul,
-        Script::Yi,
-        Script::CjkCompat,
-        Script::Cherokee,
-        Script::Ucas,
-        Script::Ethiopic,
-        Script::HangulCompatJamo,
-        Script::HangulJamo,
-        Script::Runic,
-        Script::Armenian,
-        Script::Hiragana,
-        Script::Katakana,
-        Script::CjkUnified,
-        Script::CyrillicNumber,
-        Script::Devanagari,
-        Script::Cyrillic,
-        Script::Other,
-    ],
-    reader: ReaderParams {
-        split_short_word: 0.5,
-        split_g2p_letter: 0.3,
-        split_lone_letter: 0.7,
-        // The TTS read "varymoldifrog" as "very moldy frog" (exp1), "thisisepicswang" as "this
-        // is Sepik swang" (exp2) and "biepbiepamtruck" as "beep beep'em truck" (exp5). 0.3–1.0
-        // all help offline; 1.0 also keeps `gigamaxdong` from splitting as gig|amax|dong.
-        split_onset: 1.0,
-        // exp2–exp5 heard the digit in 5 of 10 clips with a number glued to letters (`3the`,
-        // `2eut`). Plural `2s` was read both times.
-        glued_number_drop: 1.0,
-    },
-    // v6: deletion and insertion costs fitted by `phono fit` on 408 harness clips (exp1–exp6),
-    // ranking pairs of answers to the same phrase (λ 0.01, substitution scales held at their
-    // hand-set values). Losing a sound costs more than v1–v5 assumed, most of all an unstressed
-    // full vowel (0.45 → 0.94), a singleton consonant (0.7 → 1.23) and an onset (0.9 → 1.22).
-    // Held-out phrases: within-phrase ranking 80.0% → 83.1% (Whisper-only truth: 74.9% →
-    // 78.8%). Letting the substitution scales move too scored ~86%, mostly by making vowel
-    // swaps cheap (3.0 → 1.3); the search avoided vowel swaps so far, so the clips can't say
-    // whether it would exploit them, and that fit is not used.
-    weights: Weights {
-        del_primary: 1.0,
-        del_secondary: 0.84,
-        del_unstressed: 0.94,
-        del_schwa: 0.37,
-        del_onset: 1.22,
-        del_cluster: 0.5,
-        del_consonant: 1.23,
-        ins_stressed: 0.62,
-        ins_unstressed: 0.26,
-        ins_consonant: 0.75,
-        sub_scale: 2.0,
-        vowel_sub_scale: 3.0,
-        stress_mismatch: 0.18,
-        class_mismatch: 0.57,
-    },
-    // Fitted with the weights above. The spelling weight was 0.4 in v4 (fit on exp1–exp3).
-    predict: Predict {
-        nbest: true,
-        risk_scale: 1.3,
-        spelling: 0.52,
-    },
+    script_preference: SCRIPT_PREFERENCE,
+    reader: FLASH_READER,
+    weights: FLASH_WEIGHTS,
+    predict: FLASH_PREDICT,
 };
+
+/// Representative order shared by the calibrated profiles: when several codepoints
+/// transliterate to the same chunk, the search uses the first script here.
+const SCRIPT_PREFERENCE: &[Script] = &[
+    Script::Latin,
+    Script::Hangul,
+    Script::Yi,
+    Script::CjkCompat,
+    Script::Cherokee,
+    Script::Ucas,
+    Script::Ethiopic,
+    Script::HangulCompatJamo,
+    Script::HangulJamo,
+    Script::Runic,
+    Script::Armenian,
+    Script::Hiragana,
+    Script::Katakana,
+    Script::CjkUnified,
+    Script::CyrillicNumber,
+    Script::Devanagari,
+    Script::Cyrillic,
+    Script::Other,
+];
+
+const FLASH_READER: ReaderParams = ReaderParams {
+    split_short_word: 0.5,
+    split_g2p_letter: 0.3,
+    split_lone_letter: 0.7,
+    // The TTS read "varymoldifrog" as "very moldy frog" (exp1), "thisisepicswang" as "this
+    // is Sepik swang" (exp2) and "biepbiepamtruck" as "beep beep'em truck" (exp5). 0.3–1.0
+    // all help offline; 1.0 also keeps `gigamaxdong` from splitting as gig|amax|dong.
+    split_onset: 1.0,
+    // exp2–exp5 heard the digit in 5 of 10 clips with a number glued to letters (`3the`,
+    // `2eut`). Plural `2s` was read both times.
+    glued_number_drop: 1.0,
+};
+
+// v6: deletion and insertion costs fitted by `phono fit` on 408 harness clips (exp1–exp6),
+// ranking pairs of answers to the same phrase (λ 0.01, substitution scales held at their
+// hand-set values). Losing a sound costs more than v1–v5 assumed, most of all an unstressed
+// full vowel (0.45 → 0.94), a singleton consonant (0.7 → 1.23) and an onset (0.9 → 1.22).
+// Held-out phrases: within-phrase ranking 80.0% → 83.1% (Whisper-only truth: 74.9% →
+// 78.8%). Letting the substitution scales move too scored ~86%, mostly by making vowel
+// swaps cheap (3.0 → 1.3); the search avoided vowel swaps so far, so the clips can't say
+// whether it would exploit them, and that fit is not used.
+const FLASH_WEIGHTS: Weights = Weights {
+    del_primary: 1.0,
+    del_secondary: 0.84,
+    del_unstressed: 0.94,
+    del_schwa: 0.37,
+    del_onset: 1.22,
+    del_cluster: 0.5,
+    del_consonant: 1.23,
+    ins_stressed: 0.62,
+    ins_unstressed: 0.26,
+    ins_consonant: 0.75,
+    sub_scale: 2.0,
+    vowel_sub_scale: 3.0,
+    stress_mismatch: 0.18,
+    class_mismatch: 0.57,
+};
+
+// Fitted with the weights above. The spelling weight was 0.4 in v4 (fit on exp1–exp3).
+const FLASH_PREDICT: Predict = Predict {
+    nbest: true,
+    risk_scale: 1.3,
+    spelling: 0.52,
+};
+
+/// `eleven_multilingual_v2`, probed in exp11 and calibrated on exp11–exp13 (338 clips). It reads
+/// most scripts by transliteration like Flash v2.5, but less clearly (mean truth 0.70 vs 0.78
+/// on the same 160 texts). Reader constants, weights and prediction settings are Flash's until
+/// tasks 3.2–3.3 check them against this model's clips.
+pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
+    model_ids: &["eleven_multilingual_v2"],
+    scripts: multilingual_v2_scripts,
+    // exp11 found no transliterated script that reads worse than its neighbours in Flash's
+    // order, so the order is the same.
+    script_preference: SCRIPT_PREFERENCE,
+    reader: FLASH_READER,
+    weights: FLASH_WEIGHTS,
+    predict: FLASH_PREDICT,
+};
+
+/// Multilingual v2's scripts, from exp11–exp13:
+/// - Read natively: Cyrillic (`Привет` in Russian), Devanagari (`कमल` "Kamal", not unidecode's
+///   `kml`) and kana (`フリ`, `ふり` "Free"). Kana is the change from Flash, which searches it.
+/// - Everything else is read by transliteration, with the same defaults as Flash.
+/// - Risks are Flash's except `҈`: predictions with Flash's profile over-shoot clips with it by
+///   about 0.29 per codepoint, against 0.06 on Flash's own clips (least squares over script
+///   counts). Risk 0.18 × `risk_scale` 1.3 covers the 0.23 difference. exp11 heard it as
+///   "Hander a thousand" and exp12's worst messages contain it. The other scripts' excess was
+///   within the ±0.03 that Flash's in-sample check shows.
+fn multilingual_v2_scripts(s: Script) -> ScriptProfile {
+    use Script::*;
+    use ScriptReading::*;
+    match s {
+        Hiragana | Katakana => ScriptProfile {
+            reading: Native,
+            risk: 0.1,
+            default_on: false,
+        },
+        CyrillicNumber => ScriptProfile {
+            risk: 0.18,
+            ..flash_v2_5_scripts(s)
+        },
+        _ => flash_v2_5_scripts(s),
+    }
+}
 
 /// Flash v2.5's scripts, from exp0–exp4:
 /// - Latin, Hangul and Yi behaved; CJK, kana, syllabics, Ethiopic and conjoining jamo produced
@@ -233,6 +284,58 @@ mod tests {
             err.contains("`eleven_v4`") && err.contains("eleven_flash_v2_5"),
             "{err}"
         );
+    }
+
+    #[test]
+    fn finds_multilingual_v2() {
+        let p = for_model("eleven_multilingual_v2").unwrap();
+        assert!(std::ptr::eq(p, &MULTILINGUAL_V2));
+        assert_eq!(p.id(), "eleven_multilingual_v2");
+        assert!(
+            std::ptr::eq(DEFAULT, &FLASH_V2_5),
+            "Flash stays the default"
+        );
+        let ids = known_model_ids();
+        assert!(ids.contains(&"eleven_flash_v2_5") && ids.contains(&"eleven_multilingual_v2"));
+    }
+
+    #[test]
+    fn multilingual_v2_scripts() {
+        let p = &MULTILINGUAL_V2;
+        // exp11: kana, Cyrillic and Devanagari are read natively.
+        for s in [
+            Script::Katakana,
+            Script::Hiragana,
+            Script::Cyrillic,
+            Script::Devanagari,
+        ] {
+            assert_eq!(p.script(s).reading, ScriptReading::Native, "{s:?}");
+            assert!(!p.script(s).default_on, "{s:?}");
+        }
+        for s in [
+            Script::Latin,
+            Script::Hangul,
+            Script::Yi,
+            Script::CjkCompat,
+            Script::CjkUnified,
+            Script::CyrillicNumber,
+        ] {
+            assert_eq!(p.script(s).reading, ScriptReading::Transliterated, "{s:?}");
+            assert!(p.script(s).default_on, "{s:?}");
+        }
+        for s in [
+            Script::Runic,
+            Script::HangulJamo,
+            Script::Ucas,
+            Script::Ethiopic,
+        ] {
+            assert!(!p.script(s).default_on, "{s:?}");
+        }
+        // `҈` is read unreliably on this model (exp11–exp13), unlike on Flash.
+        assert!(
+            p.script(Script::CyrillicNumber).risk > FLASH_V2_5.script(Script::CyrillicNumber).risk
+        );
+        assert!(p.preference(Script::Hangul) < p.preference(Script::Yi));
     }
 
     #[test]
