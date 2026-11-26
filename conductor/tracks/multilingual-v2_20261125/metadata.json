@@ -19,17 +19,20 @@
   },
   "phases": {
     "total": 4,
-    "completed": 1
+    "completed": 2
   },
   "tasks": {
     "total": 9,
-    "completed": 2
+    "completed": 5
   },
-  "current_phase": 2,
-  "current_task": "2.2",
+  "current_phase": 3,
+  "current_task": "3.1",
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11",
-    "699269d: feat(harness): cases_from list"
+    "699269d: feat(harness): cases_from list",
+    "9aee008: exp: add exp12",
+    "11a3659: exp: write up exp12",
+    "93a2971: exp: write up exp13"
   ]
 }

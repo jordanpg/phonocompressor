@@ -43,12 +43,12 @@ Collect the clips the baseline and the fit need.
 ### Tasks
 
 - [x] Task 2.1: Let an experiment's `cases_from` take a list of files, dropping a text already seen for the same phrase; existing experiment files keep working (ruff clean; dry runs of exp1 and exp7 list the same cases as before) ([#28](https://github.com/jordanpg/phonocompressor/issues/28))
-- [~] Task 2.2: exp12: the 34 community messages × 2 seeds on Multilingual v2; report; write-up next to exp1 (Whisper similarity, phone fidelity, language ID, silent clips). Stop point: if it isn't reading the messages through transliteration, ask before exp13 ([#29](https://github.com/jordanpg/phonocompressor/issues/29))
-- [ ] Task 2.3: exp13: the v1–v6 engine answers (126, community texts excluded) × 2 seeds on Multilingual v2; report; export one clips file of the model's default-setting clips from exp11–exp13; short PLAN.md entry ([#30](https://github.com/jordanpg/phonocompressor/issues/30))
+- [x] Task 2.2: exp12: the 34 community messages × 2 seeds on Multilingual v2; report; write-up next to exp1 (Whisper similarity, phone fidelity, language ID, silent clips). Stop point: if it isn't reading the messages through transliteration, ask before exp13 ([#29](https://github.com/jordanpg/phonocompressor/issues/29))
+- [x] Task 2.3: exp13: the v1–v6 engine answers (126, community texts excluded) × 2 seeds on Multilingual v2; report; export one clips file of the model's default-setting clips from exp11–exp13; short PLAN.md entry ([#30](https://github.com/jordanpg/phonocompressor/issues/30))
 
 ### Verification
 
-- [ ] The clips file lists only `eleven_multilingual_v2`, and `phono fit` with Flash's weights reports about 200 or more within-phrase pairs
+- [x] The clips file lists only `eleven_multilingual_v2`, and `phono fit` with Flash's weights reports about 200 or more within-phrase pairs
 
 ## Phase 3: The Multilingual v2 profile
 
@@ -56,7 +56,7 @@ Build the profile, move the reader rules its clips disagree with, then fit the w
 
 ### Tasks
 
-- [ ] Task 3.1: Add `MULTILINGUAL_V2` to `model.rs` and `PROFILES`: script table and preference order from exp11; Flash's reader constants and weights copied for now. Tests first (id resolves, katakana `Native`, default-on scripts). Baseline `phono calibrate --model eleven_multilingual_v2` ([#31](https://github.com/jordanpg/phonocompressor/issues/31))
+- [~] Task 3.1: Add `MULTILINGUAL_V2` to `model.rs` and `PROFILES`: script table and preference order from exp11; Flash's reader constants and weights copied for now. Tests first (id resolves, katakana `Native`, default-on scripts). Baseline `phono calibrate --model eleven_multilingual_v2` ([#31](https://github.com/jordanpg/phonocompressor/issues/31))
 - [ ] Task 3.2: Check the capital-letter rules, plurals, number grouping, glued-number drop and split costs against Multilingual v2's clips. Rules they disagree with become profile data, tests first. Flash's `phono eval` byte-identical; `calibrate` recorded for both models ([#32](https://github.com/jordanpg/phonocompressor/issues/32))
 - [ ] Task 3.3: `phono fit --model eleven_multilingual_v2` with substitution scales held (as in v6); put the weights and `predict` in the profile with a comment on their source; report in-sample and held-out ranking next to Flash's weights ([#33](https://github.com/jordanpg/phonocompressor/issues/33))
 
