@@ -938,6 +938,62 @@ keys.
     identically, so no weights can order them.
   - So v6's weights stay.
 
+**exp11 result (real TTS, 2026-11-25, 249 credits; 1218/10000 used after):
+Multilingual v2 reads most scripts by transliteration, like Flash v2.5, but
+reads Cyrillic, Devanagari and kana natively, and doesn't drop glued digits.**
+This was the probe for item 7 (issue #6, track `multilingual-v2_20261125`):
+exp0's 20 cases plus 27 new ones × 2 seeds on `eleven_multilingual_v2`, same
+voice. exp0's seed-1 clips were cached, so 74 clips were paid for. The
+dry-run estimate (1 credit per character at cost ×1.0) was exact. Cases and
+predictions: `tools/experiments/exp11.toml`; report: `tools/results/exp11.md`.
+Seeds agree less than on Flash: 19/47 identical transcripts.
+
+| script | heard (seed 1 / seed 2) | draft reading |
+|---|---|---|
+| Latin | `checkhimPC` "Check Him PC" ×2 | T |
+| Hangul | `딧잇` "This is" ×2; `솪` "Swag" ×2; `빞빞` "Bip bip" ×2; but `거` /ke/ ×2, `벗` /pat/, /pot/ | T, noisy on lone syllables (`벗` is the Korean reading) |
+| Hangul compat jamo | `ㅊ헻ㅋ힘` "Check him" ×2 | T |
+| Hangul jamo (conjoining) | not measured: the `jamo_conj` case used precomposed `가` by mistake ("ga" ×2) | unmeasured, off by default |
+| Yi | `ꌟ` "Suck" ×2; `ꀠddꏒꀊm` "Bad dream" ×2 | T |
+| CJK compat | `㌀` "Apartment" ×2; `㎞` "KM" / "Game is" | T |
+| Cyrillic number signs | `҈` "Hander a thousand" / "100,000"; `҈㌀s` "100,000 apartments" ×2 | T |
+| CJK unified | `嬶` "Caca"/"Kaka"; `萙` "Kutabireru" ×2; `嬶萙` "Kaka Kutabireru" ×2 | T (Whisper's language ID is often not English, but the phones are unidecode's) |
+| Katakana | `フリ` "Free" /fuːɾiː/ / "Hootie" /hri/; `アパート`, `キロ` /apato/, /kiro/ ×2 | N on seed 1 of `フリ`; the others fit both readings. Native, as exp0 said |
+| Hiragana | `ふり`, `あぱーと`: same phones as their katakana twins | Native, like katakana |
+| Cherokee | `ᏃᎧ` /noka/ ×2; `ᎠᎢ` "I" / "Bye" | T |
+| Canadian syllabics | `ᐊᐃ` "I" / "Bye" | T |
+| Ethiopic | `ሀለ` "Hala" ×2 | T |
+| Armenian | `ԱԲ` "A. B." ×2 | T (unidecode gives capitals, read as letters) |
+| Runic | `ᚠ` "F" ×2; `ᚠᚱ` "Far" / "Ha" | T, unstable |
+| Devanagari | `क` /ka/, /k/; `कमल` "Kamal" ×2 (unidecode: `kml`) | N |
+| Cyrillic | `Привет` "Привет" (Russian) ×2 | N |
+| Other | `™` "Me" / "May" (unidecode `(tm)`) | unmeasured, as on Flash |
+
+Draft preference order: Flash's, unchanged. The order only breaks ties
+between scripts that transliterate to the same chunk, and exp11 found no
+transliterated script that reads worse than its neighbours in Flash's order
+except Runic (already near the end). Draft defaults: on for every T script
+except Runic, Hangul jamo, Canadian syllabics and Ethiopic (as on Flash);
+risk values wait for exp12–exp13, which give per-script outcomes over many
+more clips.
+
+Reader rules (Flash's constants, which the reader uses today):
+
+| rule | heard (seed 1 / seed 2) | agrees? |
+|---|---|---|
+| glued number dropped (`glued_number_drop` 1.0) | `3the` "Three the" ×2; `2eut` "to a" / "To it" | No: the digit was read in 4 of 4 clips (Flash: 5 of 10) |
+| plural `2s` → "twos" | /tuːs/, /tuːz/ | Yes |
+| a run of capitals is its own word | `checkhimPC` "Check Him PC" ×2 | Yes |
+| interior capital consonant stays in the word | `tHe` "The" / "Ta-" (clipped) | Yes, weakly |
+| trailing capital is its own letter (v5.1) | `nexT` "Next" ×2; `timE` "Tammy" /taɪmiː/, "Timmy" /tɪmiː/ | Mixed: `nexT` drops the letter, `timE` reads E as /iː/ |
+| `100.000` grouped as "one hundred thousand" | "Thank you" / "100 Julian" (German-like) | No, but the search only reaches it through `҈`, which is read right |
+| `&`, `%` read as words | "You and me" ×2; "50%" /fɪfti pɚsɛnt/ ×2 | Yes |
+| `+`, `@` read as words | `you+me` "Oops, me" / "You, me"; `joemama@aha` "Jai Mama Nawa" / "Gemma Mazawa" | No: neither was read "plus" or "at" |
+
+So task 3.2 has candidates: `glued_number_drop` (probably near 0 for this
+model), the trailing-capital rule, and the `+`/`@` symbol words. Each needs
+the exp12–exp13 clips before it moves into the profile.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
