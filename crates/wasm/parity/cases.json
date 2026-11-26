@@ -22,6 +22,15 @@
     {
       "phrase": "bad dream",
       "options": { "model": "eleven_turbo_v2_5", "allowedScripts": ["latin", "yi"] }
+    },
+    { "phrase": "you and me at home", "options": { "model": "eleven_multilingual_v2" } },
+    {
+      "phrase": "hundred thousand apartments",
+      "options": { "model": "eleven_multilingual_v2", "topN": 25 }
+    },
+    {
+      "phrase": "free kilo",
+      "options": { "model": "eleven_multilingual_v2", "allowedScripts": ["latin", "hangul", "cjk-unified"] }
     }
   ]
 }
