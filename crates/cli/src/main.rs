@@ -108,6 +108,10 @@ enum Command {
         /// --risk-scale and --spelling).
         #[arg(long)]
         hand: bool,
+        /// Also summarize by script: each clip counts under every script in its own text, with
+        /// the script-risk penalty it paid and the over-prediction with and without it.
+        #[arg(long)]
+        by_script: bool,
     },
     /// Fit the scorer's weights to harness clips by within-phrase ranking, with cross-validation.
     Fit {
@@ -317,6 +321,7 @@ fn main() -> Result<(), String> {
             voicing,
             dump,
             hand,
+            by_script,
         } => {
             let heard = phono_core::score::Heard {
                 vowel_scale: heard_vowel_scale,
@@ -339,7 +344,15 @@ fn main() -> Result<(), String> {
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
-            calibrate(&engine, &clips, worst, &heard, &predict, dump.as_ref())?
+            calibrate(
+                &engine,
+                &clips,
+                worst,
+                &heard,
+                &predict,
+                dump.as_ref(),
+                by_script,
+            )?
         }
         Command::Fit {
             clips,
@@ -434,26 +447,30 @@ fn scripts_in(text: &str) -> Vec<Script> {
     out
 }
 
-/// Per-script sums for `eval --by-script`: (entries, community sum, ours sum, ours ≥ community).
-#[derive(Default)]
-struct ScriptStats(std::collections::BTreeMap<Script, (usize, f32, f32, usize)>);
+/// Means of per-item values grouped by script, for `eval` and `calibrate --by-script`. Each
+/// item counts once under every script in its text ([`scripts_in`]).
+struct ByScript<const N: usize>(std::collections::BTreeMap<Script, (usize, [f32; N])>);
 
-impl ScriptStats {
-    fn add(&mut self, unicode: &str, theirs: f32, ours: f32) {
-        for script in scripts_in(unicode) {
-            let e = self.0.entry(script).or_default();
-            e.0 += 1;
-            e.1 += theirs;
-            e.2 += ours;
-            e.3 += usize::from(ours >= theirs);
+impl<const N: usize> ByScript<N> {
+    fn new() -> Self {
+        Self(Default::default())
+    }
+
+    fn add(&mut self, text: &str, values: [f32; N]) {
+        for script in scripts_in(text) {
+            let (n, sums) = self.0.entry(script).or_insert((0, [0.0; N]));
+            *n += 1;
+            for (s, v) in sums.iter_mut().zip(values) {
+                *s += v;
+            }
         }
     }
 
-    /// (script, entries, community mean, ours mean, ours ≥ community).
-    fn rows(&self) -> Vec<(Script, usize, f32, f32, usize)> {
+    /// (script, items, mean of each value), in [`Script::ALL`] order.
+    fn rows(&self) -> Vec<(Script, usize, [f32; N])> {
         self.0
             .iter()
-            .map(|(&s, &(n, t, o, w))| (s, n, t / n as f32, o / n as f32, w))
+            .map(|(&s, &(n, sums))| (s, n, sums.map(|x| x / n as f32)))
             .collect()
     }
 }
@@ -487,7 +504,7 @@ fn eval(
         ..Default::default()
     };
     let (mut theirs, mut ours, mut wins) = (0.0, 0.0, 0);
-    let mut stats = ScriptStats::default();
+    let mut stats = ByScript::<3>::new(); // community, ours, ours ≥ community
     let mut scored: Vec<(f32, &str, &str)> = Vec::new();
     let mut exported = Vec::new();
     // Library keys (`u` + 8 hex) are wider than the hand-picked ones.
@@ -514,7 +531,7 @@ fn eval(
         if our >= their {
             wins += 1;
         }
-        stats.add(unicode, their, our);
+        stats.add(unicode, [their, our, f32::from(u8::from(our >= their))]);
         scored.push((their, id, unicode));
         println!(
             "{id:<w$} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
@@ -536,7 +553,8 @@ fn eval(
             "\n{:<20} {:>4} {:>9} {:>6} {:>6}",
             "script", "n", "community", "ours", "ours≥"
         );
-        for (script, n, t, o, w) in stats.rows() {
+        for (script, n, [t, o, w]) in stats.rows() {
+            let w = (w * n as f32).round();
             println!("{:<20} {n:>4} {t:>9.3} {o:>6.3} {w:>6}", script.name());
         }
         scored.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -734,6 +752,7 @@ fn calibrate(
     heard: &phono_core::score::Heard,
     predict: &phono_core::Predict,
     dump: Option<&PathBuf>,
+    by_script: bool,
 ) -> Result<(), String> {
     let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
@@ -842,6 +861,26 @@ fn calibrate(
             mean(|r| r.whisper)
         );
     }
+    if by_script {
+        // Penalty as the predictor applies it: risk_scale × the profile's per-codepoint risk.
+        let mut stats = ByScript::<3>::new(); // predicted, risk penalty, truth
+        for (r, t) in rows.iter().zip(&truth) {
+            let penalty = predict.risk_scale * engine.profile.risk(&r.clip.text);
+            stats.add(&r.clip.text, [r.predicted, penalty, *t]);
+        }
+        println!(
+            "\n{:<20} {:>5} {:>9} {:>7} {:>6} {:>6} {:>12}",
+            "script", "clips", "predicted", "penalty", "truth", "gap", "gap w/o risk"
+        );
+        for (script, n, [p, k, t]) in stats.rows() {
+            println!(
+                "{:<20} {n:>5} {p:>9.3} {k:>7.3} {t:>6.3} {:>+6.3} {:>+12.3}",
+                script.name(),
+                p - t,
+                p + k - t
+            );
+        }
+    }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
     for r in rows.iter().take(worst) {
@@ -866,7 +905,7 @@ fn calibrate(
 
 #[cfg(test)]
 mod tests {
-    use super::{ScriptStats, parse_keys, parse_messages, scripts_in};
+    use super::{ByScript, parse_keys, parse_messages, scripts_in};
     use phono_core::chunks::Script;
 
     #[test]
@@ -910,15 +949,16 @@ mod tests {
     }
 
     #[test]
-    fn script_stats_count_each_entry_once_per_script() {
-        let mut stats = ScriptStats::default();
-        stats.add("ꀠ딧", 0.5, 0.9);
-        stats.add("딧잇", 0.7, 0.6);
+    fn by_script_counts_each_item_once_per_script() {
+        let mut stats = ByScript::<2>::new();
+        stats.add("ꀠ딧", [0.5, 0.9]);
+        stats.add("딧잇", [0.7, 0.6]);
         let rows = stats.rows();
         assert_eq!(rows.len(), 2);
-        let (script, n, theirs, ours, wins) = rows[0];
-        assert_eq!((script, n, wins), (Script::Hangul, 2, 1));
-        assert!((theirs - 0.6).abs() < 1e-6 && (ours - 0.75).abs() < 1e-6);
-        assert_eq!((rows[1].0, rows[1].1, rows[1].4), (Script::Yi, 1, 1));
+        let (script, n, [a, b]) = rows[0];
+        assert_eq!((script, n), (Script::Hangul, 2));
+        assert!((a - 0.6).abs() < 1e-6 && (b - 0.75).abs() < 1e-6);
+        assert_eq!((rows[1].0, rows[1].1), (Script::Yi, 1));
+        assert_eq!(rows[1].2, [0.5, 0.9]);
     }
 }
