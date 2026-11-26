@@ -1,11 +1,11 @@
-"""phono-harness CLI. Normally invoked through mise tasks (see mise.toml):
+"""phono-harness CLI. Normally invoked through mise tasks (see tools/mise.toml):
 
-mise run harness:credits                 credit usage this period            (API, free)
-mise run harness:models                  TTS models and cost multipliers     (API, free)
-mise run harness:synth exp0              estimate cost of uncached clips     (dry run)
-mise run harness:synth exp0 --spend      ...and actually synthesize them     (API, costs credits)
-mise run harness:transcribe exp0         local ASR on cached clips           (GPU, free)
-mise run harness:report exp0             markdown report to tools/results/
+mise run //tools:credits                 credit usage this period            (API, free)
+mise run //tools:models                  TTS models and cost multipliers     (API, free)
+mise run //tools:synth exp0              estimate cost of uncached clips     (dry run)
+mise run //tools:synth exp0 --spend      ...and actually synthesize them     (API, costs credits)
+mise run //tools:transcribe exp0         local ASR on cached clips           (GPU, free)
+mise run //tools:report exp0             markdown report to tools/results/
 """
 
 from __future__ import annotations
@@ -77,7 +77,9 @@ def cmd_synth(args) -> None:
     models = _tts_models(client)
     unknown = sorted({r.model_id for _, r in todo} - models.keys())
     if unknown:
-        raise SystemExit(f"not TTS models for this account: {unknown} (see harness:models)")
+        raise SystemExit(
+            f"not TTS models for this account: {unknown} (see `mise run //tools:models`)"
+        )
 
     def cost(r) -> int:
         # Billing rounds each request up to a whole credit (exp0: 1-char requests on 0.5× models cost 1).
@@ -111,7 +113,9 @@ def cmd_synth(args) -> None:
         print(f"[{i}/{len(todo)}] {case.id:16} {req.model_id:24} {len(pcm) / 32000:.2f}s")
 
     after = client.remaining_credits()
-    print(f"credits used so far: {remaining - after} (billing lags; re-check with harness:credits)")
+    print(
+        f"credits used so far: {remaining - after} (billing lags; re-check with `mise run //tools:credits`)"
+    )
     if failures:
         raise SystemExit(f"{failures} request(s) failed")
 

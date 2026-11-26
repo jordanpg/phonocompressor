@@ -1,5 +1,5 @@
 # cargo-about config for the web bundle's third-party notices (crates/wasm/notices.mjs,
-# `mise run wasm:notices`). The script asks for phono-wasm's dependencies on wasm32 only, so the
+# `mise run //crates/wasm:notices`). The script asks for phono-wasm's dependencies on wasm32 only, so the
 # builder's and CLI's crates aren't considered.
 
 # Tried in order: a dual-licensed crate is listed under the first one it allows. A crate that none

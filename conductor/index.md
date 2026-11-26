@@ -21,7 +21,7 @@ Tickets: [issues](https://github.com/jordanpg/phonocompressor/issues) (public) o
 - [Python](./code_styleguides/python.md) (`tools/` harness)
 - [TypeScript](./code_styleguides/typescript.md) (planned web tool)
 
-Each guide starts with a "phonocompressor overrides" section; the repo's tool configs (`rustfmt.toml`, `[tool.ruff]`, `mise.toml` tasks) win over the guides.
+Each guide starts with a "phonocompressor overrides" section; the repo's tool configs (`rustfmt.toml`, `[tool.ruff]`, the `mise.toml` tasks at the root and in `tools/`) win over the guides.
 
 ## Active Tracks
 

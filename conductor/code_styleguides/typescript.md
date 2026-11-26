@@ -8,7 +8,7 @@ TypeScript is for the planned web tool (Phase 3): Svelte + Vite over the wasm-bi
 
 - **Framework:** Svelte components (`.svelte` with `<script lang="ts">`), not React. Read the React import examples below as plain module imports.
 - **Strict mode:** use the strict `tsconfig` settings shown below.
-- **Formatter and linter:** to be chosen when the web tool starts, then added to `mise run fmt`, `fmt:check` and `lint` like Rust and Python. Until then, match the 100-column limit used elsewhere.
+- **Formatter and linter:** to be chosen when the web tool starts, then added as `fmt`, `fmt:check` and `lint` tasks in `web/mise.toml` (with `web` added to `config_roots`); the root tasks of the same name run them, as they do for `tools/`. Until then, match the 100-column limit used elsewhere.
 - **WASM boundary:** use the types wasm-bindgen generates for `compress(...)`; don't hand-write duplicates. Keep the engine call in a Web Worker so a 2–6 s first search doesn't freeze the page.
 - **Client-side only:** no server calls, no API keys, no analytics that send the user's phrases anywhere.
 - **Results UI:** show each result's text, its Latin transliteration and its score. Make them copyable as plain text. Follow the accessibility rules in `product-guidelines.md`.

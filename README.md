@@ -62,6 +62,8 @@ cd phonocompressor
 mise run data      # export transliteration table + build data/generated/phono.bin (~15 s)
 ```
 
+Tasks are split across three mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`), the harness in `tools/` and the binding in `crates/wasm/`. Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front.
+
 ### CLI
 
 ```sh
@@ -100,11 +102,11 @@ engine.compress("bad dream", { maxCodepoints: 6, topN: 10 });
 Options: `model` (default `eleven_flash_v2_5`), `maxCodepoints` (1–30, default 6), `topN` (1–50, default 10) and `allowedScripts` (names such as `latin`, `hangul`, `yi`; default: the model's default scripts). Invalid input throws an `Error` that says what to change. The TypeScript types are generated into `phono_wasm.d.ts`.
 
 ```sh
-mise run wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts, third-party notices
-mise run wasm:notices   # just the notices: third-party-notices.html (cargo-about); --out <file>
-mise run wasm:check     # phono-core and phono-wasm build for wasm32
-mise run wasm:parity    # same guesses as `phono compress --json` on crates/wasm/parity/cases.json (Node)
-mise run wasm:serve     # test page at http://127.0.0.1:8000/; open /?bench to time it
+mise run //crates/wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts, third-party notices
+mise run //crates/wasm:notices   # just the notices: third-party-notices.html (cargo-about); --out <file>
+mise run //crates/wasm:check     # phono-core and phono-wasm build for wasm32
+mise run //crates/wasm:parity    # same guesses as `phono compress --json` on crates/wasm/parity/cases.json (Node)
+mise run //crates/wasm:serve     # test page at http://127.0.0.1:8000/; open /?bench to time it
 ```
 
 ### Test harness
@@ -119,15 +121,15 @@ Cost per clip is `ceil(codepoints × model multiplier)`, so it follows the codep
 | 3–4 | 2 |
 | 5–6 | 3 |
 
-At the default budget of 6, a candidate costs at most 3 credits per seed, so two seeds is at most 6. The free tier's 10,000 credits would cover roughly 3,300 clips of that length, before counting reruns. `harness:synth` prints the same estimate on a dry run and refuses to spend past an experiment's `max_credits`. These figures are the harness's estimate, and ElevenLabs' own usage counter has not always agreed with it, so treat the dashboard as authoritative.
+At the default budget of 6, a candidate costs at most 3 credits per seed, so two seeds is at most 6. The free tier's 10,000 credits would cover roughly 3,300 clips of that length, before counting reruns. `//tools:synth` prints the same estimate on a dry run and refuses to spend past an experiment's `max_credits`. These figures are the harness's estimate, and ElevenLabs' own usage counter has not always agreed with it, so treat the dashboard as authoritative.
 
 ```sh
-mise run harness:credits               # credit usage (free API call)
-mise run harness:synth exp9            # dry run: estimated cost of uncached clips
-mise run harness:synth exp9 --spend    # actually synthesize
-mise run harness:transcribe exp9       # local Whisper + wav2vec2 (no credits)
-mise run harness:report exp9           # → tools/results/exp9.md
-mise run harness:export                # clips → data/generated/clips.tsv for calibrate/fit
+mise run //tools:credits               # credit usage (free API call)
+mise run //tools:synth exp9            # dry run: estimated cost of uncached clips
+mise run //tools:synth exp9 --spend    # actually synthesize
+mise run //tools:transcribe exp9       # local Whisper + wav2vec2 (no credits)
+mise run //tools:report exp9           # → tools/results/exp9.md
+mise run //tools:export                # clips → data/generated/clips.tsv for calibrate/fit
 ```
 
 The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.dev/) and only exposed to the tasks that call the API. Transcription uses PyTorch and is intended to run on a GPU.
@@ -139,6 +141,6 @@ The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.de
 | Phoible | phone distance | CC BY 4.0 |
 | CMUdict | English pronunciations | BSD-style |
 | [`deunicode`](https://crates.io/crates/deunicode) | transliteration table, built by `phono-build` | BSD-3-Clause |
-| Python `unidecode` | dev comparison only (`mise run dev:translit-unidecode`); never feeds the data file | GPL-2.0+ |
+| Python `unidecode` | dev comparison only (`mise run //tools:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
 Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed MIT OR Apache-2.0.

@@ -1,21 +1,26 @@
-min_version = "2026.10.4"   # older mise rejects `secrets` on a task
+min_version = "2026.11.7"   # task templates in a project's config resolve from any directory
+monorepo_root = true
+
+# Each project has its own mise.toml and its tasks are named by path: `//tools:synth`,
+# `//crates/wasm:build`. This file keeps the shared tools and the tasks that span the Rust
+# workspace. `mise tasks --all` lists every task; `mise install --monorepo` installs every
+# project's tools (plain `mise install` only reads this file).
+[monorepo]
+config_roots = ["tools", "crates/wasm"]
 
 [tools]
 fnox = "latest"
-rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }  # wasm32 for the web tool
+# The wasm32 target stays here, not in crates/wasm/mise.toml: a second `rust@stable` request with
+# different options makes `mise install --monorepo` fail ("conflicting options").
+rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }
 uv = "latest"
-# Must equal the `wasm-bindgen` crate version pinned in Cargo.toml.
-"github:wasm-bindgen/wasm-bindgen" = "0.2.130"
-"github:EmbarkStudios/cargo-about" = "0.9.3"  # third-party notices for the web bundle
-node = "26"                 # LTS; runs the wasm parity check
+node = "26"                 # LTS; the wasm parity check and test page (and later web/)
 
 [settings]
 experimental = true         # mise secrets is experimental
 
+# Secrets come from fnox. A task only receives the ones it lists in `secrets`.
 [secrets.fnox]
-
-[env]
-UV_PROJECT_ENVIRONMENT = "{{env.HOME}}/.cache/phonocompressor/tools-venv"
 
 # --- Data file for the Rust engine (data/generated/, not committed) ---
 
@@ -23,110 +28,25 @@ UV_PROJECT_ENVIRONMENT = "{{env.HOME}}/.cache/phonocompressor/tools-venv"
 description = "Build data/generated/phono.bin: Phoible features, CMUdict, G2P model, transliteration (deunicode)"
 run = "cargo run --release -p phono-builder"
 
-# Dev only: unidecode (GPL) output for diffing against the shipped table. Never feeds phono.bin
-# unless you pass it to the builder with --translit by hand.
-[tasks."dev:translit-unidecode"]
-description = "Export Python unidecode's table to data/generated/translit-unidecode.tsv, for comparison only"
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness translit-table ../data/generated/translit-unidecode.tsv"
-
 [tasks.phono]
 description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"
 run = "cargo run --release -q -p phono-cli --"
 
-# --- Formatting & linting (Rust: rustfmt + clippy; Python tools/: ruff) ---
+# --- Formatting & linting: Rust here, then each project's task of the same name ---
+# Use depends_post, not `mise run '//...:fmt'` in `run`: `...` also matches this root, so the
+# latter recurses. mise leaves the task itself out of its own depends_post.
 
 [tasks.fmt]
-description = "Format all code (rustfmt + ruff format + ruff import sorting)"
-run = [
-  "cargo fmt --all",
-  "uvx ruff format tools",
-  "uvx ruff check --select I --fix tools",
-]
+description = "Format all code: rustfmt, then every project's fmt (ruff in tools/)"
+run = "cargo fmt --all"
+depends_post = ["//...:fmt"]
 
 [tasks."fmt:check"]
-description = "Check formatting without changing files (for CI)"
-run = [
-  "cargo fmt --all --check",
-  "uvx ruff format --check tools",
-]
+description = "Check formatting without changing files (for CI): rustfmt, then every project's fmt:check"
+run = "cargo fmt --all --check"
+depends_post = ["//...:fmt:check"]
 
 [tasks.lint]
-description = "Lint: clippy (warnings are errors) + ruff check"
-run = [
-  "cargo clippy --workspace --all-targets -- -D warnings",
-  "uvx ruff check tools",
-]
-
-# --- WASM (web tool, Phase 3) ---
-
-[tasks."wasm:check"]
-description = "Check that phono-core and phono-wasm build for wasm32-unknown-unknown (the target comes from `mise install`)"
-run = "cargo build -p phono-core -p phono-wasm --target wasm32-unknown-unknown"
-
-[tasks."wasm:build"]
-description = "Build the browser binding into target/wasm-pkg (.wasm, .js, .d.ts, notices; wasm-bindgen --target web)"
-depends = ["wasm:notices"]
-run = [
-  "cargo build -p phono-wasm --release --target wasm32-unknown-unknown",
-  "wasm-bindgen --target web --out-dir target/wasm-pkg target/wasm32-unknown-unknown/release/phono_wasm.wasm",
-]
-
-# The license gate for the bundle: fails on a crate license not accepted in crates/wasm/about.toml.
-[tasks."wasm:notices"]
-description = "Write target/wasm-pkg/third-party-notices.html: licenses of the .wasm's crates (cargo-about) and phono.bin's data; --out"
-run = "node crates/wasm/notices.mjs"
-
-[tasks."wasm:parity"]
-description = "Check the wasm binding gives the same guesses as `phono compress --json` (Node; needs phono.bin)"
-depends = ["wasm:build"]
-run = [
-  "cargo build --release -q -p phono-cli",
-  "node crates/wasm/parity/parity.mjs",
-]
-
-[tasks."wasm:serve"]
-description = "Serve the wasm test page (crates/wasm/www) at http://127.0.0.1:8000/; --port, --host"
-depends = ["wasm:build"]
-run = "node crates/wasm/serve.mjs"
-
-# --- ElevenLabs test harness (tools/). Only tasks that call the API receive the key. ---
-
-[tasks."harness:credits"]
-description = "Show ElevenLabs credit usage this period (free API call)"
-secrets = ["ELEVENLABS_API_KEY"]
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness credits"
-
-[tasks."harness:models"]
-description = "List ElevenLabs TTS models and cost multipliers (free API call)"
-secrets = ["ELEVENLABS_API_KEY"]
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness models"
-
-[tasks."harness:voices"]
-description = "List voices this account can use (free API call)"
-secrets = ["ELEVENLABS_API_KEY"]
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness voices"
-
-[tasks."harness:synth"]
-description = "Synthesize an experiment's uncached clips: dry run unless --spend"
-secrets = ["ELEVENLABS_API_KEY"]
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness synth"
-
-[tasks."harness:transcribe"]
-description = "Run local ASR (Whisper + wav2vec2 phones) on an experiment's cached clips"
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness transcribe"
-
-[tasks."harness:export"]
-description = "Export transcribed clips with targets for `phono calibrate` (gitignored output)"
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness export-clips exp1 exp2 --out ../data/generated/clips.tsv"
-
-[tasks."harness:report"]
-description = "Write a markdown report for an experiment to tools/results/"
-dir = "{{config_root}}/tools"
-run = "uv run phono-harness report"
+description = "Lint: clippy (warnings are errors), then every project's lint (ruff in tools/)"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+depends_post = ["//...:lint"]

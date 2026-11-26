@@ -5,7 +5,7 @@
 1. **The track's `plan.md` is the source of truth** for what the tasks are and their status. The [project board](https://github.com/users/jordanpg/projects/8) mirrors that status and owns scheduling (priority, size, iteration). If they disagree, update the board to match `plan.md`.
 2. **Tests: moderate.** Write tests for engine logic (reader rules, scorer, search, tiling, data format) where they help. They are encouraged, not a gate on starting work. Unit tests can't show how the TTS sounds; experiments on real clips remain the measure of quality.
 3. **Measure, don't assume.** A change that affects engine output is checked with `phono eval` (and `phono calibrate` when the reader or scorer changes) before it counts as done.
-4. **Never spend credits without asking.** `mise run harness:synth <exp> --spend` needs the user's explicit go-ahead every time, even mid-track. Dry runs are free and fine.
+4. **Never spend credits without asking.** `mise run //tools:synth <exp> --spend` needs the user's explicit go-ahead every time, even mid-track. Dry runs are free and fine.
 5. **Small commits.** One logical change per commit, in Conventional Commits format.
 6. **Every piece of work has an issue.** Tracks, plan tasks, experiments, bugs and TODOs are GitHub issues on the `phonocompressor` project (see "Issues and the project board").
 
@@ -156,13 +156,13 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
-| wasm32 | `phono-core` and `phono-wasm` still build for wasm | `mise run wasm:check` |
-| WASM parity | The binding still gives the CLI's guesses, if the core, `compress --json` or `crates/wasm` changed | `mise run wasm:parity` |
-| Licensing | No GPL code or data in anything shipped. Crates in the `.wasm` only under a license accepted in `crates/wasm/about.toml` | `mise run wasm:notices` for the `.wasm`'s crates; a manual check for other deps and data |
+| wasm32 | `phono-core` and `phono-wasm` still build for wasm | `mise run //crates/wasm:check` |
+| WASM parity | The binding still gives the CLI's guesses, if the core, `compress --json` or `crates/wasm` changed | `mise run //crates/wasm:parity` |
+| Licensing | No GPL code or data in anything shipped. Crates in the `.wasm` only under a license accepted in `crates/wasm/about.toml` | `mise run //crates/wasm:notices` for the `.wasm`'s crates; a manual check for other deps and data |
 
-The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in `mise.toml`).
+The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in the root `mise.toml`). The wasm-bindgen CLI is pinned in `crates/wasm/mise.toml`; the first `//crates/wasm:*` task installs it, or `mise install --monorepo` does.
 
-`phono eval` needs `sample/messages.json`, and `calibrate` needs exported clips; both are gitignored and local. `wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
+`phono eval` needs `sample/messages.json`, and `calibrate` needs exported clips; both are gitignored and local. `//crates/wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
 
 In a fresh git worktree, run `git submodule update --init` before the gates: the core's tests read Phoible's feature table from `phoible/`.
 
@@ -170,9 +170,11 @@ To fix formatting: `mise run fmt`.
 
 ## Development commands
 
+Run these from the repo root. Workspace tasks (`data`, `phono`, `fmt`, `fmt:check`, `lint`) are in the root `mise.toml`; the harness and the binding have their own, in `tools/` and `crates/wasm/`, and their tasks are named by path. `mise tasks --all` lists every task. Inside a project directory, `mise run :<task>` runs that project's task, and root tasks need `//:` (e.g. `mise run //:phono`).
+
 ```sh
 # Setup (clone with --recurse-submodules first)
-mise install
+mise install --monorepo                      # every project's tools, not just the root's
 mise run data                                # build data/generated/phono.bin (~15 s)
 
 # Use the engine
@@ -183,20 +185,20 @@ mise run phono read 'ꀠddꏒꀊm'
 # Check
 mise run fmt:check && mise run lint && cargo test --workspace
 mise run phono eval
-mise run wasm:check && mise run wasm:parity
+mise run //crates/wasm:check && mise run //crates/wasm:parity
 
 # Browser binding
-mise run wasm:build                          # target/wasm-pkg (.wasm, JS glue, .d.ts, notices)
-mise run wasm:serve                          # test page at http://127.0.0.1:8000/ (/?bench times it)
+mise run //crates/wasm:build                 # target/wasm-pkg (.wasm, JS glue, .d.ts, notices)
+mise run //crates/wasm:serve                 # test page at http://127.0.0.1:8000/ (/?bench times it)
 
 # Harness (free)
-mise run harness:credits
-mise run harness:synth <exp>                 # dry run: estimated cost
-mise run harness:transcribe <exp>
-mise run harness:report <exp>
+mise run //tools:credits
+mise run //tools:synth <exp>                 # dry run: estimated cost
+mise run //tools:transcribe <exp>
+mise run //tools:report <exp>
 
 # Harness (spends credits: ask first)
-mise run harness:synth <exp> --spend
+mise run //tools:synth <exp> --spend
 ```
 
 ## Experiments

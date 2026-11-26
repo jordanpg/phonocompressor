@@ -50,7 +50,7 @@ worker.onmessage = ({ data: msg }) => {
 };
 
 worker.onerror = (e) => {
-  onFailed(new Error(`${e.message || "worker error"} (did \`mise run wasm:build\` run?)`));
+  onFailed(new Error(`${e.message || "worker error"} (did \`mise run //crates/wasm:build\` run?)`));
 };
 
 function showError(message) {

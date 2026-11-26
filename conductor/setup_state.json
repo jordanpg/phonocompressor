@@ -30,7 +30,7 @@
     "workflow.tdd": "Moderate: tests encouraged for engine logic (reader rules, scorer, search, data format), not blocking; experiments on real clips remain the measure of quality",
     "workflow.commits": "Conventional Commits; no AI attribution lines (no Co-Authored-By or generated-by trailers)",
     "workflow.review": "Optional; self-review OK",
-    "workflow.checkpoints": "After each task completion; spending ElevenLabs credits (harness:synth --spend) always needs explicit user go-ahead",
+    "workflow.checkpoints": "After each task completion; spending ElevenLabs credits (//tools:synth --spend) always needs explicit user go-ahead",
     "styleguides.languages": ["typescript", "python", "rust", "general"],
     "styleguides.existing_configs": "Use existing configs as source of truth: rustfmt.toml, ruff in tools/pyproject.toml, mise fmt/fmt:check/lint tasks"
   },

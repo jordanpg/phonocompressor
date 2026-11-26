@@ -11,7 +11,7 @@
 // Data: the CMUdict and deunicode license texts are read from cmudict/ and the crate's source,
 // and the submodule commits from git, so they match what `mise run data` builds from.
 //
-// Usage: mise run wasm:notices [--out <file>] (default: target/wasm-pkg/third-party-notices.html)
+// Usage: mise run //crates/wasm:notices [--out <file>] (default: target/wasm-pkg/third-party-notices.html)
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,7 +29,7 @@ const OUT = flags.out
   : join(ROOT, "target/wasm-pkg/third-party-notices.html");
 
 function fail(message) {
-  console.error(`wasm:notices: ${message}`);
+  console.error(`notices: ${message}`);
   process.exit(1);
 }
 
@@ -276,6 +276,6 @@ ${crates.body}
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, page);
 console.log(
-  `wasm:notices: wrote ${OUT} ` +
+  `notices: wrote ${OUT} ` +
     `(${crates.count} crates, ${licenses.length} license texts, 3 data sources)`,
 );
