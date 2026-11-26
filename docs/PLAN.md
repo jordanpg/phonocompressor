@@ -1332,6 +1332,79 @@ same phrases, written in whatever scripts the search picked:
   entries in Ethiopic and conjoining jamo score higher there, because its
   profile gives those scripts lower risks.
 
+**exp15 result (real TTS, 2026-11-26, 500 credits; 3342/10000 used after):
+in the low-scoring scripts the community entries are better than predicted,
+and our answers worse. Offline we led by 0.23; heard, we lead by 0.03.**
+Setup: the 52 library entries whose community text has Katakana, Cherokee,
+Ethiopic, Canadian syllabics, conjoining jamo, Hiragana, Armenian or
+Devanagari (`tools/experiments/exp15.keys`, 6 of them among the 34), plus our
+top answer for each phrase. Flash v2.5, seeds 1 and 2, exp1's voice. 212
+clips, 24 of them cached. There were also two ҂ checks (#49). Truth is as in
+`calibrate`: the mean of heard-phone and Whisper fidelity. Numbers come from
+`phono calibrate data/generated/clips-exp15.tsv --dump`, grouped by the
+scripts of each phrase's community text. "Gap" is predicted − truth; on exp1
+(the 34 community messages) it is +0.02.
+
+| script | n | community: predicted | + risk | truth | gap | gap without risk | ours: predicted | truth | ours > community |
+|---|---|---|---|---|---|---|---|---|---|
+| ucas | 22 | 0.692 | 0.787 | 0.776 | −0.08 | +0.01 | 0.920 | 0.807 | 11 |
+| ethiopic | 10 | 0.703 | 0.788 | 0.725 | −0.02 | +0.06 | 0.925 | 0.666 | 3 |
+| hangul-jamo | 10 | 0.723 | 0.769 | 0.683 | +0.04 | +0.09 | 0.906 | 0.762 | 9 |
+| katakana | 7 | 0.599 | 0.695 | 0.706 | −0.11 | −0.01 | 0.920 | 0.780 | 4 |
+| hiragana | 7 | 0.753 | 0.857 | 0.829 | −0.08 | +0.03 | 0.907 | 0.808 | 3 |
+| cherokee | 6 | 0.746 | 0.801 | 0.750 | −0.00 | +0.05 | 0.954 | 0.778 | 5 |
+| armenian | 2 | 0.753 | 0.808 | 0.859 | −0.11 | −0.05 | 0.964 | 0.814 | 1 |
+| devanagari | 1 | 0.388 | 0.518 | 0.607 | −0.22 | −0.09 | 0.712 | 0.511 | 0 |
+| **all 52** | 52 | **0.696** | | **0.745** | −0.05 | | **0.921** | **0.771** | **30** |
+
+Harness Whisper similarity is 0.80 / 0.81 per seed. Within-phrase ranking is
+24 of 36 pairs (66.7%), against about 80% on exp1–exp14.
+
+Whether the reader or the entries were wrong, per script:
+
+- **Katakana, Canadian syllabics, Hiragana: the reader's readings are right,
+  but Flash's script risks are too high.** Without the risk, prediction
+  matches truth as well as on exp1. With it, these entries are under-predicted
+  by 0.08–0.11. The community entries are fine (truth 0.71–0.83).
+  Hiragana's beat ours (0.829 vs 0.808). Filed as #50. A caveat: the
+  community's characters are hand-picked ones that work, and the search
+  would use any chunk in the script.
+- **Cherokee, Ethiopic, conjoining jamo: the entries are weak, and the risk
+  is earned.** Even without the risk the readings over-predict (+0.05 to
+  +0.09), and the entries are heard at 0.68–0.75. Keeping syllabics,
+  Ethiopic and jamo off by default on Flash stands. Our answers beat jamo 9
+  of 10 times and Cherokee 5 of 6.
+- **Armenian, Devanagari:** 3 entries in all, too few to say.
+
+Our answers were over-predicted by +0.15 here. Some of that is expected,
+since the search picks the top of many predictions, but it is far above the
+community's +0.02 on exp1. The worst cases aren't about scripts:
+
+- **Pseudo-word targets:** names and coinages are misheard (`u531d33fc`,
+  `uea38b3b8`, `u585b9961`, `247`). That's item 5 below, short pseudo-words.
+- **A dropped first word** (`ua60036ce`).
+- **A runaway loop:** `ua626e6e4`'s answer, one Hangul syllable repeated, made
+  Flash loop for about half a minute on one seed (truth 0.27). The predictor
+  can't see that (#51).
+- **Recognizer noise:** some answers heard word-perfect (`uf9fa9b27`,
+  `uc5786e8c`) still score about 0.73, because the phone recognizer is noisy.
+  That caps truth below 1 for short phrases.
+
+Our answers for Ethiopic phrases lose 7 of 10. Three of the cases above
+(`u585b9961`, `ua60036ce`, `ua626e6e4`) are among them, and our answers aren't written in Ethiopic
+(it's off by default).
+
+**҂ (#49).** It was heard as a thousand on all 4 clips, but "one" was dropped
+on 2 of them, like `҈`'s "hundred thousand". It's worth adding as a chunk for
+"thousand", with a risk for the dropped "one".
+
+So the low offline community scores in these scripts are half right. For
+Katakana, syllabics and Hiragana the risk table is too harsh. For Cherokee,
+Ethiopic and jamo the entries really are weak. The bigger lesson is that our
+lead shrinks a lot on hard phrases (0.92 vs 0.70 predicted, 0.77 vs 0.75
+heard). The full run (#45) and the refit (#46) should show whether that holds
+across the library.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
