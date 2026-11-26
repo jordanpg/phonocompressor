@@ -1025,7 +1025,6 @@ report's difflib similarity is 0.77 / 0.78 per seed, against exp1's 0.86 /
   comes"), `ꄫꀔ` ("toe" → "two"), `ꀂꀑꊂꌟ` (seed 1 "ayahuasks") and `҈㌖㌐ꂶ동`.
   Messages with `҈` are the worst: its reading varies a lot here (exp11:
   "Hander a thousand" / "100,000").
-- 6 messages are exactly right on both seeds (Flash: 9).
 
 Decision: exp13 waits for the user's go-ahead, since the track's stop point
 (non-English language ID) is met on its face.
