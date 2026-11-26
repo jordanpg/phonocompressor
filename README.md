@@ -8,7 +8,7 @@ This project searches for short strings of exotic characters whose TTS reading l
 
 ## How it works
 
-The TTS models on ElevenLabs' 2.5 generation (Flash v2.5, Turbo v2.5) don't read unfamiliar scripts in their native language. They **transliterate** each character into Latin letters (a table equivalent to Python's [`unidecode`](https://pypi.org/project/Unidecode/); we build ours from Rust's [`deunicode`](https://crates.io/crates/deunicode)), then read the result as English spelling. `딧잇` becomes "dis·is" and is read as "this is"; `㌀` becomes "apartment". The engine exploits that:
+ElevenLabs' Flash v2.5 and Turbo v2.5, and for most scripts Multilingual v2, don't read unfamiliar scripts in their native language. They **transliterate** each character into Latin letters (a table equivalent to Python's [`unidecode`](https://pypi.org/project/Unidecode/); we build ours from Rust's [`deunicode`](https://crates.io/crates/deunicode)), then read the result as English spelling. `딧잇` becomes "dis·is" and is read as "this is"; `㌀` becomes "apartment". The engine exploits that:
 
 ```
 English phrase
@@ -24,7 +24,7 @@ top-N codepoint strings with scores
 - **Phone distance** uses [Phoible](https://phoible.org/) feature vectors, with a weighted edit distance that cares about stress and position.
 - **Reader** models how the TTS turns a Latin string into sounds: dictionary lookup, word splitting of run-together pseudo-words, initialisms, number words.
 - **Scorer** weights are fitted offline against real ElevenLabs clips (`phono fit`), including per-script risk and a spelling-closeness term so results stay recognizable as words.
-- **Model profiles** (`crates/core/src/model.rs`) hold everything that depends on the TTS model. Only `eleven_flash_v2_5` (which also covers `eleven_turbo_v2_5`) is calibrated; other models are rejected until they get a profile.
+- **Model profiles** (`crates/core/src/model.rs`) hold everything that depends on the TTS model. Two are calibrated: `eleven_flash_v2_5` (the default, which also covers `eleven_turbo_v2_5`) and `eleven_multilingual_v2`. Other models are rejected until they get a profile.
 
 Output is non-deterministic on the TTS side, so the engine returns the top N guesses rather than one answer.
 
@@ -34,9 +34,14 @@ The full design, experiment write-ups and decision history are in [`docs/PLAN.md
 
 The native CLI works end to end (about 1.5–3 s per phrase in release). The browser binding (`crates/wasm`) works too: it returns the same guesses as the CLI and runs in Chrome and Firefox, about 0.4 s to start and 2–6 s for a first search (see PLAN.md, Phase 3). The web front end and its deployment are not built yet.
 
-**Scope today:** the engine targets one TTS, ElevenLabs `eleven_flash_v2_5` (and `eleven_turbo_v2_5`, which behaves the same). The reader, script risks and scorer weights are all calibrated against that model's actual output, and the CLI rejects models without a calibrated profile. Model-specific settings are kept in a `ModelProfile` so more ElevenLabs models can be added by probing and calibrating them. Other TTS providers might be supported someday, but nothing in the repo does that yet, and it would need its own measurement work, not just a new profile.
+**Scope today:** the engine targets two ElevenLabs models, each calibrated against its own recorded output:
 
-Against a set of hand-made reference messages (34 samples, Whisper transcripts of real ElevenLabs output), the current engine matches or beats them on sound and word intelligibility; see PLAN.md for the numbers and for known failure modes (voicing swaps, ambiguous spellings, rare scripts).
+- `eleven_flash_v2_5` (the default, and `eleven_turbo_v2_5`, which behaves the same);
+- `eleven_multilingual_v2` (`--model eleven_multilingual_v2`). It reads kana, Cyrillic and Devanagari natively, so the search doesn't use them; it doesn't read `@` as "at"; and it reads digits glued to letters. It is noisier than Flash: on the same texts it is heard about 0.07 less accurately, whoever wrote them.
+
+The CLI rejects models without a calibrated profile. Model-specific settings are kept in a `ModelProfile`, so more ElevenLabs models can be added by probing and calibrating them. Other TTS providers might be supported someday, but nothing in the repo does that yet, and it would need its own measurement work, not just a new profile.
+
+Against a set of hand-made reference messages (34 samples, Whisper transcripts of real ElevenLabs output), the current engine matches or beats them on sound and word intelligibility on both models; see PLAN.md for the numbers and for known failure modes (voicing swaps, ambiguous spellings, rare scripts).
 
 ## Layout
 
@@ -120,6 +125,8 @@ Cost per clip is `ceil(codepoints × model multiplier)`, so it follows the codep
 | 1–2 | 1 |
 | 3–4 | 2 |
 | 5–6 | 3 |
+
+Multilingual v2 bills at 1×, so the same clip costs twice as much there (one credit per codepoint).
 
 At the default budget of 6, a candidate costs at most 3 credits per seed, so two seeds is at most 6. The free tier's 10,000 credits would cover roughly 3,300 clips of that length, before counting reruns. `//tools:synth` prints the same estimate on a dry run and refuses to spend past an experiment's `max_credits`. These figures are the harness's estimate, and ElevenLabs' own usage counter has not always agreed with it, so treat the dashboard as authoritative.
 

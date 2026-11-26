@@ -1,0 +1,14 @@
+name = "exp12"
+description = """
+Community baseline on Multilingual v2: exp1's cases (the community sample messages,
+sample/messages.json, gitignored) on eleven_multilingual_v2, two seeds. Measures how close the
+community's messages come to their phrase on this model, for comparison with exp1 (Flash v2.5)
+and with the new profile's answers (exp14). Also checks that the model reads them through
+transliteration: English language ID, few silent clips. Track multilingual-v2_20261125, issue #29.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_multilingual_v2"]
+seeds = [1, 2]
+max_credits = 360
+cases_from = "sample/messages.json"

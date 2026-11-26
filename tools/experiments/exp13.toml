@@ -1,0 +1,24 @@
+name = "exp13"
+description = """
+Replay of earlier engine answers on Multilingual v2, as fit data for its profile. Every distinct
+answer phono v1-v6 gave for the community phrases (data/generated/ours-v1..v6.json, gitignored),
+leaving out texts exp12 already ran (the community's own), on eleven_multilingual_v2, two seeds.
+`phono fit --model eleven_multilingual_v2` learns from pairs of different answers to the same
+phrase; exp1's equivalent for Flash v2.5 was exp2-exp7.
+Track multilingual-v2_20261125, issue #30.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_multilingual_v2"]
+seeds = [1, 2]
+max_credits = 1300
+cases_from = [
+    "data/generated/ours-v1.json",
+    "data/generated/ours-v2.json",
+    "data/generated/ours-v3.json",
+    "data/generated/ours-v4.json",
+    "data/generated/ours-v5.json",
+    "data/generated/ours-v5b.json",
+    "data/generated/ours-v6.json",
+]
+cases_exclude = "sample/messages.json"

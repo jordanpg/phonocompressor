@@ -6,7 +6,7 @@
 
 **One line:** A phonetic compression engine (Rust: a native CLI and a browser binding, with the web tool planned) that searches for short exotic-character strings whose TTS reading matches a target phrase.
 
-**How it works, briefly:** ElevenLabs' 2.5-generation models (Flash v2.5, Turbo v2.5) transliterate unfamiliar scripts into Latin letters and read the result as English spelling. The engine turns an English phrase into target phones, searches for codepoint strings whose transliteration spells those sounds within a codepoint budget (configurable, default 6, spaces count), predicts how the TTS will read each candidate, and returns the top N. TTS output is not deterministic, so it returns several guesses rather than one answer. Example: "hundred thousand apartments" → `҈㌀s` (3 codepoints).
+**How it works, briefly:** ElevenLabs' Flash v2.5 and Turbo v2.5, and for most scripts Multilingual v2, transliterate unfamiliar scripts into Latin letters and read the result as English spelling. The engine turns an English phrase into target phones, searches for codepoint strings whose transliteration spells those sounds within a codepoint budget (configurable, default 6, spaces count), predicts how the TTS will read each candidate, and returns the top N. TTS output is not deterministic, so it returns several guesses rather than one answer. Example: "hundred thousand apartments" → `҈㌀s` (3 codepoints).
 
 Full design, experiments and decision history: [`docs/PLAN.md`](../docs/PLAN.md).
 
@@ -32,15 +32,16 @@ Live-chat TTS messages (e.g. Twitch) have a tiny character budget, and no tool f
 ## Goals
 
 1. **Ship the WASM web tool (Phase 3).** Run the engine fully in the browser. The binding (`crates/wasm`) works and matches the CLI; the front end and its deploy are next.
-2. **Add more TTS models.** Calibrate more ElevenLabs models as new `ModelProfile`s beyond `eleven_flash_v2_5`. Each needs an exp0-style probe, a community-message run and fitted weights.
+2. **Add more TTS models.** Calibrate more ElevenLabs models as new `ModelProfile`s. `eleven_multilingual_v2` is the second (`multilingual-v2_20261125`). Each needs an exp0-style probe, a community-message run, a replay of earlier answers for fitting, and a live check. v3/v4 also need reading model N.
 3. **Beat hand-made messages.** Keep matching or beating hand-crafted reference messages on intelligibility of real TTS output.
 
-## Current status (2026-11-25)
+## Current status (2026-11-26)
 
 - Phase 0 (harness, reading-model experiment) and Phase 1 (native CLI search) are done. The CLI runs end to end in about 1.5–3 s per phrase (release build).
 - Phase 2 is partly done: an order-5 Kneser-Ney G2P handles unknown words. Reading model N (native readings for v3/v4) is not started.
 - Phase 3 (WASM): the binding is done (`wasm-binding_20261125`, #14): typed `compress()`, CLI parity, a Worker test page, measured in Chrome and Firefox. The Svelte front end and the GitHub Pages deploy are not started.
-- Only `eleven_flash_v2_5` (also covering `eleven_turbo_v2_5`) has a profile. The CLI rejects other models.
+- Two models have profiles: `eleven_flash_v2_5` (the default, also covering `eleven_turbo_v2_5`) and `eleven_multilingual_v2` (since `multilingual-v2_20261125`, #6). The CLI and the binding reject other models.
+- On Multilingual v2 (exp14), the engine's answers beat the community's messages (phone fidelity 0.774 vs 0.739, Whisper 0.803 vs 0.734), level with Flash's answers played on that model. The model reads everything about 0.07 worse than Flash.
 
 ## Success metrics
 

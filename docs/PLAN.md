@@ -205,10 +205,13 @@ showed to be most reliable.
 - the fitted scorer weights.
 
 Target phones, phone distances and the search are the same for every model.
-Only `eleven_flash_v2_5` (which also covers `eleven_turbo_v2_5`) has a
-profile. A new model needs an exp0-style probe and a community-message run
-to get one. Models that read scripts natively (v3, v4) also need reading
-model N.
+Two models have profiles: `eleven_flash_v2_5` (the default, also covering
+`eleven_turbo_v2_5`) and, since exp11–exp14, `eleven_multilingual_v2`. Its
+profile differs in the script table (kana native; risks for `҈`, syllabics,
+Ethiopic, conjoining jamo), the symbol words (`@` silent) and
+`glued_number_drop`; the rest is Flash's. A new model needs an exp0-style
+probe, a community-message run and a replay of earlier answers to get one.
+Models that read scripts natively (v3, v4) also need reading model N.
 
 ## Repo layout
 
@@ -938,6 +941,320 @@ keys.
     identically, so no weights can order them.
   - So v6's weights stay.
 
+**exp11 result (real TTS, 2026-11-25, 249 credits; 1218/10000 used after):
+Multilingual v2 reads most scripts by transliteration, like Flash v2.5, but
+reads Cyrillic, Devanagari and kana natively, and doesn't drop glued digits.**
+This was the probe for item 7 (issue #6, track `multilingual-v2_20261125`):
+exp0's 20 cases plus 27 new ones × 2 seeds on `eleven_multilingual_v2`, same
+voice. exp0's seed-1 clips were cached, so 74 clips were paid for. The
+dry-run estimate (1 credit per character at cost ×1.0) was exact. Cases and
+predictions: `tools/experiments/exp11.toml`; report: `tools/results/exp11.md`.
+Seeds agree less than on Flash: 19/47 identical transcripts.
+
+| script | heard (seed 1 / seed 2) | draft reading |
+|---|---|---|
+| Latin | `checkhimPC` "Check Him PC" ×2 | T |
+| Hangul | `딧잇` "This is" ×2; `솪` "Swag" ×2; `빞빞` "Bip bip" ×2; but `거` /ke/ ×2, `벗` /pat/, /pot/ | T, noisy on lone syllables (`벗` is the Korean reading) |
+| Hangul compat jamo | `ㅊ헻ㅋ힘` "Check him" ×2 | T |
+| Hangul jamo (conjoining) | `가` (U+1100 U+1161) "God" / "Yeah", /ɡaː/ ×2 | T, unstable; off by default, as on Flash |
+| Yi | `ꌟ` "Suck" ×2; `ꀠddꏒꀊm` "Bad dream" ×2 | T |
+| CJK compat | `㌀` "Apartment" ×2; `㎞` "KM" / "Game is" | T |
+| Cyrillic number signs | `҈` "Hander a thousand" / "100,000"; `҈㌀s` "100,000 apartments" ×2 | T |
+| CJK unified | `嬶` "Caca"/"Kaka"; `萙` "Kutabireru" ×2; `嬶萙` "Kaka Kutabireru" ×2 | T (Whisper's language ID is often not English, but the phones are unidecode's) |
+| Katakana | `フリ` "Free" /fuːɾiː/ / "Hootie" /hri/; `アパート`, `キロ` /apato/, /kiro/ ×2 | N on seed 1 of `フリ`; the others fit both readings. Native, as exp0 said |
+| Hiragana | `ふり`, `あぱーと`: same phones as their katakana twins | Native, like katakana |
+| Cherokee | `ᏃᎧ` /noka/ ×2; `ᎠᎢ` "I" / "Bye" | T |
+| Canadian syllabics | `ᐊᐃ` "I" / "Bye" | T |
+| Ethiopic | `ሀለ` "Hala" ×2 | T |
+| Armenian | `ԱԲ` "A. B." ×2 | T (unidecode gives capitals, read as letters) |
+| Runic | `ᚠ` "F" ×2; `ᚠᚱ` "Far" / "Ha" | T, unstable |
+| Devanagari | `क` /ka/, /k/; `कमल` "Kamal" ×2 (unidecode: `kml`) | N |
+| Cyrillic | `Привет` "Привет" (Russian) ×2 | N |
+| Other | `™` "Me" / "May" (unidecode `(tm)`) | unmeasured, as on Flash |
+
+Draft preference order: Flash's, unchanged. The order only breaks ties
+between scripts that transliterate to the same chunk, and exp11 found no
+transliterated script that reads worse than its neighbours in Flash's order
+except Runic (already near the end). Draft defaults: on for every T script
+except Runic, Hangul jamo, Canadian syllabics and Ethiopic (as on Flash);
+risk values wait for exp12–exp13, which give per-script outcomes over many
+more clips.
+
+Reader rules (Flash's constants, which the reader uses today):
+
+| rule | heard (seed 1 / seed 2) | agrees? |
+|---|---|---|
+| glued number dropped (`glued_number_drop` 1.0) | `3the` "Three the" ×2; `2eut` "to a" / "To it" | No: the digit was read in 4 of 4 clips (Flash: 5 of 10) |
+| plural `2s` → "twos" | /tuːs/, /tuːz/ | Yes |
+| a run of capitals is its own word | `checkhimPC` "Check Him PC" ×2 | Yes |
+| interior capital consonant stays in the word | `tHe` "The" / "Ta-" (clipped) | Yes, weakly |
+| trailing capital is its own letter (v5.1) | `nexT` "Next" ×2; `timE` "Tammy" /taɪmiː/, "Timmy" /tɪmiː/ | Mixed: `nexT` drops the letter, `timE` reads E as /iː/ |
+| `100.000` grouped as "one hundred thousand" | "Thank you" / "100 Julian" (German-like) | No, but the search only reaches it through `҈`, which is read right |
+| `&`, `%` read as words | "You and me" ×2; "50%" /fɪfti pɚsɛnt/ ×2 | Yes |
+| `+`, `@` read as words | `you+me` "Oops, me" / "You, me"; `joemama@aha` "Jai Mama Nawa" / "Gemma Mazawa" | No: neither was read "plus" or "at" |
+
+So task 3.2 has candidates: `glued_number_drop` (probably near 0 for this
+model), the trailing-capital rule, and the `+`/`@` symbol words. Each needs
+the exp12–exp13 clips before it moves into the profile.
+
+**exp12 result (real TTS, 2026-11-25, 334 credits; 1552/10000 used after):
+the community messages on Multilingual v2 are read by transliteration, but
+less well and less steadily than on Flash v2.5.** exp1's 34 messages × 2
+seeds on `eleven_multilingual_v2`, same voice (`tools/experiments/exp12.toml`;
+`tools/results/exp12.md`, gitignored like exp1's). Measured with
+`phono calibrate`'s truth, so the numbers sit next to exp1's:
+
+| run | model | phone fidelity | Whisper similarity | Whisper says English | silent | identical across seeds |
+|---|---|---|---|---|---|---|
+| exp1 | Flash v2.5 | 0.791 | 0.847 | 67/68 | 0 | 16/34 |
+| exp12 | Multilingual v2 | 0.739 | 0.734 | 41/68 | 0 | 14/34 |
+
+(exp1's phone fidelity is 0.791 here and 0.783 in the exp3 table; `calibrate`
+has changed since. Both rows above come from the current build.) The harness
+report's difflib similarity is 0.77 / 0.78 per seed, against exp1's 0.86 /
+0.88, with 17 and 19 of 34 messages at 0.8 or more (exp1: 24 and 24).
+
+- **No silent clips**, and the phones are unidecode's chunks read as English
+  (`ꀂꀑꊂꌟ` "Iowa sucks" /aː j ɔ w a s a k s/, `ꀠddꏒꀊm` "Bad dream" in exp11).
+  So the model still reads these texts by transliteration.
+- **Language ID is not English on 27 of 68 clips** (Japanese 6, Swedish 4,
+  then Polish, Welsh and others, one each or two), against 1 of 68 on Flash.
+  These are mostly pseudo-word messages and the audio is noisier (accents
+  drift between words). The Whisper English transcript still matches the
+  phones, so this doesn't mean the model reads the text as another language.
+- **18 messages are 0.05 or more worse than on Flash, 4 better** (mean of
+  phone and Whisper truth per message). The biggest drops are `҈ꃑ쿰이s`
+  ("100,000 fat kumis" → "What I would have thought, Miss?" / "100% of the fat
+  comes"), `ꄫꀔ` ("toe" → "two"), `ꀂꀑꊂꌟ` (seed 1 "ayahuasks") and `҈㌖㌐ꂶ동`.
+  Messages with `҈` are the worst: its reading varies a lot here (exp11:
+  "Hander a thousand" / "100,000").
+
+Decision: the track's stop point (non-English language ID) was met on its
+face, so exp13 waited for the user's go-ahead, and got it.
+
+**exp13 result (real TTS, 2026-11-25, 1244 credits; 2796/10000 used after):
+the fit data for Multilingual v2.** Every distinct answer phono v1–v6 gave
+for the community phrases (126 texts, 628 characters; the community's own
+texts left out, since exp12 has them) × 2 seeds on `eleven_multilingual_v2`:
+252 clips, none silent, 0 not cached afterwards (`tools/experiments/exp13.toml`,
+`tools/results/exp13.md`; the harness's `cases_from` now takes a list of files
+and `cases_exclude`). Mean similarity per seed (harness difflib measure)
+0.73 / 0.73, with 60/126 and 62/126 at 0.8 or more; transcripts identical
+across seeds on 38/127. Whisper says English on 157/256 (61%; exp12:
+60%, exp1: 99%).
+
+`mise run //tools:export`-style clips file for the model, from exp11–exp13
+(`data/generated/clips-mv2.tsv`, gitignored, default-setting clips only):
+338 clips, all `eleven_multilingual_v2` (exp11 18, exp12 68, exp13 252). With
+Flash's reader constants and weights (no profile yet; the file's model column
+was relabelled for this check), `phono calibrate` ranks **161 of 210
+within-phrase pairs (76.7%)** like truth; Flash's own clips give 83.7%
+(exp9). Prediction correlates 0.50 with truth (mean of phone and Whisper
+measures). Per source, predicted / actual phones / Whisper:
+
+| exp | clips | predicted | phones | Whisper |
+|---|---|---|---|---|
+| exp11 | 18 | 0.900 | 0.644 | 0.537 |
+| exp12 (community) | 68 | 0.843 | 0.739 | 0.734 |
+| exp13 (engine answers) | 252 | 0.854 | 0.705 | 0.676 |
+
+Flash's weights over-predict on this model by about 0.15 to 0.2. That is the
+gap the profile's fit and reader checks (tasks 3.1–3.3) work on.
+
+**Multilingual v2 vs Flash v2.5 on the same texts (2026-11-25, no credits).**
+The 160 texts both models have clips for (34 community messages and the 126
+replayed answers; Flash's from `clips-all9.tsv`), each scored with
+`calibrate`'s truth (mean of phone and Whisper measures, over 2 seeds):
+
+| | Flash v2.5 | Multilingual v2 |
+|---|---|---|
+| mean truth, all 160 texts | 0.782 | 0.702 |
+| community messages (34) | 0.819 | 0.736 |
+| engine answers (126) | 0.772 | 0.693 |
+| seed 1 vs seed 2 truth (Pearson) | 0.82 | 0.79 |
+| phrases where some engine answer ≥ the community's | 25/34 | 28/34 |
+
+- **Same behaviour, lower level.** Both kinds of text lose about 0.08, so the
+  model is uniformly harder to hear, not worse on one kind of text.
+- **The models agree on what works.** Per-text truth correlates 0.73 between
+  them (Spearman 0.73), close to each model's own seed-to-seed ceiling.
+  Within a phrase, of the 164 answer pairs both models separate by 0.05 or
+  more, 134 (82%) are in the same order.
+- **What differs is specific:** kana read natively (the one script change the
+  search notices; Cyrillic and Devanagari were already native on Flash),
+  glued digits read rather than dropped, `+` and `@` not read as words, `҈`
+  unstable, and more noise overall (Whisper hears English on about 60% of
+  clips vs 99%).
+- **Prediction:** Flash's profile ranks 76.7% of Multilingual v2's
+  within-phrase pairs right vs 83.7% of Flash's own, and correlates 0.50 vs
+  0.77 with truth. Flash's figures are in-sample (its weights were fitted on
+  those clips), so the true gap is smaller.
+
+Expectation for the profile: the script table, the reader rules above and a
+recalibrated level can fix specific losses and stop the CLI overstating its
+confidence. They can't fix the model's noise floor. The v6 fit gained about
+3 points of held-out ranking on Flash's 227 pairs; with 210 pairs here,
+expect about as much. The profile should beat reusing Flash's and the
+community's messages on this model, but not reach Flash's level. If the fit
+barely beats Flash's weights, ship Flash's weights with the script and rule
+changes, and treat exp14 as a sanity check.
+
+**Multilingual v2 profile, first cut (2026-11-25).** `MULTILINGUAL_V2` in
+`model.rs`, in `PROFILES`, so `--model eleven_multilingual_v2` works; Flash
+stays the default. Its script table is Flash's except:
+- kana is `Native` (exp11), so the search no longer uses it;
+- `҈` risk 0.0 → 0.18. With Flash's profile, a least-squares fit of the
+  over-prediction (predicted − truth) on per-script codepoint counts gives
+  +0.29 per `҈` on Multilingual v2's clips and +0.06 on Flash's own. Every
+  other script's excess was within the ±0.03 that Flash's in-sample check
+  shows, so the rest keep Flash's risks.
+
+The preference order, reader constants, weights and prediction settings are
+Flash's (now shared constants in `model.rs`). Flash's `phono eval` is
+byte-identical. Baseline `phono --model eleven_multilingual_v2 calibrate
+data/generated/clips-mv2.tsv`: 161/210 within-phrase pairs (76.7%, as with
+Flash's profile), Pearson 0.539 / Spearman 0.598 with truth (Flash's profile:
+0.500 / 0.532). `eval` under the new profile changes one answer (`very moldy
+frog` drops a kana) and lowers the predicted score of the `҈` answers
+(e.g. 0.998 → 0.873), which still win: nothing else says "100,000" in 6
+codepoints.
+
+**Reader rules on Multilingual v2 (2026-11-25, no credits).** Each of
+`reading.rs`'s Flash-derived rules, checked against every clip whose Latin
+(`phono read`) exercises it, on both models' clips (`clips-mv2.tsv`,
+`clips-all9.tsv`):
+
+| rule | Multilingual v2 heard | verdict |
+|---|---|---|
+| a digit glued to letters is dropped about half the time (`glued_number_drop` 1.0) | read in 11 of 12 clips, the 12th unclear: `3the` "Three the" ×2, `3ᕞ ጔ` "Three the gwee", `3咜취e` /s ɹ iː …/ ×2. Flash dropped it in 4 of the 8 exp13-text clips | **disagrees**: 0.1 for this model |
+| `@` → "at" | 0 of 14 clips over 7 texts (`chuxdung@joMama` "Dunga Joe Mama", `joemama@aha` "Jai Mama Nawa"). Flash: 11 of 14 between words | **disagrees**: `@` is silent on this model |
+| `&` → "and", `%` → "percent" | 5 of 6; 2 of 2 | agrees |
+| `+` → "plus" | `you+me` /j p s m e/, "You, me": 1 of 2 at most | too few clips; stays |
+| a trailing capital after two or more letters is its own letter | 10 of 12: `timE lupe` /t i m i/ ×2, `yurE notfunny` "Yuri" ×2, `nexT pleas` "Nexty, please" ×2; only bare `nexT` ("Next" ×2) disagrees | agrees |
+| a run of capitals in a word is its own word | `checkhimPC` "Check Him PC" ×4 | agrees |
+| a single interior capital stays in the word | `joeMama` "Joe Mama", `tHe` /t/ (clipped); the Han-derived cases (`oHao`, `veRi`) are too noisy to read either way | agrees, weakly |
+| plural `2s` | `2s` /tuːs/, /tuːz/; `ot are2s` /t uː z/ (1 of 2) | agrees |
+| `100.000` grouped | only reachable through `҈`, whose instability is in its risk (0.18) | stays |
+
+So two rules move into profile data:
+- `glued_number_drop` was already a profile constant; Multilingual v2's is
+  0.1 (about 1 drop in 12).
+- The symbol table moved from `chunks.rs` into `ReaderParams::symbol_words`.
+  `chunks::SYMBOL_WORDS` remains the list of symbols any model voices, so
+  chunks containing one are still read through the reader. The tiler's
+  symbol words follow the profile too.
+
+The capital and plural rules stay in `reading.rs` for both models.
+
+Split costs (`split_onset`, `split_short_word`, `split_lone_letter`,
+`split_g2p_letter`) were checked by moving each one down and up (e.g. onset
+0.5 and 1.5) under Multilingual v2's profile. `calibrate` stayed within 158–162
+of 210 pairs and Pearson 0.524–0.552 (base 161, 0.542), so they keep Flash's
+values. `glued_number_drop` 0.0–0.3 moves Pearson by 0.01 (few clips have a
+glued digit), so the counts above set it.
+
+After the change: Flash's `phono eval` byte-identical, Flash `calibrate`
+unchanged (190/227, 0.773). Multilingual v2 `calibrate`: 161/210, Pearson
+0.542. Its `eval` changes two answers: `kaka chucks dung at joe mama` swaps
+`@` for `앝` ("at"), and `what are thoooose` now uses a glued `2` that this
+model reads.
+
+**Fitting Multilingual v2's weights (2026-11-25, no credits): Flash's
+weights stay, once four script risks are set for this model.** `phono fit
+--model eleven_multilingual_v2` on `clips-mv2.tsv`: 169 distinct answers to
+43 phrases, 210 within-phrase pairs at |Δ| ≥ 0.05. Substitution scales held,
+as in v6; 5 folds by phrase × 4 repeats. `fit` gained `--prior profile`,
+which starts from and regularizes towards the profile's weights (here
+Flash's) instead of v1–v5's hand-set ones. The default is unchanged, and
+Flash's `fit` output is identical.
+
+| weights | script risks | in-sample | held-out (λ 0–0.03) | Pearson over answers |
+|---|---|---|---|---|
+| hand-set (v1–v5) | Flash's | 73.8% | – | 0.564 |
+| Flash's (v6) | Flash's | 76.7% | – (never fitted on these clips) | 0.572 |
+| fitted, prior hand | Flash's | 81.4% | 76.7–79.3% | 0.533 |
+| fitted, prior Flash | Flash's | 80.0% | 77.3–79.2% | 0.530 |
+| fitted, prior Flash, `risk_scale` held | Flash's | 76.7% | 76.2–76.5% | 0.517 |
+| **Flash's (v6)** | **Multilingual v2's** | **79.5%** | – | **0.574** |
+| fitted, prior Flash, `risk_scale` held | Multilingual v2's | 79.0% | 78.8–79.9% | 0.536 |
+| fitted, prior Flash | Multilingual v2's | 79.0% | 78.3–80.8% | 0.539 |
+
+For comparison, Flash's clips: v6 weights 83.7% in-sample, a fresh fit
+80.1–81.4% held out.
+
+- **The first fits' gain was all script risk.** Fitting with Flash's script
+  table cut `risk_scale` 1.3 → 0.14. With `risk_scale` held, the held-out
+  gain vanished (76.5%). The pairs that flipped: answers using Canadian
+  syllabics, Ethiopic or conjoining jamo beat their siblings more often than
+  Flash's risks allow (8 pairs fixed, 1 broken). The per-script residuals
+  from the first profile say the same (−0.04, −0.08, −0.09 per codepoint,
+  against +0.03, +0.03, −0.01 on Flash). One global scale can't lower those
+  three and keep `҈`'s penalty, so the fit lowered it for every script.
+- **So the profile sets those three risks** (syllabics 0.05 → 0.02,
+  Ethiopic 0.05 → 0, conjoining jamo 0.03 → 0) and keeps `risk_scale`. All
+  three scripts are off by default on both models, so the default search's
+  answers are unchanged. Only the predicted scores of the community messages
+  that use them move (e.g. `푽ᆾꇤꆌm` 0.523 → 0.552). These risks were chosen
+  from the same clips they are scored on, so 79.5% is in-sample. exp14 is
+  the out-of-sample check.
+- **Then no fit beats Flash's weights.** Held-out ranking stays between 78.3%
+  and 80.8% (spread across repeats about ±1 point, i.e. 2 pairs), pooled
+  correlation drops from 0.574 to about 0.54, and the fits push `del_onset`
+  to 2.9 (Flash: 1.22) and `del_unstressed` to 1.1–1.7. That's more change
+  than the data supports, so the profile keeps Flash's weights and
+  prediction settings.
+- `fit`'s "new in the last experiment" check is empty here: every
+  non-community answer first appears in exp13, so there is nothing to train
+  on. Cross-validation is the only held-out measure.
+
+Flash's `phono eval` is byte-identical. Multilingual v2 `calibrate`: 167/210
+(79.5%), Pearson 0.544 / Spearman 0.600.
+
+**exp14 result (real TTS, 2026-11-25, 46 credits; 2842/10000 used after):
+the Multilingual v2 profile's answers beat the community's on that model,
+by about as much as Flash's answers do, and no more.** The profile's top
+answer for each of the 34 phrases × 2 seeds on `eleven_multilingual_v2`
+(`phono --model eleven_multilingual_v2 eval --export
+data/generated/ours-mv2.json`; `tools/experiments/exp14.toml`,
+`tools/results/exp14.md`). 60 of the 68 clips were cached from exp13, since
+only 4 answers were new. Truth as in `calibrate`, all on Multilingual v2:
+
+| answers | phone fidelity | Whisper similarity | ≥ community (of 34) | harness sim (per seed) |
+|---|---|---|---|---|
+| community (exp12) | 0.739 | 0.734 | – | 0.77 / 0.78 |
+| Flash profile, v6 answers (exp13) | 0.779 | 0.803 | 28 | – |
+| Flash profile, v6.1 answers (exp13/exp14) | 0.775 | 0.798 | 28 | – |
+| **Multilingual v2 profile (exp14)** | **0.774** | **0.803** | **27** | **0.84 / 0.84** |
+
+On Flash, for scale: community 0.791 / 0.847, v6 answers 0.844 / 0.900
+(exp7).
+
+- **Against the community on this model:** +0.035 phone fidelity and +0.07
+  Whisper similarity, the same margins as Flash's answers have here. No
+  silent clips; 17/34 transcripts identical across seeds (community: 14/34).
+- **Against Flash's answers on this model: level.** Three answers differ
+  from v6.1's:
+  - `very moldy frog` drops its kana: truth 0.90 either way, but Whisper now
+    hears "Very moldy frog." on both seeds ("Very Moldafrog." once before).
+  - `what are thoooose` uses a glued `2` that this model reads: 0.34 → 0.42
+    ("Otare2 OS").
+  - `kaka chucks dung at joe mama` swaps `@` for `앝`: 0.72 → 0.70 ("Kakachuk
+    Dungajui Mama"); the "at" is still lost.
+- **Below the community on 7 phrases.** The biggest gaps are `what are
+  thoooose` (0.62 vs 0.42, no /ð/ chunk, as on Flash), `no rizz` (`노 리z`
+  "Norris", 0.75 vs 0.63) and `check him pc` (`c헻k힘 ㍶` "Check in PC" on one
+  seed). The rest are within 0.03 (`toe`: `퇴` → "two").
+- `calibrate` on exp11–exp14 (`clips-mv2b.tsv`, 406 clips; exp14 repeats 60
+  exp13 clips): 180/227 within-phrase pairs (79.3%), Pearson 0.561. The
+  profile still over-predicts its own answers (0.952 predicted, 0.774 / 0.803
+  heard): this model's noise floor isn't in the scorer.
+
+So the profile ships. It is a correct description of the model (kana not
+searched, `@` silent, glued digits read, `҈` risky) and doesn't cost any
+quality against Flash's answers, but on these 34 phrases it doesn't gain
+any either. The model reads everything about 0.07 worse than Flash, whoever
+wrote the text.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -969,16 +1286,24 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
    boundary, the reader was right about `& # = / ⅔`, and Flash v2.5 doesn't
    normalize by default. Small reader fixes it suggests, none searchable
    today: `½` → "half", `×` not "ex", `$`+digits → "dollars".
-7. **Supporting another model.** Each one needs:
+7. **Supporting another model.** Multilingual v2 is done (exp11–exp14,
+   track `multilingual-v2_20261125`): its profile ships, level with Flash's
+   answers on that model and ahead of the community's. Each further model
+   needs:
    - an exp0-style probe;
    - a community-message run (exp1-style);
    - a new `ModelProfile` with its script table, reader constants and
      `phono fit --model <id>` weights.
 
    Two more things come with it:
-   - Move the capital-letter rules, plurals and number grouping from
+   - ~~Move the capital-letter rules, plurals and number grouping from
      `reading.rs` into profile data once a second model's clips disagree
-     with them.
+     with them.~~ Checked on Multilingual v2: its clips disagree with the
+     `@` symbol word and the glued-digit drop, which are now profile data
+     (`ReaderParams::symbol_words`, `glued_number_drop`). The capital,
+     plural and number-grouping rules agree, so they stay shared. The cheap
+     order for the next model: probe, community run, replay, then
+     `phono fit --prior profile`.
    - v3 and v4 need reading model N (Phase 2). exp0 found v4 reads Hangul as
      Korean, so that needs a Korean reader for Hangul runs: sounds change
      across syllables (`딧잇` → [디싣], heard "did it"). Per-character
@@ -1184,6 +1509,7 @@ To do:
 
 - ~~Which ElevenLabs model to standardize on.~~ Phase 0 picked Flash
   v2.5, and since v6.2 other models can get their own profiles (item 7).
+  Multilingual v2 has one since exp14; Flash stays the default.
   The real voice is still unmeasured: the free-tier API can't use Voice
   Library voices, so the harness uses premade Adam.
 - Whether a space between pseudo-words is worth its codepoint

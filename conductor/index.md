@@ -27,15 +27,17 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-_None. Run `/conductor:new-track` to start one._
+_None._
 
 ## Archived Tracks
+
+- [x] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/_archive/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): exp11–exp14 on `eleven_multilingual_v2` and its `ModelProfile` (own script table, symbol words and glued-digit rule; Flash's weights after a fit found no held-out gain). 9/9 tasks, complete.
 
 - [x] [Build the WASM binding](./tracks/_archive/wasm-binding_20261125/index.md) (`wasm-binding_20261125`, [#14](https://github.com/jordanpg/phonocompressor/issues/14), part of [#1](https://github.com/jordanpg/phonocompressor/issues/1)): `crates/wasm` binding, CLI parity check and a Worker test page. 9/9 tasks, complete.
 
 ## Project Status
 
-- Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`.
+- Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`; `eleven_multilingual_v2` has a calibrated profile too (`--model`).
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
 - Phase 3: WASM binding built (`wasm-binding_20261125`); the front end and deploy are next.
 

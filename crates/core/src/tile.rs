@@ -15,7 +15,7 @@
 //! (`100,000` → `҈` "*100.000*"), and the words `at`, `and`, `plus`, `percent` may be spelled
 //! by their symbol. The reranker decides which tilings actually sound right.
 
-use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet, Script, symbol_word};
+use crate::chunks::{BOUNDARY, ChunkKind, ChunkSet, Script};
 use crate::model::ModelProfile;
 use std::collections::HashMap;
 
@@ -233,7 +233,7 @@ pub fn tile(
             fixed.entry(alnum(&c.latin)).or_default().push(i as u32);
             let mut it = c.latin.trim().chars();
             if let (Some(sym), None) = (it.next(), it.next())
-                && let Some(word) = symbol_word(sym)
+                && let Some(word) = profile.reader.symbol_word(sym)
             {
                 symbols.entry(word).or_default().push(i as u32);
             }

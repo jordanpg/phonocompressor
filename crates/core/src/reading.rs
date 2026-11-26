@@ -2,9 +2,8 @@
 //!
 //! Tokens: letter runs are words (dictionary pronunciation if known, else G2P; vowel-less runs
 //! like `tm` are spelled out as letters), digit runs are numbers (`100.000` → one hundred
-//! thousand), and a few symbols are words (`@` → at). Everything else separates words.
+//! thousand), and a few symbols are words (`@` → at, per model). Everything else separates words.
 
-use crate::chunks::symbol_word;
 use crate::g2p::G2p;
 use crate::lexicon::Lexicon;
 use crate::phone::Phone;
@@ -88,7 +87,7 @@ fn split_caps(run: &[char]) -> Vec<(usize, usize, bool)> {
     out
 }
 
-fn tokenize(latin: &str) -> Vec<Token> {
+fn tokenize(latin: &str, params: &ReaderParams) -> Vec<Token> {
     // Curly apostrophes read like straight ones (`you’re`).
     let chars: Vec<char> = latin
         .chars()
@@ -140,7 +139,7 @@ fn tokenize(latin: &str) -> Vec<Token> {
             });
             after_count = true;
         } else {
-            if symbol_word(c).is_some() {
+            if params.symbol_word(c).is_some() {
                 out.push(Token::Symbol(c));
             }
             after_count = false;
@@ -268,6 +267,19 @@ pub struct ReaderParams {
     /// How often a number glued to following letters (`3the`, `2eut`) is dropped, relative to
     /// being read.
     pub glued_number_drop: f32,
+    /// Symbols read as words (`&` → and). Any other symbol separates words silently. A subset of
+    /// [`crate::chunks::SYMBOL_WORDS`].
+    pub symbol_words: &'static [(char, &'static str)],
+}
+
+impl ReaderParams {
+    /// Word this model reads a symbol as, if any.
+    pub fn symbol_word(&self, c: char) -> Option<&'static str> {
+        self.symbol_words
+            .iter()
+            .find(|&&(s, _)| s == c)
+            .map(|&(_, w)| w)
+    }
 }
 
 fn has_vowel(w: &str) -> bool {
@@ -410,7 +422,7 @@ impl Reader<'_> {
     /// Read a Latin string as English words.
     pub fn read(&self, latin: &str) -> Vec<Word> {
         let mut out: Vec<Word> = Vec::new();
-        for tok in tokenize(latin) {
+        for tok in tokenize(latin, &self.params) {
             match tok {
                 Token::Letters(w) => self.letters(&w, &mut out),
                 Token::Number { text, glued } => {
@@ -446,7 +458,7 @@ impl Reader<'_> {
                     });
                 }
                 Token::Symbol(c) => {
-                    let w = symbol_word(c).unwrap_or_default();
+                    let w = self.params.symbol_word(c).unwrap_or_default();
                     out.push(Word {
                         text: w.to_string(),
                         phones: self.word(w),
@@ -489,7 +501,11 @@ mod tests {
     }
 
     fn toks(s: &str) -> Vec<String> {
-        tokenize(s)
+        toks_with(s, &crate::model::FLASH_V2_5.reader)
+    }
+
+    fn toks_with(s: &str, params: &ReaderParams) -> Vec<String> {
+        tokenize(s, params)
             .into_iter()
             .map(|t| match t {
                 Token::Letters(w) => format!("L:{w}"),
@@ -524,5 +540,16 @@ mod tests {
             toks("3the 2sa no2"),
             ["N:3+", "L:the", "N:2+", "L:sa", "L:no", "N:2"]
         );
+    }
+
+    #[test]
+    fn symbol_words_follow_the_profile() {
+        let ml = &crate::model::MULTILINGUAL_V2.reader;
+        assert_eq!(toks("joemama@aha"), ["L:joemama", "S:@", "L:aha"]);
+        // Multilingual v2 never read `@` as "at" (exp11–exp13, 0 of 14 clips).
+        assert_eq!(toks_with("joemama@aha", ml), ["L:joemama", "L:aha"]);
+        assert_eq!(toks_with("you&me", ml), ["L:you", "S:&", "L:me"]);
+        assert_eq!(ml.symbol_word('&'), Some("and"));
+        assert_eq!(ml.symbol_word('@'), None);
     }
 }

@@ -116,6 +116,16 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 **Consequences:** Model-specific settings live in a `ModelProfile` (v6.2). Other models need their own probe, community-message run and fitted weights.
 
+### Add Multilingual v2 as a second profile
+
+**Date:** 2026-11-26 · **Status:** accepted
+
+**Context:** Goal 2 is more TTS models. exp11–exp14 (about 1,870 credits) found `eleven_multilingual_v2` reads most scripts by transliteration like Flash v2.5, but reads kana, Cyrillic and Devanagari natively, never reads `@` as "at", reads glued digits, and is noisier (about 0.07 lower truth on the same texts).
+
+**Decision:** Ship `MULTILINGUAL_V2` in `PROFILES` with its own script table (kana native; risks for `҈`, syllabics, Ethiopic, conjoining jamo), symbol words and `glued_number_drop`. It keeps Flash's preference order, split costs, weights and prediction settings: once its script risks were set, `phono fit` gave no held-out gain over Flash's weights (78.3–80.8% vs 79.5%). Flash stays the default.
+
+**Consequences:** `ReaderParams` carries the per-model symbol table (`symbol_words`), and `phono fit --prior profile` can start a new model from an existing profile. The capital-letter and plural rules stay shared, since Multilingual v2's clips agree with them. Its live answers beat the community's on that model but don't beat Flash's answers there.
+
 ### Transliteration table from `deunicode`, not `unidecode`
 
 **Date:** 2026-11-25 · **Status:** accepted

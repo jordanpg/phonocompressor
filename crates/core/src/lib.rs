@@ -300,6 +300,7 @@ mod tests {
             split_lone_letter: 0.7,
             split_onset: 1.0,
             glued_number_drop: 1.0,
+            symbol_words: chunks::SYMBOL_WORDS,
         },
         weights: Weights::HAND,
         predict: Predict::HAND,

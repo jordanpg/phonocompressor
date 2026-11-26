@@ -1,0 +1,17 @@
+name = "exp14"
+description = """
+Live check of the Multilingual v2 profile (track multilingual-v2_20261125, issue #34): its top
+answer for each community sample phrase on eleven_multilingual_v2, two seeds, for comparison
+with the community's own messages on the same model (exp12). Profile vs Flash v2.5's: kana is
+read natively (not searched), `҈` carries a risk, `@` is silent, glued digits are read,
+syllabics/Ethiopic/jamo risks are lower (off by default either way); weights are Flash's.
+Answers that earlier versions already gave were synthesized in exp13 and are cached.
+Cases come from `phono --model eleven_multilingual_v2 eval --export data/generated/ours-mv2.json`
+(gitignored: it contains the sample phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_multilingual_v2"]
+seeds = [1, 2]
+max_credits = 60
+cases_from = "data/generated/ours-mv2.json"
