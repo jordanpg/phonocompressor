@@ -1,0 +1,35 @@
+name = "exp15"
+description = """
+Live probe of the scripts where the community library scores lowest offline (track
+community-library_20261126, issue #43). Cases: the 52 library entries whose community text
+has Katakana, Cherokee, Ethiopic, Canadian syllabics, conjoining Hangul jamo, Hiragana,
+Armenian or Devanagari (keys in exp15.keys; 6 are among the hand-picked 34), plus phono's top
+answer for each phrase. Offline on Flash v2.5: community 0.696, ours 0.921, ours ≥ community on
+51 of 52. For each script, the clips say whether the reader or the entries are wrong.
+Two extra cases check ҂ (U+0482), which transliterates to "*1000*" but isn't searched (#49).
+Same model, voice and seeds as exp1.
+Cases come from gitignored files: `sample/library.json` (`mise run //tools:fetch-library`)
+and `phono eval sample/library.json --subset tools/experiments/exp15.keys --export
+data/generated/ours-exp15.json` (they contain the library's phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 560
+cases_from = ["sample/library.json", "data/generated/ours-exp15.json"]
+cases_keys = "tools/experiments/exp15.keys"
+
+[[cases]]
+id = "thousand_sign"
+text = "҂"
+t = "one thousand"
+target = "one thousand"
+note = "#49: U+0482 alone; transliterates to *1000*"
+
+[[cases]]
+id = "thousand_sign_word"
+text = "҂ cats"
+t = "one thousand cats"
+target = "one thousand cats"
+note = "#49: U+0482 before a word"
