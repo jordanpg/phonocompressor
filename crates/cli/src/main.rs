@@ -138,10 +138,10 @@ enum Command {
         #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
         lambdas: Vec<f32>,
     },
-    /// Score the community sample messages and compress their phrases (each entry's `target`,
-    /// else its `spoken` label).
+    /// Score the community library's entries and compress their phrases (each entry's
+    /// `target`, else its `spoken` label). `mise run //tools:fetch-library` writes the library.
     Eval {
-        #[arg(default_value = "sample/messages.json")]
+        #[arg(default_value = "sample/library.json")]
         messages: PathBuf,
         /// Also write our top answers in the same JSON shape, for a harness experiment
         /// (`cases_from`). It contains the sample phrases, so keep it out of git.
@@ -155,6 +155,10 @@ enum Command {
         /// last tab-separated field (so `tools/library-keys.tsv` selects the hand-picked 34).
         #[arg(long)]
         subset: Option<PathBuf>,
+        /// Also summarize the entries listed in this file (same format as `--subset`), if it
+        /// exists: by default the hand-picked 34 that exp1–exp10 used.
+        #[arg(long, default_value = "tools/library-keys.tsv")]
+        named_subset: PathBuf,
     },
 }
 
@@ -390,12 +394,14 @@ fn main() -> Result<(), String> {
             export,
             by_script,
             subset,
+            named_subset,
         } => eval(
             &engine,
             &messages,
             export.as_ref(),
             by_script,
             subset.as_ref(),
+            &named_subset,
         )?,
     }
     Ok(())
@@ -487,6 +493,7 @@ fn eval(
     export: Option<&PathBuf>,
     by_script: bool,
     subset: Option<&PathBuf>,
+    named_subset: &PathBuf,
 ) -> Result<(), String> {
     let mut messages = load_messages(path)?;
     if let Some(keys_path) = subset {
@@ -509,7 +516,7 @@ fn eval(
         top_n: 1,
         ..Default::default()
     };
-    let (mut theirs, mut ours, mut wins) = (0.0, 0.0, 0);
+    let mut results: Vec<(&str, f32, f32)> = Vec::new(); // id, community, ours
     let mut stats = ByScript::<3>::new(); // community, ours, ours ≥ community
     let mut scored: Vec<(f32, &str, &str)> = Vec::new();
     let mut exported = Vec::new();
@@ -532,11 +539,7 @@ fn eval(
             .first()
             .map(|c| (c.text.clone(), c.fidelity))
             .unwrap_or_default();
-        theirs += their;
-        ours += our;
-        if our >= their {
-            wins += 1;
-        }
+        results.push((id, their, our));
         stats.add(unicode, [their, our, f32::from(u8::from(our >= their))]);
         scored.push((their, id, unicode));
         println!(
@@ -570,14 +573,56 @@ fn eval(
             println!("  {id:<w$} {their:>6.3}  {}", names.join(","));
         }
     }
-    let n = messages.len() as f32;
+    let all = Summary::of(&results);
     println!(
-        "\nmean fidelity: community {:.3}, ours {:.3}; ours ≥ community on {wins}/{}",
-        theirs / n,
-        ours / n,
-        messages.len()
+        "\nmean fidelity: community {:.3}, ours {:.3}; ours ≥ community on {}/{}",
+        all.community, all.ours, all.wins, all.n
     );
+    // A missing file just means no named subset, e.g. outside this repo's layout.
+    if let Ok(text) = std::fs::read_to_string(named_subset) {
+        let keys = parse_keys(&text);
+        let picked: Vec<_> = results
+            .iter()
+            .copied()
+            .filter(|(id, _, _)| keys.contains(*id))
+            .collect();
+        if !picked.is_empty() && picked.len() < results.len() {
+            let sub = Summary::of(&picked);
+            println!(
+                "  {} ({} of {} keys): community {:.3}, ours {:.3}; ours ≥ community on {}/{}",
+                named_subset.display(),
+                sub.n,
+                keys.len(),
+                sub.community,
+                sub.ours,
+                sub.wins,
+                sub.n
+            );
+        }
+    }
     Ok(())
+}
+
+/// Mean community and ours fidelity over `eval` results, and how often ours ≥ community.
+struct Summary {
+    n: usize,
+    community: f32,
+    ours: f32,
+    wins: usize,
+}
+
+impl Summary {
+    fn of(results: &[(&str, f32, f32)]) -> Summary {
+        let n = results.len();
+        let mean =
+            |f: fn(&(&str, f32, f32)) -> f32| results.iter().map(f).sum::<f32>() / n.max(1) as f32;
+        Summary {
+            n,
+            community: mean(|r| r.1),
+            ours: mean(|r| r.2),
+            wins: results.iter().filter(|r| r.2 >= r.1).count(),
+        }
+    }
 }
 
 fn json_quote(s: &str) -> String {
@@ -911,7 +956,7 @@ fn calibrate(
 
 #[cfg(test)]
 mod tests {
-    use super::{ByScript, parse_keys, parse_messages, scripts_in};
+    use super::{ByScript, Summary, parse_keys, parse_messages, scripts_in};
     use phono_core::chunks::Script;
 
     #[test]
@@ -942,6 +987,14 @@ mod tests {
         let mut got: Vec<_> = keys.into_iter().collect();
         got.sort();
         assert_eq!(got, ["10", "8", "u1a2b3c4d"]);
+    }
+
+    #[test]
+    fn summary_means_and_counts_ties_as_wins() {
+        let s = Summary::of(&[("a", 0.8, 0.9), ("b", 0.6, 0.6), ("c", 1.0, 0.5)]);
+        assert_eq!((s.n, s.wins), (3, 2));
+        assert!((s.community - 0.8).abs() < 1e-6);
+        assert!((s.ours - 2.0 / 3.0).abs() < 1e-6);
     }
 
     #[test]
