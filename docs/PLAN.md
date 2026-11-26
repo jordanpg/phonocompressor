@@ -1096,6 +1096,26 @@ community's messages on this model, but not reach Flash's level. If the fit
 barely beats Flash's weights, ship Flash's weights with the script and rule
 changes, and treat exp14 as a sanity check.
 
+**Multilingual v2 profile, first cut (2026-11-25).** `MULTILINGUAL_V2` in
+`model.rs`, in `PROFILES`, so `--model eleven_multilingual_v2` works; Flash
+stays the default. Its script table is Flash's except:
+- kana is `Native` (exp11), so the search no longer uses it;
+- `҈` risk 0.0 → 0.18. With Flash's profile, a least-squares fit of the
+  over-prediction (predicted − truth) on per-script codepoint counts gives
+  +0.29 per `҈` on Multilingual v2's clips and +0.06 on Flash's own. Every
+  other script's excess was within the ±0.03 that Flash's in-sample check
+  shows, so the rest keep Flash's risks.
+
+The preference order, reader constants, weights and prediction settings are
+Flash's (now shared constants in `model.rs`). Flash's `phono eval` is
+byte-identical. Baseline `phono --model eleven_multilingual_v2 calibrate
+data/generated/clips-mv2.tsv`: 161/210 within-phrase pairs (76.7%, as with
+Flash's profile), Pearson 0.539 / Spearman 0.598 with truth (Flash's profile:
+0.500 / 0.532). `eval` under the new profile changes one answer (`very moldy
+frog` drops a kana) and lowers the predicted score of the `҈` answers
+(e.g. 0.998 → 0.873), which still win: nothing else says "100,000" in 6
+codepoints.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
