@@ -6,6 +6,7 @@ mise run //tools:synth exp0              estimate cost of uncached clips     (dr
 mise run //tools:synth exp0 --spend      ...and actually synthesize them     (API, costs credits)
 mise run //tools:transcribe exp0         local ASR on cached clips           (GPU, free)
 mise run //tools:report exp0             markdown report to tools/results/
+mise run //tools:fetch-library           community library to sample/library.json (gitignored)
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import argparse
 import math
 import sys
 
-from . import cache
+from . import cache, library
 from .experiments import REPO_ROOT, load
 
 
@@ -332,6 +333,30 @@ def cmd_translit_table(args) -> None:
     print(f"wrote {n} entries to {out}")
 
 
+def cmd_fetch_library(args) -> None:
+    """Fetch the community library into gitignored sample/library.json (see library.py)."""
+    import os
+    from pathlib import Path
+
+    url = os.environ.get(library.URL_ENV)
+    if not url:
+        raise SystemExit(f"{library.URL_ENV} is not set (it comes from fnox via the mise task)")
+    out = Path(args.out)
+    table = library.load_key_table(Path(args.keys))
+    items = library.build(library.fetch(url), table)
+    added, changed, removed = library.diff(library.read(out), items)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(library.dumps(items), encoding="utf-8")
+    keys = library.as_map(items)
+    picked = sum(1 for k in table.values() if k in keys)
+    print(f"wrote {len(items)} entries to {out}")
+    print(f"new {len(added)}, changed {len(changed)}, removed {len(removed)} since the last fetch")
+    print(f"hand-picked keys present: {picked}/{len(table)}")
+    print(f"content hash {library.content_hash(items)}")
+    if removed:
+        print("removed keys: " + " ".join(removed))
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
         prog="phono-harness",
@@ -357,6 +382,10 @@ def main(argv: list[str] | None = None) -> None:
     tt = sub.add_parser("translit-table")
     tt.add_argument("out")
     tt.set_defaults(func=cmd_translit_table)
+    fl = sub.add_parser("fetch-library")
+    fl.add_argument("--out", default=str(library.OUT_PATH))
+    fl.add_argument("--keys", default=str(library.KEYS_PATH))
+    fl.set_defaults(func=cmd_fetch_library)
     r = sub.add_parser("report")
     r.add_argument("experiment")
     r.set_defaults(func=cmd_report)

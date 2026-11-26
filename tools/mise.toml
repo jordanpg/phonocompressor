@@ -48,6 +48,17 @@ description = "Write a markdown report for an experiment to tools/results/"
 extends = "harness"
 vars = { cmd = "report" }
 
+# Library URL comes from fnox; the output and the URL stay out of git (the repo is public).
+[tasks.fetch-library]
+description = "Fetch the community message library into sample/library.json (gitignored)"
+extends = "harness"
+vars = { cmd = "fetch-library" }
+secrets = ["PHONO_LIBRARY_URL"]
+
+[tasks.test]
+description = "Run the harness's Python tests (pytest)"
+run = "uv run pytest -q"
+
 # Dev only: unidecode (GPL) output for diffing against the shipped table. Never feeds phono.bin
 # unless you pass it to the builder with --translit by hand.
 [tasks.translit-unidecode]

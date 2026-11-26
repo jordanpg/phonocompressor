@@ -153,6 +153,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Format | No diffs | `mise run fmt:check` |
 | Lint | Clippy with `-D warnings`; ruff clean | `mise run lint` |
 | Rust tests | All passing | `cargo test --workspace` |
+| Python tests | All passing, if `tools/` changed | `mise run //tools:test` |
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
@@ -192,6 +193,7 @@ mise run //crates/wasm:build                 # target/wasm-pkg (.wasm, JS glue, 
 mise run //crates/wasm:serve                 # test page at http://127.0.0.1:8000/ (/?bench times it)
 
 # Harness (free)
+mise run //tools:fetch-library               # community library to sample/library.json (URL from fnox)
 mise run //tools:credits
 mise run //tools:synth <exp>                 # dry run: estimated cost
 mise run //tools:transcribe <exp>
