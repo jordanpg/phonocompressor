@@ -1,0 +1,324 @@
+name = "exp11"
+description = """
+Probe of Multilingual v2 (docs/PLAN.md item 7, issue #6). exp0 ran 20 cases on it at seed 1:
+mostly reading model T (transliterate, read as English), with katakana read natively. This
+experiment repeats exp0's cases (seed 1 is cached) at a second seed and adds what exp0 left open,
+to build the model's profile:
+1. Script table: hiragana, more katakana, Armenian, Cherokee, Ethiopic, Canadian syllabics, Runic,
+   Hangul jamo, CJK unified and compatibility, Cyrillic, Devanagari. Which are read as their
+   transliteration (T), which natively (N), which silently or as noise.
+2. Reader rules Flash v2.5's profile assumes: numbers (`100.000`, digits glued to letters, `2s`),
+   interior and trailing capitals (`timE`, `checkhimPC`, `tHe`), and symbols (`@ & + %`).
+`t` = what phono's reader predicts (Flash v2.5's constants). Same voice as exp0-exp9.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_multilingual_v2"]
+seeds = [1, 2]
+max_credits = 250
+
+# --- Hangul: is it read as Korean, or as its romanization? ---
+
+[[cases]]
+id = "dis_is"
+text = "딧잇"
+t = "dis is /dɪs ɪz/"
+n = "Korean [디싣] /tisit̚/"
+note = "Sample 'this is epic swag' relies on ㅅ coda = s."
+
+[[cases]]
+id = "check_him"
+text = "ㅊ헻ㅋ힘"
+t = "c·hec·k·him → 'check him'"
+n = "chieut het kieuk him (compatibility jamo read by name)"
+
+[[cases]]
+id = "geo"
+text = "거"
+t = "geo /dʒioʊ/"
+n = "Korean /kʌ/"
+note = "Strongest single-syllable discriminator: English 'eo' vs Korean ㅓ."
+
+[[cases]]
+id = "beos"
+text = "벗"
+t = "beos /bioʊs/ or /boʊs/"
+n = "Korean [벋] /pʌt̚/"
+
+[[cases]]
+id = "swagg"
+text = "솪"
+t = "swagg /swæɡ/"
+n = "Korean [솩] /swak̚/"
+
+# --- Yi (no ElevenLabs language): transliterated? and does it change its neighbours? ---
+
+[[cases]]
+id = "yi_sux"
+text = "ꌟ"
+t = "sux /sʌks/"
+n = "— (no Yi support; silence or garbage)"
+
+[[cases]]
+id = "yi_baddream"
+text = "ꀠddꏒꀊm"
+t = "ba·d·d·re·a·m → 'bad dream'"
+n = "—"
+note = "Sample message, verbatim."
+
+[[cases]]
+id = "mix_hangul_yi"
+text = "딧잇ꌟ"
+t = "disissux → 'this is sucks'"
+n = "Korean 디싣 + ?"
+note = "Compare with dis_is: does a Yi neighbour flip Hangul to T, or the reverse?"
+
+# --- Long transliterations: the big compression wins if T holds ---
+
+[[cases]]
+id = "hundred_k"
+text = "҈"
+t = "*100.000* → 'one hundred thousand'"
+n = "— (combining mark, probably silent)"
+
+[[cases]]
+id = "apartments"
+text = "҈㌀s"
+t = "'hundred thousand apartments'"
+n = "?"
+
+[[cases]]
+id = "apaato"
+text = "㌀"
+t = "apartment"
+n = "Japanese アパート /apaːto/"
+
+[[cases]]
+id = "kaka"
+text = "嬶"
+t = "Kaka"
+n = "Mandarin bì? / Japanese kakā"
+
+[[cases]]
+id = "kutabireru"
+text = "萙"
+t = "Kutabireru (10 letters, 1 codepoint)"
+n = "Mandarin ?"
+
+[[cases]]
+id = "kana_huri"
+text = "フリ"
+t = "huri /hʊɹi/"
+n = "Japanese furi /ɸɯɾi/"
+
+# --- Other listed scripts ---
+
+[[cases]]
+id = "deva_ka"
+text = "क"
+t = "k"
+n = "Hindi /kə/"
+
+[[cases]]
+id = "runic_f"
+text = "ᚠ"
+t = "f"
+n = "rune name 'fehu' / 'feoh'?"
+
+[[cases]]
+id = "cherokee"
+text = "ᏃᎧ"
+t = "noka"
+n = "— (no Cherokee support)"
+
+[[cases]]
+id = "cyr_zh"
+text = "Ж"
+t = "Zh"
+n = "Russian letter name /ʐɛ/"
+
+[[cases]]
+id = "tm"
+text = "™"
+t = "(tm) → 'TM' or 'trademark'"
+n = "—"
+
+[[cases]]
+id = "km"
+text = "㎞"
+t = "km → 'kilometer(s)' or 'K M'"
+n = "Japanese キロメートル?"
+
+# --- New: more of each script (exp0 left these open) ---
+
+[[cases]]
+id = "hira_huri"
+text = "ふり"
+t = "huri"
+n = "Japanese furi"
+note = "Hiragana twin of kana_huri."
+
+[[cases]]
+id = "hira_word"
+text = "あぱーと"
+t = "apaato"
+n = "Japanese apaato"
+
+[[cases]]
+id = "kata_apaato"
+text = "アパート"
+t = "apaato"
+n = "Japanese apaato"
+
+[[cases]]
+id = "kata_kiro"
+text = "キロ"
+t = "kiro"
+n = "Japanese kiro"
+
+[[cases]]
+id = "han_two"
+text = "嬶萙"
+t = "Kaka Kutabireru"
+n = "Mandarin/Japanese"
+note = "Two CJK unified codepoints in a row."
+
+[[cases]]
+id = "armenian"
+text = "ԱԲ"
+t = "ab"
+n = "Armenian ayb ben"
+
+[[cases]]
+id = "ethiopic"
+text = "ሀለ"
+t = "hale"
+n = "Amharic"
+
+[[cases]]
+id = "ucas"
+text = "ᐊᐃ"
+t = "ai"
+n = "—"
+
+[[cases]]
+id = "jamo_conj"
+text = "가"
+t = "ga"
+n = "Korean ga (conjoining jamo)"
+
+[[cases]]
+id = "cherokee_word"
+text = "ᎠᎢ"
+t = "ai"
+n = "—"
+
+[[cases]]
+id = "runic_two"
+text = "ᚠᚱ"
+t = "fr"
+n = "rune names"
+
+[[cases]]
+id = "cyr_word"
+text = "Привет"
+t = "Privet"
+n = "Russian privet"
+
+[[cases]]
+id = "deva_word"
+text = "कमल"
+t = "kamal"
+n = "Hindi kamal"
+
+[[cases]]
+id = "hangul_word"
+text = "빞빞"
+t = "bipbip"
+n = "Korean"
+note = "From a community message (msg230)."
+
+# --- New: numbers ---
+
+[[cases]]
+id = "num_dot"
+text = "100.000"
+target = "one hundred thousand"
+t = "one hundred thousand"
+
+[[cases]]
+id = "num_glued_the"
+text = "3the"
+t = "(the, digit dropped) or 'three the'"
+note = "Flash: dropped in 5 of 10 clips."
+
+[[cases]]
+id = "num_glued_eut"
+text = "2eut"
+t = "(eut) or 'two eut'"
+
+[[cases]]
+id = "num_plural"
+text = "2s"
+t = "twos"
+note = "Flash: plural of two, both seeds."
+
+[[cases]]
+id = "num_word_digits"
+text = "ot ㌃2s"
+target = "what are those"
+t = "ot R twos"
+note = "Community msg, `2s` inside a word."
+
+# --- New: capitals ---
+
+[[cases]]
+id = "cap_trail"
+text = "timE"
+target = "Tim A"
+t = "tim · E"
+note = "Flash: heard 'Tim A' (exp2)."
+
+[[cases]]
+id = "cap_run"
+text = "checkhimPC"
+target = "check him P C"
+t = "check him P C"
+
+[[cases]]
+id = "cap_mid"
+text = "tHe"
+target = "the"
+t = "the"
+note = "Flash: heard 'the' (exp5)."
+
+[[cases]]
+id = "cap_next"
+text = "nexT"
+target = "next to"
+t = "next · T"
+
+# --- New: symbols ---
+
+[[cases]]
+id = "sym_at"
+text = "joemama@aha"
+t = "joemama at aha"
+
+[[cases]]
+id = "sym_amp"
+text = "you&me"
+target = "you and me"
+t = "you and me"
+
+[[cases]]
+id = "sym_plus"
+text = "you+me"
+target = "you plus me"
+t = "you plus me"
+
+[[cases]]
+id = "sym_pct"
+text = "50%"
+target = "fifty percent"
+t = "fifty percent"

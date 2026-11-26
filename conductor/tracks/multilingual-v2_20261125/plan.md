@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#6](https://github.com/jordanpg/phonocompressor/issues/6)
 **Created:** 2026-11-25
-**Status:** [ ] Not Started
+**Status:** [~] In Progress
 
 ## Overview
 
@@ -30,7 +30,7 @@ Find out how Multilingual v2 reads each script and where it departs from the rea
 
 ### Tasks
 
-- [ ] Task 1.1: exp11: probe Multilingual v2's scripts and reader rules. Link the main checkout's gitignored harness data into the worktree; confirm the model and its cost with `harness:models`; write `tools/experiments/exp11.toml` with exp0's 20 cases plus cases for hiragana, more katakana, the remaining scripts, numbers (`100.000`, glued digits, `2s`), capitals (`timE`, `checkhimPC`, `tHe`) and symbols, 2 seeds, a `max_credits` cap; dry run (exp0's seed-1 clips cached), approval, spend, transcribe, report; PLAN.md write-up with a draft script table and preference order ([#27](https://github.com/jordanpg/phonocompressor/issues/27))
+- [~] Task 1.1: exp11: probe Multilingual v2's scripts and reader rules. Link the main checkout's gitignored harness data into the worktree; confirm the model and its cost with `harness:models`; write `tools/experiments/exp11.toml` with exp0's 20 cases plus cases for hiragana, more katakana, the remaining scripts, numbers (`100.000`, glued digits, `2s`), capitals (`timE`, `checkhimPC`, `tHe`) and symbols, 2 seeds, a `max_credits` cap; dry run (exp0's seed-1 clips cached), approval, spend, transcribe, report; PLAN.md write-up with a draft script table and preference order ([#27](https://github.com/jordanpg/phonocompressor/issues/27))
 
 ### Verification
 

@@ -2,7 +2,7 @@
 
 | Status | Track ID | Title | Created | Updated |
 | ------ | -------- | ----- | ------- | ------- |
-| [ ] | [multilingual-v2_20261125](./tracks/multilingual-v2_20261125/index.md) | [Calibrate a second ElevenLabs model (Multilingual v2)](https://github.com/jordanpg/phonocompressor/issues/6) | 2026-11-25 | 2026-11-25 |
+| [~] | [multilingual-v2_20261125](./tracks/multilingual-v2_20261125/index.md) | [Calibrate a second ElevenLabs model (Multilingual v2)](https://github.com/jordanpg/phonocompressor/issues/6) | 2026-11-25 | 2026-11-25 |
 | [x] | [wasm-binding_20261125](./tracks/_archive/wasm-binding_20261125/index.md) | [Build the WASM binding](https://github.com/jordanpg/phonocompressor/issues/14) | 2026-11-25 | 2026-11-25 |
 
 <!-- Tracks registered by /conductor:new-track -->
