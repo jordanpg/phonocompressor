@@ -46,17 +46,17 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 ### Tasks
 
 - [x] Task 3.1: Define the next experiment: community entries in Katakana, Cherokee, Ethiopic, Canadian syllabics, Hangul Jamo, Hiragana, Armenian and Devanagari, plus our top answer for each phrase, on Flash v2.5, seeds 1 and 2, same voice as exp1. Show the dry-run estimate and wait for approval. ([#43](https://github.com/jordanpg/phonocompressor/issues/43))
-- [~] Task 3.2: Synthesize, transcribe and report it, then add a PLAN.md write-up (setup, credits, results, decision). For each script, record whether the reader or the entries were wrong, and open an issue per confirmed reader blind spot. ([#44](https://github.com/jordanpg/phonocompressor/issues/44))
+- [x] Task 3.2: Synthesize, transcribe and report it, then add a PLAN.md write-up (setup, credits, results, decision). For each script, record whether the reader or the entries were wrong, and open an issue per confirmed reader blind spot. ([#44](https://github.com/jordanpg/phonocompressor/issues/44))
 
 ### Verification
 
-- [ ] Report and write-up exist, with no phrases in committed files. Follow-up issues are filed.
+- [x] Report and write-up exist, with no phrases in committed files. Follow-up issues are filed.
 
 ## Phase 4: Full run and refit
 
 ### Tasks
 
-- [ ] Task 4.1: Define an experiment for the remaining library entries not yet clipped (community and ours, Flash v2.5, 2 seeds). Show the estimate and wait for approval, then synthesize, transcribe and report, with a PLAN.md write-up. ([#45](https://github.com/jordanpg/phonocompressor/issues/45))
+- [~] Task 4.1: Define an experiment for the remaining library entries not yet clipped (community and ours, Flash v2.5, 2 seeds). Show the estimate and wait for approval, then synthesize, transcribe and report, with a PLAN.md write-up. ([#45](https://github.com/jordanpg/phonocompressor/issues/45))
 - [ ] Task 4.2: Make `phono fit`'s cross-validation group cases that share a chunk. Refit on all Flash clips, and compare held-out ranking, `phono eval` and `phono calibrate` against v6's weights. Adopt the new weights only if held-out ranking improves, and record the result either way. ([#46](https://github.com/jordanpg/phonocompressor/issues/46))
 
 ### Verification

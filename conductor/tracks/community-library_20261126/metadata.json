@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-26T00:00:00Z",
-  "updated": "2026-11-26T17:00:00Z",
+  "updated": "2026-11-26T19:00:00Z",
   "issue": 39,
   "task_issues": {
     "1.1": 40,
@@ -18,14 +18,14 @@
   },
   "phases": {
     "total": 5,
-    "completed": 2
+    "completed": 3
   },
   "tasks": {
     "total": 8,
-    "completed": 4
+    "completed": 5
   },
-  "current_phase": 3,
-  "current_task": "3.2",
+  "current_phase": 4,
+  "current_task": "4.1",
   "commits": [
     "132c80d: chore(conductor): start task 1.1 (community-library_20261126)",
     "57d61d8: feat(harness): add library fetch task (community-library_20261126)",
@@ -33,6 +33,7 @@
     "c5d0a52: feat(cli): add eval --by-script and --subset (community-library_20261126)",
     "ac634f6: docs(plan): record the offline library baseline (community-library_20261126)",
     "889d86c: feat(harness): let cases_keys pick cases by key (community-library_20261126)",
-    "41f5126: exp: add exp15 probe of low-scoring library scripts (community-library_20261126)"
+    "41f5126: exp: add exp15 probe of low-scoring library scripts (community-library_20261126)",
+    "033d8c6: exp: write up exp15 live probe of low-scoring scripts (community-library_20261126)"
   ]
 }
