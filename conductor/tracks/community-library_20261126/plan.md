@@ -35,17 +35,17 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 
 ### Tasks
 
-- [~] Task 2.1: Add a `--by-script` summary to `phono eval` (mean community and ours per script, using the core's script lookup) and a `--subset <keys file>` filter. Run it on the library and write the baseline into PLAN.md: overall, the 34 vs the rest, per script, and the lowest-scoring community cases by key. ([#42](https://github.com/jordanpg/phonocompressor/issues/42))
+- [x] Task 2.1: Add a `--by-script` summary to `phono eval` (mean community and ours per script, using the core's script lookup) and a `--subset <keys file>` filter. Run it on the library and write the baseline into PLAN.md: overall, the 34 vs the rest, per script, and the lowest-scoring community cases by key. ([#42](https://github.com/jordanpg/phonocompressor/issues/42))
 
 ### Verification
 
-- [ ] The numbers match the 2026-11-26 check (0.855 / 0.952 overall), or the difference is explained.
+- [x] The numbers match the 2026-11-26 check (0.855 / 0.952 overall), or the difference is explained.
 
 ## Phase 3: Live probe of low-scoring scripts
 
 ### Tasks
 
-- [ ] Task 3.1: Define the next experiment: community entries in Katakana, Cherokee, Ethiopic, Canadian syllabics, Hangul Jamo, Hiragana, Armenian and Devanagari, plus our top answer for each phrase, on Flash v2.5, seeds 1 and 2, same voice as exp1. Show the dry-run estimate and wait for approval. ([#43](https://github.com/jordanpg/phonocompressor/issues/43))
+- [~] Task 3.1: Define the next experiment: community entries in Katakana, Cherokee, Ethiopic, Canadian syllabics, Hangul Jamo, Hiragana, Armenian and Devanagari, plus our top answer for each phrase, on Flash v2.5, seeds 1 and 2, same voice as exp1. Show the dry-run estimate and wait for approval. ([#43](https://github.com/jordanpg/phonocompressor/issues/43))
 - [ ] Task 3.2: Synthesize, transcribe and report it, then add a PLAN.md write-up (setup, credits, results, decision). For each script, record whether the reader or the entries were wrong, and open an issue per confirmed reader blind spot. ([#44](https://github.com/jordanpg/phonocompressor/issues/44))
 
 ### Verification
