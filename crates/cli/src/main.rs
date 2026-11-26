@@ -4,7 +4,7 @@ mod fit;
 
 use clap::{Parser, Subcommand};
 use phono_core::Engine;
-use phono_core::chunks::Scripts;
+use phono_core::chunks::{Script, Scripts};
 use phono_core::phone::{fmt_phones, fmt_word_phones};
 use phono_core::reading::Word;
 use phono_core::score::Op;
@@ -139,6 +139,14 @@ enum Command {
         /// (`cases_from`). It contains the sample phrases, so keep it out of git.
         #[arg(long)]
         export: Option<PathBuf>,
+        /// Also summarize by script (each entry counts once under every script in its
+        /// community text) and list the lowest-scoring community entries.
+        #[arg(long)]
+        by_script: bool,
+        /// Score only the entries whose keys are listed in this file: one per line, or the
+        /// last tab-separated field (so `tools/library-keys.tsv` selects the hand-picked 34).
+        #[arg(long)]
+        subset: Option<PathBuf>,
     },
 }
 
@@ -358,7 +366,18 @@ fn main() -> Result<(), String> {
                 &opts,
             )?
         }
-        Command::Eval { messages, export } => eval(&engine, &messages, export.as_ref())?,
+        Command::Eval {
+            messages,
+            export,
+            by_script,
+            subset,
+        } => eval(
+            &engine,
+            &messages,
+            export.as_ref(),
+            by_script,
+            subset.as_ref(),
+        )?,
     }
     Ok(())
 }
@@ -393,17 +412,93 @@ fn parse_messages(text: &str) -> Result<Vec<(String, String, String)>, String> {
     Ok(out)
 }
 
-fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(), String> {
-    let messages = load_messages(path)?;
+/// Keys from a subset file: one per line (the last tab-separated field), `#` comments skipped.
+fn parse_keys(text: &str) -> std::collections::HashSet<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .filter_map(|l| l.rsplit('\t').next().map(|k| k.trim().to_string()))
+        .collect()
+}
+
+/// The scripts a message is written in, in [`Script::ALL`] order. Whitespace and ASCII
+/// punctuation don't count, so `latin` means Latin letters or digits.
+fn scripts_in(text: &str) -> Vec<Script> {
+    let mut out: Vec<Script> = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !c.is_ascii_punctuation())
+        .map(Script::of)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Per-script sums for `eval --by-script`: (entries, community sum, ours sum, ours ≥ community).
+#[derive(Default)]
+struct ScriptStats(std::collections::BTreeMap<Script, (usize, f32, f32, usize)>);
+
+impl ScriptStats {
+    fn add(&mut self, unicode: &str, theirs: f32, ours: f32) {
+        for script in scripts_in(unicode) {
+            let e = self.0.entry(script).or_default();
+            e.0 += 1;
+            e.1 += theirs;
+            e.2 += ours;
+            e.3 += usize::from(ours >= theirs);
+        }
+    }
+
+    /// (script, entries, community mean, ours mean, ours ≥ community).
+    fn rows(&self) -> Vec<(Script, usize, f32, f32, usize)> {
+        self.0
+            .iter()
+            .map(|(&s, &(n, t, o, w))| (s, n, t / n as f32, o / n as f32, w))
+            .collect()
+    }
+}
+
+fn eval(
+    engine: &Engine,
+    path: &PathBuf,
+    export: Option<&PathBuf>,
+    by_script: bool,
+    subset: Option<&PathBuf>,
+) -> Result<(), String> {
+    let mut messages = load_messages(path)?;
+    if let Some(keys_path) = subset {
+        let text = std::fs::read_to_string(keys_path)
+            .map_err(|e| format!("{}: {e}", keys_path.display()))?;
+        let keys = parse_keys(&text);
+        messages.retain(|(id, _, _)| keys.contains(id));
+        eprintln!(
+            "subset {}: {} of {} keys found",
+            keys_path.display(),
+            messages.len(),
+            keys.len()
+        );
+    }
+    if messages.is_empty() {
+        return Err("no messages to score".into());
+    }
     let searcher = Searcher::new(engine);
     let cfg = SearchConfig {
         top_n: 1,
         ..Default::default()
     };
     let (mut theirs, mut ours, mut wins) = (0.0, 0.0, 0);
+    let mut stats = ScriptStats::default();
+    let mut scored: Vec<(f32, &str, &str)> = Vec::new();
     let mut exported = Vec::new();
+    // Library keys (`u` + 8 hex) are wider than the hand-picked ones.
+    let w = messages
+        .iter()
+        .map(|(id, _, _)| id.len())
+        .max()
+        .unwrap_or(0)
+        .max(6);
     println!(
-        "{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}",
+        "{:<w$} {:<28} {:>6} {:<10} {:>6} {:<10}",
         "id", "phrase", "theirs", "", "ours", ""
     );
     for (id, unicode, phrase) in &messages {
@@ -419,8 +514,10 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         if our >= their {
             wins += 1;
         }
+        stats.add(unicode, their, our);
+        scored.push((their, id, unicode));
         println!(
-            "{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
+            "{id:<w$} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
             truncate(phrase, 28)
         );
         exported.push(format!(
@@ -433,6 +530,21 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
         std::fs::write(out, format!("[\n{}\n]\n", exported.join(",\n")))
             .map_err(|e| format!("{}: {e}", out.display()))?;
         eprintln!("wrote {}", out.display());
+    }
+    if by_script {
+        println!(
+            "\n{:<20} {:>4} {:>9} {:>6} {:>6}",
+            "script", "n", "community", "ours", "ours≥"
+        );
+        for (script, n, t, o, w) in stats.rows() {
+            println!("{:<20} {n:>4} {t:>9.3} {o:>6.3} {w:>6}", script.name());
+        }
+        scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+        println!("\nlowest community scores:");
+        for (their, id, unicode) in scored.iter().take(15) {
+            let names: Vec<_> = scripts_in(unicode).into_iter().map(Script::name).collect();
+            println!("  {id:<w$} {their:>6.3}  {}", names.join(","));
+        }
     }
     let n = messages.len() as f32;
     println!(
@@ -754,7 +866,8 @@ fn calibrate(
 
 #[cfg(test)]
 mod tests {
-    use super::parse_messages;
+    use super::{ScriptStats, parse_keys, parse_messages, scripts_in};
+    use phono_core::chunks::Script;
 
     #[test]
     fn messages_prefer_target_and_fall_back_to_spoken() {
@@ -776,5 +889,36 @@ mod tests {
         assert!(parse_messages(r#"[{"1": {"spoken": "a"}}]"#).is_err());
         assert!(parse_messages(r#"[{"1": {"unicode": "a"}}]"#).is_err());
         assert!(parse_messages("not json").is_err());
+    }
+
+    #[test]
+    fn subset_keys_take_the_last_tab_field_and_skip_comments() {
+        let keys = parse_keys("# header\n\n8\nabcd-1234\t10\n  u1a2b3c4d  \n");
+        let mut got: Vec<_> = keys.into_iter().collect();
+        got.sort();
+        assert_eq!(got, ["10", "8", "u1a2b3c4d"]);
+    }
+
+    #[test]
+    fn scripts_ignore_spaces_and_punctuation() {
+        assert_eq!(scripts_in("ꀠ 딧-잇!"), [Script::Hangul, Script::Yi]);
+        assert_eq!(
+            scripts_in("Z Q丁낫x"),
+            [Script::Latin, Script::Hangul, Script::CjkUnified]
+        );
+        assert!(scripts_in(" -!? ").is_empty());
+    }
+
+    #[test]
+    fn script_stats_count_each_entry_once_per_script() {
+        let mut stats = ScriptStats::default();
+        stats.add("ꀠ딧", 0.5, 0.9);
+        stats.add("딧잇", 0.7, 0.6);
+        let rows = stats.rows();
+        assert_eq!(rows.len(), 2);
+        let (script, n, theirs, ours, wins) = rows[0];
+        assert_eq!((script, n, wins), (Script::Hangul, 2, 1));
+        assert!((theirs - 0.6).abs() < 1e-6 && (ours - 0.75).abs() < 1e-6);
+        assert_eq!((rows[1].0, rows[1].1, rows[1].4), (Script::Yi, 1, 1));
     }
 }
