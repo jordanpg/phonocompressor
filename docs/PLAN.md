@@ -1413,6 +1413,107 @@ lead shrinks a lot on hard phrases (0.92 vs 0.70 predicted, 0.77 vs 0.75
 heard). The full run (#45) and the refit (#46) should show whether that holds
 across the library.
 
+**exp16 result (real TTS, 2026-11-26, 1971 credits; 5313/10000 used after):
+across the whole library, our answers and the community's sound about the
+same. Heard, ours lead by 0.01; predicted, by 0.10.**
+Setup: the 246 library entries not in exp15 (`tools/experiments/exp16.keys`,
+the 34 among them), plus our top answer for each phrase. Six of our answers
+were identical to the community text, so they were merged. That gives 486
+cases and 972 clips, 862 of them new. Flash v2.5, seeds 1 and 2, exp1's
+voice. The cost was 81% of the dry-run estimate (≤ 2426).
+- Harness Whisper similarity: 0.91 and 0.92 per seed.
+- Identical transcripts across seeds: 317 of 486.
+
+With exp15, every one of the 298 entries now has clips. Numbers are
+`phono calibrate` on `clips-exp15-16.tsv` (`--dump`), truth as in exp15,
+paired by key:
+
+| entries | n | community: predicted | truth | ours: predicted | truth | ours better / tied / worse |
+|---|---|---|---|---|---|---|
+| **all 298** | 298 (ours 292) | 0.858 | **0.844** | 0.954 | **0.854** | 118 / 67 / 107 |
+| the 34 | 34 (ours 32) | 0.843 | 0.819 | 0.958 | 0.867 | 16 / 7 / 9 |
+| the other 264 | 264 (ours 260) | 0.859 | 0.847 | 0.953 | 0.853 | 102 / 60 / 98 |
+
+Within-phrase ranking over both experiments is 86 of 132 pairs (65.2%). On
+exp1–exp16 together (1764 Flash clips) v6's weights rank 264 of 346
+(76.3%), and the hand-set weights 251 (72.5%).
+
+- **The 34 flattered us.** On them we lead by 0.05 heard, as in exp5–exp8.
+  On the other 264 we lead by 0.006, winning 102 and losing 98.
+- **Our answers are over-predicted by +0.10; the community's by +0.01.**
+  Without the risk, community entries in Latin, Hangul and Yi over-predict
+  by +0.03 to +0.04 (`calibrate --by-script` on the community clips alone).
+  That is the cleanest reference so far. In the same scripts our answers are
+  at +0.08 to +0.10. Part of that is the winner's curse. The rest is what
+  the predictor doesn't see in the cases where we lose most:
+  - **Words run together.** Our answer drops a space or comma, or puts two
+    words in one run of glyphs, and the TTS blurs them into one:
+    `uca070d66`, `uffdeb2e3`, `uda8c79e2`. The community entries keep the
+    boundary.
+  - **Chunk misreads:** `u07765a28` (b heard as d), `u3454bfcc`.
+  - **Mixed-script mush:** `uf4b4957b`'s answer mixes Katakana, Yi, Hangul
+    and a CJK character, and two of its words were not heard at all.
+  - The exp15 cases (`u585b9961`, `ua626e6e4`, `uea38b3b8`) are still among
+    the ten worst.
+- **Script risks (#50), community clips over all 298.** The reference is
+  +0.03 without risk. The scripts exp15 covered are unchanged, since exp15
+  already had every entry in them. Two scripts are new:
+  - CJK unified, 36 clips: −0.01 with risk, +0.06 without, so the risk is
+    about earned.
+  - `҈` (Cyrillic number signs), 50 clips: +0.08 with risk and +0.09
+    without, so it is under-penalized. Our answers using it are at +0.13.
+
+**Refit on exp1–exp16 (#46): not adopted; v6's weights stay.**
+`phono fit` now keeps phrases that share a non-Latin chunk of two or more
+glyphs in the same cross-validation fold (`--group chunk`, the default).
+`--group phrase` is v6's per-phrase split.
+- **The groups:** on the 1764 clips, 311 phrases fall into 133 groups. One
+  group holds 142 phrases. Folds are balanced by phrase count, so that group
+  fills one fold.
+- **Effect on the estimate:** held-out ranking comes out 0.3–1.0 points lower
+  than with per-phrase folds, as expected.
+- **Two `fit` fixes:**
+  - It now picks λ by held-out ranking. Loss chose λ 0, whose weights
+    (`del_schwa` 30, free insertions, `risk_scale` 0) rank held-out pairs
+    below v6.
+  - The "new in the last experiment" check now orders experiments by number.
+    It had taken exp9 for the last.
+
+Held-out within-phrase ranking (5 chunk-grouped folds × 4, pairs ≥ 0.05
+apart, substitution scales fixed). v6's weights weren't fitted on these
+folds, so v6's row is its ranking of every pair. That includes the exp1–exp6
+pairs v6 was fitted on, which favours v6.
+
+| weights | held-out ranking | new in exp16 (fit without, 88 pairs) |
+|---|---|---|
+| v6 (current) | 76.3% | 55/88 |
+| refit from v6, λ 0.01 | **78.5%** (78.3–78.9) | 55/88 |
+| refit from hand-set, λ 0.003 | 77.7% | 55/88 |
+| refit from v6, `risk_scale` held at 1.3, λ 0.003 | 77.2% | 55/88 |
+
+The best refit raises deletion costs, as v6 did (`del_onset` 1.22 → 2.44,
+`del_consonant` 1.23 → 2.68). It also cuts `risk_scale` from 1.3 to 0.48.
+`phono eval` and `phono calibrate` with those weights compared with v6:
+- **Answers:** 30 of the 298 change. They lean to CJK unified characters
+  (32 → 40 codepoints across all answers).
+- **Offline fidelity** rises (community 0.858 → 0.900, ours 0.954 → 0.967),
+  but so does over-prediction. Community Latin, Hangul and Yi go from +0.01
+  to +0.05, so the absolute numbers get worse.
+- **Pooled correlation:** 0.605 → 0.609 on all clips, but 0.534 → 0.519 on
+  the community clips.
+- **Per script, a single lower `risk_scale` helps some and hurts others.**
+  Katakana, syllabics and Hiragana move to the reference. Conjoining jamo
+  (+0.14), Ethiopic (+0.08) and CJK unified (+0.08) end up under-penalized.
+  CJK is where the new answers go, and our CJK answers are already the most
+  over-predicted in exp15–exp16 (+0.135).
+
+The decision: the cross-validated gain is real but small (+2.2 points).
+Most of it is the `risk_scale` cut, which is the wrong fix: the scripts
+disagree, so they need risks set per script (#50). Holding `risk_scale`
+leaves +0.9 points, and the test closest to a new harness run (fit without
+exp16's answers, test on them) shows no gain for any refit. Refit again
+once #50 has set per-script risks.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -1428,7 +1529,8 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
 3. ~~The scorer's weights are hand-set.~~ Fitted in v6 (`phono fit`):
    ranking on held-out phrases improves by about 3 points, but the search's
    answers barely change. Refit after each new harness run (`phono fit
-   data/generated/clips-allN.tsv`).
+   data/generated/clips-allN.tsv`). The refit on exp1–exp16 was not
+   adopted (see "Refit on exp1–exp16"): set per-script risks first (#50).
 5. **Readings of short pseudo-words.** The TTS reads `kwi` like "kawaii",
    `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
    read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or
