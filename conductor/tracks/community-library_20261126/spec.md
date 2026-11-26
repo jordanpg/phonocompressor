@@ -30,12 +30,12 @@ As the developer calibrating the engine, I want the full community library avail
 
 ## Acceptance Criteria
 
-- [ ] **Fetch.** One mise task downloads the library into gitignored `sample/library.json`, in the shape the existing loaders read. The URL comes from fnox or the environment, not a committed file. Submitter fields are dropped. The 34 hand-picked entries keep their current keys, and every other entry gets a key that stays stable across re-fetches. The task prints the entry count, how many are new or changed since the last fetch, and a content hash.
-- [ ] **Targets.** Each entry carries a `target` used for scoring. Rules clean the common label forms, and a gitignored override file handles the rest. `phono eval` and the harness's `cases_from` use `target` when present and fall back to `spoken`, so `sample/messages.json` still works unchanged.
-- [ ] **Offline baseline.** `phono eval` over the library is recorded in PLAN.md: overall, the 34 vs the rest, and per script. Cases are cited by key only.
-- [ ] **Live probe.** An experiment on the entries in the low-scoring scripts (community and our answers, Flash v2.5, 2 seeds) is synthesized after the user approves the dry-run estimate, then transcribed, reported and written up. Each reader blind spot it confirms becomes its own issue.
-- [ ] **Full run and refit.** Once the user approves the spend, the rest of the library is run live. `phono fit` is refitted on all clips, with cross-validation folds that keep entries sharing a chunk together. New weights ship only if held-out ranking improves, and `phono eval` and `phono calibrate` are compared before and after.
-- [ ] **Metrics moved.** `product.md`'s success metrics and the `phono eval` default point at the library set, with the 34 still reported as a subset for continuity.
+- [x] **Fetch.** One mise task downloads the library into gitignored `sample/library.json`, in the shape the existing loaders read. The URL comes from fnox or the environment, not a committed file. Submitter fields are dropped. The 34 hand-picked entries keep their current keys, and every other entry gets a key that stays stable across re-fetches. The task prints the entry count, how many are new or changed since the last fetch, and a content hash.
+- [x] **Targets.** Each entry carries a `target` used for scoring. Rules clean the common label forms, and a gitignored override file handles the rest. `phono eval` and the harness's `cases_from` use `target` when present and fall back to `spoken`, so `sample/messages.json` still works unchanged.
+- [x] **Offline baseline.** `phono eval` over the library is recorded in PLAN.md: overall, the 34 vs the rest, and per script. Cases are cited by key only.
+- [x] **Live probe.** An experiment on the entries in the low-scoring scripts (community and our answers, Flash v2.5, 2 seeds) is synthesized after the user approves the dry-run estimate, then transcribed, reported and written up. Each reader blind spot it confirms becomes its own issue.
+- [x] **Full run and refit.** Once the user approves the spend, the rest of the library is run live. `phono fit` is refitted on all clips, with cross-validation folds that keep entries sharing a chunk together. New weights ship only if held-out ranking improves, and `phono eval` and `phono calibrate` are compared before and after.
+- [x] **Metrics moved.** `product.md`'s success metrics and the `phono eval` default point at the library set, with the 34 still reported as a subset for continuity.
 
 ## Dependencies
 

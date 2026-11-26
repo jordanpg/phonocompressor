@@ -2,9 +2,9 @@
   "id": "community-library_20261126",
   "title": "Use the full community sample library",
   "type": "feature",
-  "status": "in_progress",
+  "status": "complete",
   "created": "2026-11-26T00:00:00Z",
-  "updated": "2026-11-26T23:00:00Z",
+  "updated": "2026-11-27T01:00:00Z",
   "issue": 39,
   "task_issues": {
     "1.1": 40,
@@ -18,29 +18,32 @@
   },
   "phases": {
     "total": 5,
-    "completed": 4
+    "completed": 5
   },
   "tasks": {
     "total": 8,
-    "completed": 7
+    "completed": 8
   },
   "current_phase": 5,
-  "current_task": "5.1",
+  "current_task": null,
   "commits": [
     "132c80d: chore(conductor): start task 1.1 (community-library_20261126)",
     "57d61d8: feat(harness): add library fetch task (community-library_20261126)",
-    "e2a9b22: feat(harness): add cleaned scoring targets (community-library_20261126)",
-    "c5d0a52: feat(cli): add eval --by-script and --subset (community-library_20261126)",
-    "ac634f6: docs(plan): record the offline library baseline (community-library_20261126)",
-    "889d86c: feat(harness): let cases_keys pick cases by key (community-library_20261126)",
-    "41f5126: exp: add exp15 probe of low-scoring library scripts (community-library_20261126)",
-    "033d8c6: exp: write up exp15 live probe of low-scoring scripts (community-library_20261126)",
-    "6ab1ec5: chore(conductor): mark task 3.2 and phase 3 complete (community-library_20261126)",
-    "22aa944: feat(cli): add calibrate --by-script (community-library_20261126)",
-    "eaa8907: docs(plan): correct exp15 gaps without risk (community-library_20261126)",
-    "93e02c0: exp: add exp16 full run of the community library (community-library_20261126)",
-    "9e91675: feat(fit): group cross-validation folds by shared chunk (community-library_20261126)",
-    "20402c2: fix(fit): pick λ by held-out ranking and order experiments by number (community-library_20261126)",
-    "00644e7: docs(plan): write up exp16 and the rejected refit (community-library_20261126)"
+    "dd20495: feat(harness): add cleaned scoring targets (community-library_20261126)",
+    "e9c8788: feat(cli): add eval --by-script and --subset (community-library_20261126)",
+    "787cf0d: docs(plan): record the offline library baseline (community-library_20261126)",
+    "26afb4c: feat(harness): let cases_keys pick cases by key (community-library_20261126)",
+    "141b645: exp: add exp15 probe of low-scoring library scripts (community-library_20261126)",
+    "4e1883d: exp: write up exp15 live probe of low-scoring scripts (community-library_20261126)",
+    "5553040: chore(conductor): mark task 3.2 and phase 3 complete (community-library_20261126)",
+    "33b5b2f: feat(cli): add calibrate --by-script (community-library_20261126)",
+    "b57a5d6: docs(plan): correct exp15 gaps without risk (community-library_20261126)",
+    "72473fb: exp: add exp16 full run of the community library (community-library_20261126)",
+    "e03bcd5: feat(fit): group cross-validation folds by shared chunk (community-library_20261126)",
+    "3c9d2f9: fix(fit): pick λ by held-out ranking and order experiments by number (community-library_20261126)",
+    "afbf7d4: docs(plan): write up exp16 and the rejected refit (community-library_20261126)",
+    "2837fda: chore(conductor): mark tasks 4.1, 4.2 and phase 4 complete (community-library_20261126)",
+    "1e99aa9: feat(cli): default eval to the community library, with the 34 as a subset (community-library_20261126)",
+    "4c78f5f: docs: measure against the community library, with the 34 as a subset (community-library_20261126)"
   ]
 }

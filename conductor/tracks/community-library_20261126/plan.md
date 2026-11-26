@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#39](https://github.com/jordanpg/phonocompressor/issues/39)
 **Created:** 2026-11-26
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -67,19 +67,19 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 
 ### Tasks
 
-- [ ] Task 5.1: Point `phono eval`'s default and `product.md`'s success metrics at `sample/library.json`, with the 34 reported as a subset. Update `workflow.md` (quality gates, the fetch step), the Conductor index and the README where they mention the 34. ([#47](https://github.com/jordanpg/phonocompressor/issues/47))
+- [x] Task 5.1: Point `phono eval`'s default and `product.md`'s success metrics at `sample/library.json`, with the 34 reported as a subset. Update `workflow.md` (quality gates, the fetch step), the Conductor index and the README where they mention the 34. ([#47](https://github.com/jordanpg/phonocompressor/issues/47))
 
 ### Verification
 
-- [ ] Docs and defaults agree, and `mise run phono eval` works after a fresh fetch.
+- [x] Docs and defaults agree, and `mise run phono eval` works after a fresh fetch.
 
 ## Final Verification
 
-- [ ] All acceptance criteria met
-- [ ] Tests passing; gates pass
-- [ ] No library content, submitter name or URL in any tracked file, issue or PR
-- [ ] Documentation updated
-- [ ] Ready for review
+- [x] All acceptance criteria met
+- [x] Tests passing; gates pass
+- [x] No library content, submitter name or URL in any tracked file, issue or PR
+- [x] Documentation updated
+- [x] Ready for review
 
 ---
 
