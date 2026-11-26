@@ -27,7 +27,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-_None. Run `/conductor:new-track` to start one._
+- [ ] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): probe, community and replay runs on `eleven_multilingual_v2`, its `ModelProfile` with fitted weights, and a live check. 0/9 tasks.
 
 ## Archived Tracks
 
