@@ -42,8 +42,8 @@ Collect the clips the baseline and the fit need.
 
 ### Tasks
 
-- [~] Task 2.1: Let an experiment's `cases_from` take a list of files, dropping a text already seen for the same phrase; existing experiment files keep working (ruff clean; dry runs of exp1 and exp7 list the same cases as before) ([#28](https://github.com/jordanpg/phonocompressor/issues/28))
-- [ ] Task 2.2: exp12: the 34 community messages × 2 seeds on Multilingual v2; report; write-up next to exp1 (Whisper similarity, phone fidelity, language ID, silent clips). Stop point: if it isn't reading the messages through transliteration, ask before exp13 ([#29](https://github.com/jordanpg/phonocompressor/issues/29))
+- [x] Task 2.1: Let an experiment's `cases_from` take a list of files, dropping a text already seen for the same phrase; existing experiment files keep working (ruff clean; dry runs of exp1 and exp7 list the same cases as before) ([#28](https://github.com/jordanpg/phonocompressor/issues/28))
+- [~] Task 2.2: exp12: the 34 community messages × 2 seeds on Multilingual v2; report; write-up next to exp1 (Whisper similarity, phone fidelity, language ID, silent clips). Stop point: if it isn't reading the messages through transliteration, ask before exp13 ([#29](https://github.com/jordanpg/phonocompressor/issues/29))
 - [ ] Task 2.3: exp13: the v1–v6 engine answers (126, community texts excluded) × 2 seeds on Multilingual v2; report; export one clips file of the model's default-setting clips from exp11–exp13; short PLAN.md entry ([#30](https://github.com/jordanpg/phonocompressor/issues/30))
 
 ### Verification
