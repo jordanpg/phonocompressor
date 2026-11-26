@@ -57,8 +57,8 @@ Build the profile, move the reader rules its clips disagree with, then fit the w
 ### Tasks
 
 - [x] Task 3.1: Add `MULTILINGUAL_V2` to `model.rs` and `PROFILES`: script table and preference order from exp11; Flash's reader constants and weights copied for now. Tests first (id resolves, katakana `Native`, default-on scripts). Baseline `phono calibrate --model eleven_multilingual_v2` ([#31](https://github.com/jordanpg/phonocompressor/issues/31))
-- [~] Task 3.2: Check the capital-letter rules, plurals, number grouping, glued-number drop and split costs against Multilingual v2's clips. Rules they disagree with become profile data, tests first. Flash's `phono eval` byte-identical; `calibrate` recorded for both models ([#32](https://github.com/jordanpg/phonocompressor/issues/32))
-- [ ] Task 3.3: `phono fit --model eleven_multilingual_v2` with substitution scales held (as in v6); put the weights and `predict` in the profile with a comment on their source; report in-sample and held-out ranking next to Flash's weights ([#33](https://github.com/jordanpg/phonocompressor/issues/33))
+- [x] Task 3.2: Check the capital-letter rules, plurals, number grouping, glued-number drop and split costs against Multilingual v2's clips. Rules they disagree with become profile data, tests first. Flash's `phono eval` byte-identical; `calibrate` recorded for both models ([#32](https://github.com/jordanpg/phonocompressor/issues/32))
+- [~] Task 3.3: `phono fit --model eleven_multilingual_v2` with substitution scales held (as in v6); put the weights and `predict` in the profile with a comment on their source; report in-sample and held-out ranking next to Flash's weights ([#33](https://github.com/jordanpg/phonocompressor/issues/33))
 
 ### Verification
 

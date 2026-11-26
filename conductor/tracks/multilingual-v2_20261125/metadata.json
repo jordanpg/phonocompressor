@@ -23,10 +23,10 @@
   },
   "tasks": {
     "total": 9,
-    "completed": 6
+    "completed": 7
   },
   "current_phase": 3,
-  "current_task": "3.2",
+  "current_task": "3.3",
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11",
@@ -34,6 +34,7 @@
     "9aee008: exp: add exp12",
     "11a3659: exp: write up exp12",
     "93a2971: exp: write up exp13",
-    "f9b5115: feat(model): add Multilingual v2 profile"
+    "f9b5115: feat(model): add Multilingual v2 profile",
+    "0a2e983: feat(reader): symbol words and glued digits in profile data"
   ]
 }
