@@ -1156,6 +1156,57 @@ unchanged (190/227, 0.773). Multilingual v2 `calibrate`: 161/210, Pearson
 `@` for `앝` ("at"), and `what are thoooose` now uses a glued `2` that this
 model reads.
 
+**Fitting Multilingual v2's weights (2026-11-25, no credits): Flash's
+weights stay, once four script risks are set for this model.** `phono fit
+--model eleven_multilingual_v2` on `clips-mv2.tsv`: 169 distinct answers to
+43 phrases, 210 within-phrase pairs at |Δ| ≥ 0.05. Substitution scales held,
+as in v6; 5 folds by phrase × 4 repeats. `fit` gained `--prior profile`,
+which starts from and regularizes towards the profile's weights (here
+Flash's) instead of v1–v5's hand-set ones. The default is unchanged, and
+Flash's `fit` output is identical.
+
+| weights | script risks | in-sample | held-out (λ 0–0.03) | Pearson over answers |
+|---|---|---|---|---|
+| hand-set (v1–v5) | Flash's | 73.8% | – | 0.564 |
+| Flash's (v6) | Flash's | 76.7% | – (never fitted on these clips) | 0.572 |
+| fitted, prior hand | Flash's | 81.4% | 76.7–79.3% | 0.533 |
+| fitted, prior Flash | Flash's | 80.0% | 77.3–79.2% | 0.530 |
+| fitted, prior Flash, `risk_scale` held | Flash's | 76.7% | 76.2–76.5% | 0.517 |
+| **Flash's (v6)** | **Multilingual v2's** | **79.5%** | – | **0.574** |
+| fitted, prior Flash, `risk_scale` held | Multilingual v2's | 79.0% | 78.8–79.9% | 0.536 |
+| fitted, prior Flash | Multilingual v2's | 79.0% | 78.3–80.8% | 0.539 |
+
+For comparison, Flash's clips: v6 weights 83.7% in-sample, a fresh fit
+80.1–81.4% held out.
+
+- **The first fits' gain was all script risk.** Fitting with Flash's script
+  table cut `risk_scale` 1.3 → 0.14. With `risk_scale` held, the held-out
+  gain vanished (76.5%). The pairs that flipped: answers using Canadian
+  syllabics, Ethiopic or conjoining jamo beat their siblings more often than
+  Flash's risks allow (8 pairs fixed, 1 broken). The per-script residuals
+  from the first profile say the same (−0.04, −0.08, −0.09 per codepoint,
+  against +0.03, +0.03, −0.01 on Flash). One global scale can't lower those
+  three and keep `҈`'s penalty, so the fit lowered it for every script.
+- **So the profile sets those three risks** (syllabics 0.05 → 0.02,
+  Ethiopic 0.05 → 0, conjoining jamo 0.03 → 0) and keeps `risk_scale`. All
+  three scripts are off by default on both models, so the default search's
+  answers are unchanged. Only the predicted scores of the community messages
+  that use them move (e.g. `푽ᆾꇤꆌm` 0.523 → 0.552). These risks were chosen
+  from the same clips they are scored on, so 79.5% is in-sample. exp14 is
+  the out-of-sample check.
+- **Then no fit beats Flash's weights.** Held-out ranking stays between 78.3%
+  and 80.8% (spread across repeats about ±1 point, i.e. 2 pairs), pooled
+  correlation drops from 0.574 to about 0.54, and the fits push `del_onset`
+  to 2.9 (Flash: 1.22) and `del_unstressed` to 1.1–1.7. That's more change
+  than the data supports, so the profile keeps Flash's weights and
+  prediction settings.
+- `fit`'s "new in the last experiment" check is empty here: every
+  non-community answer first appears in exp13, so there is nothing to train
+  on. Cross-validation is the only held-out measure.
+
+Flash's `phono eval` is byte-identical. Multilingual v2 `calibrate`: 167/210
+(79.5%), Pearson 0.544 / Spearman 0.600.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
