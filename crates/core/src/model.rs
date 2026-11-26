@@ -220,11 +220,16 @@ pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
 /// - Read natively: Cyrillic (`Привет` in Russian), Devanagari (`कमल` "Kamal", not unidecode's
 ///   `kml`) and kana (`フリ`, `ふり` "Free"). Kana is the change from Flash, which searches it.
 /// - Everything else is read by transliteration, with the same defaults as Flash.
-/// - Risks are Flash's except `҈`: predictions with Flash's profile over-shoot clips with it by
-///   about 0.29 per codepoint, against 0.06 on Flash's own clips (least squares over script
-///   counts). Risk 0.18 × `risk_scale` 1.3 covers the 0.23 difference. exp11 heard it as
-///   "Hander a thousand" and exp12's worst messages contain it. The other scripts' excess was
-///   within the ±0.03 that Flash's in-sample check shows.
+/// - Risks are Flash's except four. Least squares of Flash-profile over-prediction (predicted −
+///   truth) on per-script codepoint counts, Multilingual v2's clips against Flash's own:
+///   - `҈`: +0.29 per codepoint vs +0.06. Risk 0.18 × `risk_scale` 1.3 covers the difference.
+///     exp11 heard it as "Hander a thousand" and exp12's worst messages contain it.
+///   - Canadian syllabics, Ethiopic, conjoining jamo: −0.04, −0.08, −0.09 vs +0.03, +0.03,
+///     −0.01 (20 or so codepoints each), so their risks come down (0.05 → 0.02, 0.05 → 0,
+///     0.03 → 0). `phono fit` pointed the same way: without this it cut `risk_scale` to 0.14,
+///     because answers in these scripts beat the risk's prediction within phrases (8 pairs).
+///     All three stay off by default, so this changes scoring, not the default search.
+///   - Every other script's excess was within the ±0.03 that Flash's in-sample check shows.
 fn multilingual_v2_scripts(s: Script) -> ScriptProfile {
     use Script::*;
     use ScriptReading::*;
@@ -236,6 +241,14 @@ fn multilingual_v2_scripts(s: Script) -> ScriptProfile {
         },
         CyrillicNumber => ScriptProfile {
             risk: 0.18,
+            ..flash_v2_5_scripts(s)
+        },
+        Ucas => ScriptProfile {
+            risk: 0.02,
+            ..flash_v2_5_scripts(s)
+        },
+        Ethiopic | HangulJamo => ScriptProfile {
+            risk: 0.0,
             ..flash_v2_5_scripts(s)
         },
         _ => flash_v2_5_scripts(s),
@@ -350,6 +363,10 @@ mod tests {
             p.script(Script::CyrillicNumber).risk > FLASH_V2_5.script(Script::CyrillicNumber).risk
         );
         assert!(p.preference(Script::Hangul) < p.preference(Script::Yi));
+        // Syllabics, Ethiopic and conjoining jamo read better here than Flash's risks say.
+        for s in [Script::Ucas, Script::Ethiopic, Script::HangulJamo] {
+            assert!(p.script(s).risk < FLASH_V2_5.script(s).risk, "{s:?}");
+        }
     }
 
     #[test]
