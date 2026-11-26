@@ -1116,6 +1116,46 @@ frog` drops a kana) and lowers the predicted score of the `҈` answers
 (e.g. 0.998 → 0.873), which still win: nothing else says "100,000" in 6
 codepoints.
 
+**Reader rules on Multilingual v2 (2026-11-25, no credits).** Each of
+`reading.rs`'s Flash-derived rules, checked against every clip whose Latin
+(`phono read`) exercises it, on both models' clips (`clips-mv2.tsv`,
+`clips-all9.tsv`):
+
+| rule | Multilingual v2 heard | verdict |
+|---|---|---|
+| a digit glued to letters is dropped about half the time (`glued_number_drop` 1.0) | read in 11 of 12 clips, the 12th unclear: `3the` "Three the" ×2, `3ᕞ ጔ` "Three the gwee", `3咜취e` /s ɹ iː …/ ×2. Flash dropped it in 4 of the 8 exp13-text clips | **disagrees**: 0.1 for this model |
+| `@` → "at" | 0 of 14 clips over 7 texts (`chuxdung@joMama` "Dunga Joe Mama", `joemama@aha` "Jai Mama Nawa"). Flash: 11 of 14 between words | **disagrees**: `@` is silent on this model |
+| `&` → "and", `%` → "percent" | 5 of 6; 2 of 2 | agrees |
+| `+` → "plus" | `you+me` /j p s m e/, "You, me": 1 of 2 at most | too few clips; stays |
+| a trailing capital after two or more letters is its own letter | 10 of 12: `timE lupe` /t i m i/ ×2, `yurE notfunny` "Yuri" ×2, `nexT pleas` "Nexty, please" ×2; only bare `nexT` ("Next" ×2) disagrees | agrees |
+| a run of capitals in a word is its own word | `checkhimPC` "Check Him PC" ×4 | agrees |
+| a single interior capital stays in the word | `joeMama` "Joe Mama", `tHe` /t/ (clipped); the Han-derived cases (`oHao`, `veRi`) are too noisy to read either way | agrees, weakly |
+| plural `2s` | `2s` /tuːs/, /tuːz/; `ot are2s` /t uː z/ (1 of 2) | agrees |
+| `100.000` grouped | only reachable through `҈`, whose instability is in its risk (0.18) | stays |
+
+So two rules move into profile data:
+- `glued_number_drop` was already a profile constant; Multilingual v2's is
+  0.1 (about 1 drop in 12).
+- The symbol table moved from `chunks.rs` into `ReaderParams::symbol_words`.
+  `chunks::SYMBOL_WORDS` remains the list of symbols any model voices, so
+  chunks containing one are still read through the reader. The tiler's
+  symbol words follow the profile too.
+
+The capital and plural rules stay in `reading.rs` for both models.
+
+Split costs (`split_onset`, `split_short_word`, `split_lone_letter`,
+`split_g2p_letter`) were checked by moving each one down and up (e.g. onset
+0.5 and 1.5) under Multilingual v2's profile. `calibrate` stayed within 158–162
+of 210 pairs and Pearson 0.524–0.552 (base 161, 0.542), so they keep Flash's
+values. `glued_number_drop` 0.0–0.3 moves Pearson by 0.01 (few clips have a
+glued digit), so the counts above set it.
+
+After the change: Flash's `phono eval` byte-identical, Flash `calibrate`
+unchanged (190/227, 0.773). Multilingual v2 `calibrate`: 161/210, Pearson
+0.542. Its `eval` changes two answers: `kaka chucks dung at joe mama` swaps
+`@` for `앝` ("at"), and `what are thoooose` now uses a glued `2` that this
+model reads.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
