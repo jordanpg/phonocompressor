@@ -119,6 +119,10 @@ enum Command {
         clips: PathBuf,
         #[arg(long, default_value_t = 5)]
         folds: usize,
+        /// What each cross-validation fold keeps together: phrases sharing a non-Latin chunk
+        /// (default), or each phrase alone (v6's fit).
+        #[arg(long, value_enum, default_value_t = fit::Grouping::Chunk)]
+        group: fit::Grouping,
         #[arg(long, default_value_t = 4)]
         repeats: usize,
         /// What to fit against.
@@ -357,6 +361,7 @@ fn main() -> Result<(), String> {
         Command::Fit {
             clips,
             folds,
+            group,
             repeats,
             truth,
             fix,
@@ -366,6 +371,7 @@ fn main() -> Result<(), String> {
             let mut engine = engine;
             let opts = fit::FitOpts {
                 folds,
+                group,
                 repeats,
                 lambdas,
                 truth,

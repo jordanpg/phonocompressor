@@ -7,7 +7,9 @@
 //! pull towards the hand-set weights in log space.
 //!
 //! Generalization is checked two ways:
-//! - k-fold cross-validation by phrase: the held-out phrases' answers are never seen in fitting;
+//! - k-fold cross-validation by phrase: the held-out phrases' answers are never seen in fitting.
+//!   By default phrases whose answers share a non-Latin chunk of two or more glyphs stay in one
+//!   fold ([`Grouping::Chunk`]), since a chunk's reading learned in one phrase carries to the next;
 //! - "new in the last experiment": fit without the answers that first appeared in the last
 //!   experiment, test on pairs involving them (the situation of a new harness run).
 
@@ -228,6 +230,8 @@ fn fit(
 
 pub struct FitOpts {
     pub folds: usize,
+    /// What the cross-validation folds keep together.
+    pub group: Grouping,
     /// Cross-validation runs, each with a different assignment of phrases to folds.
     pub repeats: usize,
     pub lambdas: Vec<f32>,
@@ -245,6 +249,71 @@ pub enum Prior {
     Hand,
     /// The model profile's current weights, e.g. Flash v2.5's for a new model's first fit.
     Profile,
+}
+
+/// What a cross-validation fold keeps together.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum Grouping {
+    /// Each phrase on its own (v6's fit).
+    Phrase,
+    /// Phrases connected by a shared non-Latin chunk of two or more glyphs ([`chunk_keys`]).
+    Chunk,
+}
+
+/// The two-glyph chunks in `text` outside Latin: consecutive non-whitespace characters from
+/// U+0250 (past Latin Extended-B) up. Two texts that share a longer chunk share one of these.
+fn chunk_keys(text: &str) -> Vec<(char, char)> {
+    let glyph = |c: char| c as u32 >= 0x250 && !c.is_whitespace();
+    let chars: Vec<char> = text.chars().collect();
+    chars
+        .windows(2)
+        .filter(|w| glyph(w[0]) && glyph(w[1]))
+        .map(|w| (w[0], w[1]))
+        .collect()
+}
+
+/// A group id for each of `n` phrases: phrases whose texts share a key are connected, and each
+/// connected component is one group. Ids are the smallest phrase index in the group.
+fn groups<K: Ord>(n: usize, keyed: impl IntoIterator<Item = (usize, K)>) -> Vec<usize> {
+    fn find(parent: &mut [usize], mut i: usize) -> usize {
+        while parent[i] != i {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        i
+    }
+    let mut parent: Vec<usize> = (0..n).collect();
+    let mut first: BTreeMap<K, usize> = BTreeMap::new();
+    for (phrase, key) in keyed {
+        let other = *first.entry(key).or_insert(phrase);
+        let (a, b) = (find(&mut parent, phrase), find(&mut parent, other));
+        parent[a.max(b)] = a.min(b);
+    }
+    (0..n).map(|i| find(&mut parent, i)).collect()
+}
+
+/// Fold of each phrase: groups in a scrambled order (a different one per `repeat`), each put in
+/// the fold with the fewest phrases so far, so a large group doesn't unbalance the folds.
+fn assign_folds(group: &[usize], folds: usize, repeat: usize) -> Vec<usize> {
+    let mut sizes: BTreeMap<usize, usize> = BTreeMap::new();
+    for &g in group {
+        *sizes.entry(g).or_default() += 1;
+    }
+    let mut order: Vec<(usize, usize)> = sizes.into_iter().collect();
+    order.sort_by_key(|&(g, n)| {
+        (
+            std::cmp::Reverse(n),
+            splitmix(splitmix(repeat as u64) ^ g as u64),
+        )
+    });
+    let mut load = vec![0; folds];
+    let mut fold_of_group = BTreeMap::new();
+    for (g, n) in order {
+        let k = (0..folds).min_by_key(|&k| (load[k], k)).unwrap();
+        load[k] += n;
+        fold_of_group.insert(g, k);
+    }
+    group.iter().map(|g| fold_of_group[g]).collect()
 }
 
 /// Which measure of what the TTS produced to fit against.
@@ -347,22 +416,51 @@ pub fn run(
         pearson(&hand_pred, &truths)
     );
 
-    // Folds by phrase: every k-th phrase in a scrambled order, a different scramble per repeat.
+    let group = match opts.group {
+        Grouping::Phrase => (0..phrases.len()).collect(),
+        Grouping::Chunk => groups(
+            phrases.len(),
+            answers
+                .iter()
+                .flat_map(|a| chunk_keys(&a.text).into_iter().map(|k| (a.phrase, k))),
+        ),
+    };
+    let mut sizes: BTreeMap<usize, usize> = BTreeMap::new();
+    for &g in &group {
+        *sizes.entry(g).or_default() += 1;
+    }
+    let shared = sizes.values().filter(|&&n| n > 1).count();
+    let largest = sizes.values().max().copied().unwrap_or(0);
     let fold_maps: Vec<Vec<usize>> = (0..opts.repeats)
-        .map(|r| {
-            let mut order: Vec<usize> = (0..phrases.len()).collect();
-            order.sort_by_key(|&i| splitmix(splitmix(r as u64) ^ i as u64));
-            let mut fold = vec![0; phrases.len()];
-            for (pos, &i) in order.iter().enumerate() {
-                fold[i] = pos % opts.folds;
+        .map(|r| match opts.group {
+            // v6's assignment: every k-th phrase in a scrambled order.
+            Grouping::Phrase => {
+                let mut order: Vec<usize> = (0..phrases.len()).collect();
+                order.sort_by_key(|&i| splitmix(splitmix(r as u64) ^ i as u64));
+                let mut fold = vec![0; phrases.len()];
+                for (pos, &i) in order.iter().enumerate() {
+                    fold[i] = pos % opts.folds;
+                }
+                fold
             }
-            fold
+            Grouping::Chunk => assign_folds(&group, opts.folds, r),
         })
         .collect();
 
     let mut best_lambda = (opts.lambdas[0], f32::MAX);
+    if opts.group == Grouping::Chunk {
+        println!(
+            "chunk groups: {} phrases in {} groups; {shared} groups join 2+ phrases, the largest {largest}",
+            phrases.len(),
+            sizes.len()
+        );
+    }
+    let by = match opts.group {
+        Grouping::Phrase => "phrase",
+        Grouping::Chunk => "chunk group",
+    };
     println!(
-        "\ncross-validation, {} folds by phrase × {} repeats (held-out pairs only; {label}: {:.1}%, loss {:.4}):",
+        "\ncross-validation, {} folds by {by} × {} repeats (held-out pairs only; {label}: {:.1}%, loss {:.4}):",
         opts.folds,
         opts.repeats,
         100.0 * r as f32 / n as f32,
@@ -478,4 +576,38 @@ pub fn run(
     );
     engine.weights = engine.profile.weights.clone();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chunk_keys_skip_latin_and_spaces() {
+        assert_eq!(
+            chunk_keys("ab \u{13E3}\u{13B3}"),
+            vec![('\u{13E3}', '\u{13B3}')]
+        );
+        assert_eq!(chunk_keys("\u{13E3} \u{13B3}"), vec![]);
+        assert_eq!(chunk_keys("éa"), vec![]);
+        assert_eq!(chunk_keys("ア이ウ"), vec![('ア', '이'), ('이', 'ウ')]);
+    }
+
+    #[test]
+    fn groups_join_phrases_transitively() {
+        // 0–1 share "x", 1–2 share "y", 3 stands alone.
+        let g = groups(4, [(0, "x"), (1, "x"), (1, "y"), (2, "y"), (3, "z")]);
+        assert_eq!(g, vec![0, 0, 0, 3]);
+    }
+
+    #[test]
+    fn folds_keep_groups_together_and_balance() {
+        let group = vec![0, 0, 0, 0, 4, 5, 6, 7];
+        for repeat in 0..3 {
+            let fold = assign_folds(&group, 2, repeat);
+            assert!(fold[..4].iter().all(|&k| k == fold[0]));
+            let in_first = fold.iter().filter(|&&k| k == fold[0]).count();
+            assert_eq!(in_first, 4);
+        }
+    }
 }
