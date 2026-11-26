@@ -4,8 +4,7 @@ Replay of earlier engine answers on Multilingual v2, as fit data for its profile
 answer phono v1-v6 gave for the community phrases (data/generated/ours-v1..v6.json, gitignored),
 leaving out texts exp12 already ran (the community's own), on eleven_multilingual_v2, two seeds.
 `phono fit --model eleven_multilingual_v2` learns from pairs of different answers to the same
-phrase; exp1's equivalent for Flash v2.5 was exp2-exp7. One extra case fills exp11's gap:
-conjoining Hangul jamo (exp11's `jamo_conj` used a precomposed syllable by mistake).
+phrase; exp1's equivalent for Flash v2.5 was exp2-exp7.
 Track multilingual-v2_20261125, issue #30.
 """
 # Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
@@ -23,10 +22,3 @@ cases_from = [
     "data/generated/ours-v6.json",
 ]
 cases_exclude = "sample/messages.json"
-
-[[cases]]
-id = "jamo_conj_real"
-text = "가"
-t = "ga"
-n = "Korean ga (conjoining jamo U+1100 U+1161)"
-note = "exp11 jamo_conj used the precomposed U+AC00 by mistake."

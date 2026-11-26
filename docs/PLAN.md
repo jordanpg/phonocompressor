@@ -953,7 +953,7 @@ Seeds agree less than on Flash: 19/47 identical transcripts.
 | Latin | `checkhimPC` "Check Him PC" ×2 | T |
 | Hangul | `딧잇` "This is" ×2; `솪` "Swag" ×2; `빞빞` "Bip bip" ×2; but `거` /ke/ ×2, `벗` /pat/, /pot/ | T, noisy on lone syllables (`벗` is the Korean reading) |
 | Hangul compat jamo | `ㅊ헻ㅋ힘` "Check him" ×2 | T |
-| Hangul jamo (conjoining) | not measured: the `jamo_conj` case used precomposed `가` by mistake ("ga" ×2) | unmeasured, off by default |
+| Hangul jamo (conjoining) | `가` (U+1100 U+1161) "God" / "Yeah", /ɡaː/ ×2 | T, unstable; off by default, as on Flash |
 | Yi | `ꌟ` "Suck" ×2; `ꀠddꏒꀊm` "Bad dream" ×2 | T |
 | CJK compat | `㌀` "Apartment" ×2; `㎞` "KM" / "Game is" | T |
 | Cyrillic number signs | `҈` "Hander a thousand" / "100,000"; `҈㌀s` "100,000 apartments" ×2 | T |
@@ -1026,8 +1026,37 @@ report's difflib similarity is 0.77 / 0.78 per seed, against exp1's 0.86 /
   Messages with `҈` are the worst: its reading varies a lot here (exp11:
   "Hander a thousand" / "100,000").
 
-Decision: exp13 waits for the user's go-ahead, since the track's stop point
-(non-English language ID) is met on its face.
+Decision: the track's stop point (non-English language ID) was met on its
+face, so exp13 waited for the user's go-ahead, and got it.
+
+**exp13 result (real TTS, 2026-11-25, 1244 credits; 2796/10000 used after):
+the fit data for Multilingual v2.** Every distinct answer phono v1–v6 gave
+for the community phrases (126 texts, 628 characters; the community's own
+texts left out, since exp12 has them) × 2 seeds on `eleven_multilingual_v2`:
+252 clips, none silent, 0 not cached afterwards (`tools/experiments/exp13.toml`,
+`tools/results/exp13.md`; the harness's `cases_from` now takes a list of files
+and `cases_exclude`). Mean similarity per seed (harness difflib measure)
+0.73 / 0.73, with 60/126 and 62/126 at 0.8 or more; transcripts identical
+across seeds on 38/127. Whisper says English on 157/256 (61%; exp12:
+60%, exp1: 99%).
+
+`mise run //tools:export`-style clips file for the model, from exp11–exp13
+(`data/generated/clips-mv2.tsv`, gitignored, default-setting clips only):
+338 clips, all `eleven_multilingual_v2` (exp11 18, exp12 68, exp13 252). With
+Flash's reader constants and weights (no profile yet; the file's model column
+was relabelled for this check), `phono calibrate` ranks **161 of 210
+within-phrase pairs (76.7%)** like truth; Flash's own clips give 83.7%
+(exp9). Prediction correlates 0.50 with truth (mean of phone and Whisper
+measures). Per source, predicted / actual phones / Whisper:
+
+| exp | clips | predicted | phones | Whisper |
+|---|---|---|---|---|
+| exp11 | 18 | 0.900 | 0.644 | 0.537 |
+| exp12 (community) | 68 | 0.843 | 0.739 | 0.734 |
+| exp13 (engine answers) | 252 | 0.854 | 0.705 | 0.676 |
+
+Flash's weights over-predict on this model by about 0.15 to 0.2. That is the
+gap the profile's fit and reader checks (tasks 3.1–3.3) work on.
 
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
