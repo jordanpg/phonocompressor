@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-26T00:00:00Z",
-  "updated": "2026-11-26T19:00:00Z",
+  "updated": "2026-11-26T23:00:00Z",
   "issue": 39,
   "task_issues": {
     "1.1": 40,
@@ -18,14 +18,14 @@
   },
   "phases": {
     "total": 5,
-    "completed": 3
+    "completed": 4
   },
   "tasks": {
     "total": 8,
-    "completed": 5
+    "completed": 7
   },
-  "current_phase": 4,
-  "current_task": "4.1",
+  "current_phase": 5,
+  "current_task": "5.1",
   "commits": [
     "132c80d: chore(conductor): start task 1.1 (community-library_20261126)",
     "57d61d8: feat(harness): add library fetch task (community-library_20261126)",
@@ -34,6 +34,13 @@
     "ac634f6: docs(plan): record the offline library baseline (community-library_20261126)",
     "889d86c: feat(harness): let cases_keys pick cases by key (community-library_20261126)",
     "41f5126: exp: add exp15 probe of low-scoring library scripts (community-library_20261126)",
-    "033d8c6: exp: write up exp15 live probe of low-scoring scripts (community-library_20261126)"
+    "033d8c6: exp: write up exp15 live probe of low-scoring scripts (community-library_20261126)",
+    "6ab1ec5: chore(conductor): mark task 3.2 and phase 3 complete (community-library_20261126)",
+    "22aa944: feat(cli): add calibrate --by-script (community-library_20261126)",
+    "eaa8907: docs(plan): correct exp15 gaps without risk (community-library_20261126)",
+    "93e02c0: exp: add exp16 full run of the community library (community-library_20261126)",
+    "9e91675: feat(fit): group cross-validation folds by shared chunk (community-library_20261126)",
+    "20402c2: fix(fit): pick λ by held-out ranking and order experiments by number (community-library_20261126)",
+    "00644e7: docs(plan): write up exp16 and the rejected refit (community-library_20261126)"
   ]
 }

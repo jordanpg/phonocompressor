@@ -56,12 +56,12 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 
 ### Tasks
 
-- [~] Task 4.1: Define an experiment for the remaining library entries not yet clipped (community and ours, Flash v2.5, 2 seeds). Show the estimate and wait for approval, then synthesize, transcribe and report, with a PLAN.md write-up. ([#45](https://github.com/jordanpg/phonocompressor/issues/45))
-- [ ] Task 4.2: Make `phono fit`'s cross-validation group cases that share a chunk. Refit on all Flash clips, and compare held-out ranking, `phono eval` and `phono calibrate` against v6's weights. Adopt the new weights only if held-out ranking improves, and record the result either way. ([#46](https://github.com/jordanpg/phonocompressor/issues/46))
+- [x] Task 4.1: Define an experiment for the remaining library entries not yet clipped (community and ours, Flash v2.5, 2 seeds). Show the estimate and wait for approval, then synthesize, transcribe and report, with a PLAN.md write-up. ([#45](https://github.com/jordanpg/phonocompressor/issues/45))
+- [x] Task 4.2: Make `phono fit`'s cross-validation group cases that share a chunk. Refit on all Flash clips, and compare held-out ranking, `phono eval` and `phono calibrate` against v6's weights. Adopt the new weights only if held-out ranking improves, and record the result either way. ([#46](https://github.com/jordanpg/phonocompressor/issues/46))
 
 ### Verification
 
-- [ ] The fit's held-out numbers come from chunk-grouped folds, and the adopt-or-reject decision is recorded in PLAN.md.
+- [x] The fit's held-out numbers come from chunk-grouped folds, and the adopt-or-reject decision is recorded in PLAN.md.
 
 ## Phase 5: Switch the reference set
 
