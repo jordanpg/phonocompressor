@@ -27,7 +27,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [ ] [Use the full community sample library](./tracks/community-library_20261126/index.md) (`community-library_20261126`, [#39](https://github.com/jordanpg/phonocompressor/issues/39)): fetch the full community library (298 entries) locally, baseline it offline, probe low-scoring scripts live, run the rest and refit. 3/8 tasks.
+- [ ] [Use the full community sample library](./tracks/community-library_20261126/index.md) (`community-library_20261126`, [#39](https://github.com/jordanpg/phonocompressor/issues/39)): fetch the full community library (298 entries) locally, baseline it offline, probe low-scoring scripts live, run the rest and refit. 4/8 tasks.
 
 ## Archived Tracks
 

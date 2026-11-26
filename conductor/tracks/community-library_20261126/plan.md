@@ -45,8 +45,8 @@ Get the library onto disk in a shape `phono eval` and the harness already read, 
 
 ### Tasks
 
-- [~] Task 3.1: Define the next experiment: community entries in Katakana, Cherokee, Ethiopic, Canadian syllabics, Hangul Jamo, Hiragana, Armenian and Devanagari, plus our top answer for each phrase, on Flash v2.5, seeds 1 and 2, same voice as exp1. Show the dry-run estimate and wait for approval. ([#43](https://github.com/jordanpg/phonocompressor/issues/43))
-- [ ] Task 3.2: Synthesize, transcribe and report it, then add a PLAN.md write-up (setup, credits, results, decision). For each script, record whether the reader or the entries were wrong, and open an issue per confirmed reader blind spot. ([#44](https://github.com/jordanpg/phonocompressor/issues/44))
+- [x] Task 3.1: Define the next experiment: community entries in Katakana, Cherokee, Ethiopic, Canadian syllabics, Hangul Jamo, Hiragana, Armenian and Devanagari, plus our top answer for each phrase, on Flash v2.5, seeds 1 and 2, same voice as exp1. Show the dry-run estimate and wait for approval. ([#43](https://github.com/jordanpg/phonocompressor/issues/43))
+- [~] Task 3.2: Synthesize, transcribe and report it, then add a PLAN.md write-up (setup, credits, results, decision). For each script, record whether the reader or the entries were wrong, and open an issue per confirmed reader blind spot. ([#44](https://github.com/jordanpg/phonocompressor/issues/44))
 
 ### Verification
 
