@@ -2,7 +2,7 @@
 // package (target/wasm-pkg) at /pkg/ and data/generated/phono.bin at /phono.bin, with `.wasm`
 // as application/wasm. No caching, so every load fetches again. Local use only.
 //
-// Usage: mise run wasm:serve [--port 8000] [--host 127.0.0.1]
+// Usage: mise run //crates/wasm:serve [--port 8000] [--host 127.0.0.1]
 
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
@@ -34,10 +34,10 @@ const { values: flags } = parseArgs({
 
 for (const [path, fix] of [
   [DATA, "run `mise run data`"],
-  [resolve(PKG, "phono_wasm.js"), "run `mise run wasm:build`"],
+  [resolve(PKG, "phono_wasm.js"), "run `mise run //crates/wasm:build`"],
 ]) {
   if (!existsSync(path)) {
-    console.error(`wasm:serve: ${path} not found; ${fix}`);
+    console.error(`serve: ${path} not found; ${fix}`);
     process.exit(2);
   }
 }
@@ -77,9 +77,9 @@ const server = createServer((req, res) => {
 });
 
 server.on("error", (e) => {
-  console.error(`wasm:serve: ${e.message} (try --port <other>)`);
+  console.error(`serve: ${e.message} (try --port <other>)`);
   process.exit(1);
 });
 server.listen(Number(flags.port), flags.host, () => {
-  console.log(`wasm:serve: http://${flags.host}:${flags.port}/ (Ctrl-C to stop)`);
+  console.log(`serve: http://${flags.host}:${flags.port}/ (Ctrl-C to stop)`);
 });

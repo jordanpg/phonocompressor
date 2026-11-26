@@ -76,7 +76,7 @@ enum Command {
         json: bool,
     },
     /// Compare predicted fidelity with what the TTS actually produced (phones recognized in
-    /// harness clips, from `mise run harness:export`).
+    /// harness clips, from `mise run //tools:export`).
     Calibrate {
         #[arg(default_value = "data/generated/clips.tsv")]
         clips: PathBuf,
@@ -139,7 +139,7 @@ enum Command {
 }
 
 /// One `phono compress --json` result. The wasm binding returns the same fields except
-/// `codepoints`, and `wasm:parity` compares the two.
+/// `codepoints`, and `//crates/wasm:parity` compares the two.
 #[derive(Serialize)]
 struct Guess<'a> {
     text: &'a str,
@@ -488,7 +488,7 @@ fn load_clips(
     profile: &phono_core::model::ModelProfile,
 ) -> Result<Vec<Clip>, String> {
     let text = std::fs::read_to_string(path)
-        .map_err(|e| format!("{}: {e} (run `mise run harness:export`)", path.display()))?;
+        .map_err(|e| format!("{}: {e} (run `mise run //tools:export`)", path.display()))?;
     let mut out = Vec::new();
     let mut other = 0;
     for line in text.lines().skip(1) {

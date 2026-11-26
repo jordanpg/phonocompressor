@@ -8,7 +8,7 @@ Python here is only the `tools/` harness (`phono-harness`: ElevenLabs synthesis,
 
 - **Config is the source of truth:** `[tool.ruff]` in `tools/pyproject.toml`: `line-length = 100` (not 88), `target-version = "py313"`, lint rules `E, F, I, UP, B` with `E501` ignored. Ignore the sample ruff config later in this guide.
 - **Format and lint:** `mise run fmt` (ruff format + import sort) and `mise run lint` (ruff check). CI-style check: `mise run fmt:check`.
-- **Environments:** uv only, run through mise tasks (`dir = tools`, `uv run phono-harness …`). Not pip, poetry or pipenv; no `requirements.txt`. The venv is at `~/.cache/phonocompressor/tools-venv`.
+- **Environments:** uv only, run through the mise tasks in `tools/mise.toml` (`mise run //tools:<task>`, which share a `uv run phono-harness` task template). Not pip, poetry or pipenv; no `requirements.txt`. The venv is at `~/.cache/phonocompressor/tools-venv`.
 - **Python 3.13:** use modern syntax (`list[str]`, `X | None`, `match` where it helps). Ruff's `UP` rules enforce most of it.
 - **Type hints** are expected on public functions. No type checker is configured yet, so the mypy section below is aspirational.
 - **Tests:** there are no Python tests yet. If you add them, use pytest under `tools/tests/`, and never call the ElevenLabs API from a test: use cached clips or fakes.

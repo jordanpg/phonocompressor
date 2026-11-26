@@ -1,0 +1,39 @@
+# Browser binding (phono-wasm). Tasks run in crates/wasm, e.g. `mise run //crates/wasm:build`;
+# cargo still finds the workspace, and build output goes to the workspace's target/.
+
+[tools]
+# Rust and its wasm32 target come from the root mise.toml. The wasm-bindgen CLI must equal the
+# `wasm-bindgen` crate version pinned in Cargo.toml; the first crates/wasm task installs it, or
+# `mise install --monorepo` does.
+"github:wasm-bindgen/wasm-bindgen" = "0.2.130"
+"github:EmbarkStudios/cargo-about" = "0.9.3"  # third-party notices for the web bundle
+
+[tasks.check]
+description = "Check that phono-core and phono-wasm build for wasm32-unknown-unknown"
+run = "cargo build -p phono-core -p phono-wasm --target wasm32-unknown-unknown"
+
+[tasks.build]
+description = "Build the browser binding into target/wasm-pkg (.wasm, .js, .d.ts, notices; wasm-bindgen --target web)"
+depends = [":notices"]
+run = [
+  "cargo build -p phono-wasm --release --target wasm32-unknown-unknown",
+  "wasm-bindgen --target web --out-dir ../../target/wasm-pkg ../../target/wasm32-unknown-unknown/release/phono_wasm.wasm",
+]
+
+# The license gate for the bundle: fails on a crate license not accepted in about.toml.
+[tasks.notices]
+description = "Write target/wasm-pkg/third-party-notices.html: licenses of the .wasm's crates (cargo-about) and phono.bin's data; --out"
+run = "node notices.mjs"
+
+[tasks.parity]
+description = "Check the wasm binding gives the same guesses as `phono compress --json` (Node; needs phono.bin)"
+depends = [":build"]
+run = [
+  "cargo build --release -q -p phono-cli",
+  "node parity/parity.mjs",
+]
+
+[tasks.serve]
+description = "Serve the wasm test page (crates/wasm/www) at http://127.0.0.1:8000/; --port, --host"
+depends = [":build"]
+run = "node serve.mjs"

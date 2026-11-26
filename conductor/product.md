@@ -27,7 +27,7 @@ Live-chat TTS messages (e.g. Twitch) have a tiny character budget, and no tool f
 
 - **Who:** The maintainer, running the CLI and the Python harness.
 - **Goal:** Calibrate the engine against real ElevenLabs output and improve it, one measured change at a time.
-- **How they use it:** `phono compress/score/read/eval/calibrate/fit`, plus `harness:synth/transcribe/report` within the ElevenLabs free tier.
+- **How they use it:** `phono compress/score/read/eval/calibrate/fit`, plus `//tools:synth/transcribe/report` within the ElevenLabs free tier.
 
 ## Goals
 

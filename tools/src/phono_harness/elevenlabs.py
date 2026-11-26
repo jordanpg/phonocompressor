@@ -56,7 +56,7 @@ class Client:
         if not key:
             raise SystemExit(
                 "ELEVENLABS_API_KEY is not set. Run this through its mise task "
-                "(e.g. `mise run harness:credits`), which injects it from fnox."
+                "(e.g. `mise run //tools:credits`), which injects it from fnox."
             )
         self._http = httpx.Client(base_url=API_BASE, headers={"xi-api-key": key}, timeout=90)
 

@@ -228,12 +228,12 @@ sample/          community sample messages (test set)
 Status: harness built (`tools/`). Usage:
 
 ```sh
-mise run harness:credits              # credit usage this period (free API call)
-mise run harness:models               # TTS models + cost multipliers (free API call)
-mise run harness:synth exp0           # dry run: count uncached clips, estimate cost
-mise run harness:synth exp0 --spend   # synthesize (refuses if over the experiment's max_credits)
-mise run harness:transcribe exp0      # local Whisper + wav2vec2 on the GPU, no credits
-mise run harness:report exp0          # → tools/results/exp0.md
+mise run //tools:credits              # credit usage this period (free API call)
+mise run //tools:models               # TTS models + cost multipliers (free API call)
+mise run //tools:synth exp0           # dry run: count uncached clips, estimate cost
+mise run //tools:synth exp0 --spend   # synthesize (refuses if over the experiment's max_credits)
+mise run //tools:transcribe exp0      # local Whisper + wav2vec2 on the GPU, no credits
+mise run //tools:report exp0          # → tools/results/exp0.md
 ```
 
 Experiments live in `tools/experiments/*.toml`. Clips and transcripts are
@@ -338,7 +338,7 @@ finds its blind spots:
   to Yi, Hangul and Latin, which proved reliable.
 
 **Calibration after exp2 (offline, no credits).**
-`mise run harness:export` then `mise run phono calibrate` compares, for each of
+`mise run //tools:export` then `mise run phono calibrate` compares, for each of
 the 136 exp1+exp2 clips:
 
 - **Predicted:** our fidelity for the text.
@@ -456,7 +456,7 @@ unchanged ones reused exp3's cached clips.
     letter-to-sound.
 
 Clips: `data/generated/clips-exp4.tsv` and `clips-all4.tsv` (exp1–exp4;
-`harness:export` still writes only exp1+exp2).
+`//tools:export` still writes only exp1+exp2).
 
 **v4: real spellings and script choice (2026-11-24; exp5 below).**
 
@@ -1028,16 +1028,16 @@ The `.wasm` stays small (150 KB gzipped, against 7.5 MB for the data), the brows
 two separately so a code change doesn't download the data again, and the raw bytes can be
 freed once decoded.
 
-Checks: `mise run wasm:parity` runs the parity cases (`crates/wasm/parity/cases.json`, public
+Checks: `mise run //crates/wasm:parity` runs the parity cases (`crates/wasm/parity/cases.json`, public
 phrases only) through the CLI and through the wasm build under Node. Text, Latin and phones
 must match in the same order, and scores within 1e-4; the largest difference seen is 2.9e-8.
-`mise run wasm:serve` serves the test page (`crates/wasm/www`), which runs the engine in a
+`mise run //crates/wasm:serve` serves the test page (`crates/wasm/www`), which runs the engine in a
 module Web Worker.
 
 #### Browser measurements (2026-11-25)
 
 The `crates/wasm` binding on the four parity phrases at the defaults (6 codepoints, top 10),
-timed by the test page's `?bench` mode (`mise run wasm:serve`, then open `/?bench`): three
+timed by the test page's `?bench` mode (`mise run //crates/wasm:serve`, then open `/?bench`): three
 runs per phrase, in a Web Worker. Headless Chrome 158 and Firefox 156 on Windows, with the page
 served from WSL2 on the same machine (Intel i5-12600K). Two passes per browser; the tables give
 the range. Native is `phono compress` (release build), search time only, a fresh process per run.
@@ -1104,7 +1104,7 @@ published tables under the GPL, which blocks a permissive repo license
 **Status (2026-11-25): steps 1–4 and 6 done on branch `worktree-deunicode`; step 5 only as
 attribution (`THIRD_PARTY.md`), the table itself is not published yet.**
 
-Step 1 table diff (BMP; `phono-build --dump-translit` vs `mise run dev:translit-unidecode`):
+Step 1 table diff (BMP; `phono-build --dump-translit` vs `mise run //tools:translit-unidecode`):
 - 40,557 codepoints in unidecode, 54,893 in deunicode. 40,172 are identical (99.1%); 383
   differ; unidecode has 2 that deunicode lacks (U+007F, U+30FC); deunicode adds 14,338
   (7,153 CJK, 954 Arabic, Vai, Tai, Kangxi, …), almost all in scripts the Flash profile
