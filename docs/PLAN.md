@@ -1342,19 +1342,25 @@ top answer for each phrase. Flash v2.5, seeds 1 and 2, exp1's voice. 212
 clips, 24 of them cached. There were also two ҂ checks (#49). Truth is as in
 `calibrate`: the mean of heard-phone and Whisper fidelity. Numbers come from
 `phono calibrate data/generated/clips-exp15.tsv --dump`, grouped by the
-scripts of each phrase's community text. "Gap" is predicted − truth; on exp1
-(the 34 community messages) it is +0.02.
+scripts of each phrase's community text. For the community rows,
+`phono calibrate --by-script` on the community clips gives the same numbers.
+"Gap" is predicted − truth. The risk penalty is what the predictor
+subtracts (`risk_scale` 1.3 × the per-codepoint risk). "Gap without risk"
+adds it back. The reference is the scripts the risk barely touches: on exp1
+(the 34 community messages) Latin, Hangul and Yi clips have gap +0.03 to
++0.04, and +0.04 to +0.05 without risk. In exp15 the same scripts in these
+52 entries are at +0.05 to +0.06 without risk.
 
-| script | n | community: predicted | + risk | truth | gap | gap without risk | ours: predicted | truth | ours > community |
+| script | n | community: predicted | risk penalty | truth | gap | gap without risk | ours: predicted | truth | ours > community |
 |---|---|---|---|---|---|---|---|---|---|
-| ucas | 22 | 0.692 | 0.787 | 0.776 | −0.08 | +0.01 | 0.920 | 0.807 | 11 |
-| ethiopic | 10 | 0.703 | 0.788 | 0.725 | −0.02 | +0.06 | 0.925 | 0.666 | 3 |
-| hangul-jamo | 10 | 0.723 | 0.769 | 0.683 | +0.04 | +0.09 | 0.906 | 0.762 | 9 |
-| katakana | 7 | 0.599 | 0.695 | 0.706 | −0.11 | −0.01 | 0.920 | 0.780 | 4 |
-| hiragana | 7 | 0.753 | 0.857 | 0.829 | −0.08 | +0.03 | 0.907 | 0.808 | 3 |
-| cherokee | 6 | 0.746 | 0.801 | 0.750 | −0.00 | +0.05 | 0.954 | 0.778 | 5 |
-| armenian | 2 | 0.753 | 0.808 | 0.859 | −0.11 | −0.05 | 0.964 | 0.814 | 1 |
-| devanagari | 1 | 0.388 | 0.518 | 0.607 | −0.22 | −0.09 | 0.712 | 0.511 | 0 |
+| ucas | 22 | 0.692 | 0.123 | 0.776 | −0.08 | +0.04 | 0.920 | 0.807 | 11 |
+| ethiopic | 10 | 0.703 | 0.111 | 0.725 | −0.02 | +0.09 | 0.925 | 0.666 | 3 |
+| hangul-jamo | 10 | 0.723 | 0.060 | 0.683 | +0.04 | +0.10 | 0.906 | 0.762 | 9 |
+| katakana | 7 | 0.599 | 0.124 | 0.706 | −0.11 | +0.02 | 0.920 | 0.780 | 4 |
+| hiragana | 7 | 0.753 | 0.136 | 0.829 | −0.08 | +0.06 | 0.907 | 0.808 | 3 |
+| cherokee | 6 | 0.746 | 0.071 | 0.750 | −0.00 | +0.07 | 0.954 | 0.778 | 5 |
+| armenian | 2 | 0.753 | 0.071 | 0.859 | −0.11 | −0.04 | 0.964 | 0.814 | 1 |
+| devanagari | 1 | 0.388 | 0.169 | 0.607 | −0.22 | −0.05 | 0.712 | 0.511 | 0 |
 | **all 52** | 52 | **0.696** | | **0.745** | −0.05 | | **0.921** | **0.771** | **30** |
 
 Harness Whisper similarity is 0.80 / 0.81 per seed. Within-phrase ranking is
@@ -1363,17 +1369,19 @@ Harness Whisper similarity is 0.80 / 0.81 per seed. Within-phrase ranking is
 Whether the reader or the entries were wrong, per script:
 
 - **Katakana, Canadian syllabics, Hiragana: the reader's readings are right,
-  but Flash's script risks are too high.** Without the risk, prediction
-  matches truth as well as on exp1. With it, these entries are under-predicted
-  by 0.08–0.11. The community entries are fine (truth 0.71–0.83).
-  Hiragana's beat ours (0.829 vs 0.808). Filed as #50. A caveat: the
-  community's characters are hand-picked ones that work, and the search
-  would use any chunk in the script.
-- **Cherokee, Ethiopic, conjoining jamo: the entries are weak, and the risk
-  is earned.** Even without the risk the readings over-predict (+0.05 to
-  +0.09), and the entries are heard at 0.68–0.75. Keeping syllabics,
-  Ethiopic and jamo off by default on Flash stands. Our answers beat jamo 9
-  of 10 times and Cherokee 5 of 6.
+  but Flash's script risks are too high.** Without the risk, these entries
+  over-predict by +0.02 to +0.06, at or below the +0.05 reference. With it,
+  they are under-predicted by 0.08–0.11. The community entries are fine
+  (truth 0.71–0.83). Hiragana's beat ours (0.829 vs 0.808). Filed as #50.
+  A caveat: the community's characters are hand-picked ones that work, and
+  the search would use any chunk in the script.
+- **Ethiopic, conjoining jamo: the entries are weak, and the risk is
+  earned.** Even without the risk the readings over-predict by +0.09 and
+  +0.10, about 0.05 above the reference, and the entries are heard at 0.73
+  and 0.68. Keeping syllabics, Ethiopic and jamo off by default on Flash
+  stands. Our answers beat jamo 9 of 10 times.
+- **Cherokee: about right either way.** The gap is −0.00 with risk and +0.07
+  without, and the entries are heard at 0.75. Ours win 5 of 6.
 - **Armenian, Devanagari:** 3 entries in all, too few to say.
 
 Our answers were over-predicted by +0.15 here. Some of that is expected,
@@ -1399,8 +1407,8 @@ on 2 of them, like `҈`'s "hundred thousand". It's worth adding as a chunk for
 "thousand", with a risk for the dropped "one".
 
 So the low offline community scores in these scripts are half right. For
-Katakana, syllabics and Hiragana the risk table is too harsh. For Cherokee,
-Ethiopic and jamo the entries really are weak. The bigger lesson is that our
+Katakana, syllabics and Hiragana the risk table is too harsh. For Ethiopic
+and jamo the entries really are weak, and Cherokee is in between. The bigger lesson is that our
 lead shrinks a lot on hard phrases (0.92 vs 0.70 predicted, 0.77 vs 0.75
 heard). The full run (#45) and the refit (#46) should show whether that holds
 across the library.
