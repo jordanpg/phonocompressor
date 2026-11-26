@@ -1,0 +1,27 @@
+{
+  "id": "community-library_20261126",
+  "title": "Use the full community sample library",
+  "type": "feature",
+  "status": "pending",
+  "created": "2026-11-26T00:00:00Z",
+  "updated": "2026-11-26T00:00:00Z",
+  "issue": 39,
+  "task_issues": {
+    "1.1": 40,
+    "1.2": 41,
+    "2.1": 42,
+    "3.1": 43,
+    "3.2": 44,
+    "4.1": 45,
+    "4.2": 46,
+    "5.1": 47
+  },
+  "phases": {
+    "total": 5,
+    "completed": 0
+  },
+  "tasks": {
+    "total": 8,
+    "completed": 0
+  }
+}
