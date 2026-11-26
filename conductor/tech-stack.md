@@ -95,7 +95,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Kind | Tool | Command |
 |---|---|---|
 | Rust unit tests | `cargo test` (inline `#[cfg(test)] mod tests`) | `cargo test --workspace` |
-| Engine regression | `phono eval` over the 34 sample messages (`sample/`, gitignored) | `mise run phono eval` |
+| Engine regression | `phono eval` over the community library (`sample/library.json`, gitignored), with the hand-picked 34 as a subset | `mise run phono eval` |
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
 | Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run //tools:…` (spends credits) |
 | wasm32 build | `phono-core` and `phono-wasm` build for `wasm32-unknown-unknown` | `mise run //crates/wasm:check` |

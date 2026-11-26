@@ -45,13 +45,15 @@ Live-chat TTS messages (e.g. Twitch) have a tiny character budget, and no tool f
 
 ## Success metrics
 
-All measured on real ElevenLabs clips, transcribed locally, over the 34 reference messages.
+All measured on real ElevenLabs clips (Flash v2.5), transcribed locally, over the community library: 298 entries in `sample/library.json` (`mise run //tools:fetch-library`, gitignored). The 34 hand-picked messages that exp1–exp10 used stay a named subset (`tools/library-keys.tsv`), so older results stay comparable.
 
-| Metric | Latest (exp7, phono v6) | Community reference (exp1) | Target |
-|---|---|---|---|
-| Whisper similarity to the phrase | 0.900 | 0.847 | ≥ community, and rising |
-| Phone fidelity (wav2vec2) | 0.844 | 0.791 | ≥ community, and rising |
-| Credits per experiment | 14 (exp7) to ~152 (exp5) | — | Stay within the 10,000/month free tier |
+| Metric | Latest: all 298 (exp15–exp16, phono v6) | Community, all 298 | Latest: the 34 | Community, the 34 (exp1) | Target |
+|---|---|---|---|---|---|
+| Whisper similarity to the phrase | 0.881 | 0.864 | 0.893 | 0.847 | ≥ community, and rising |
+| Phone fidelity (wav2vec2) | 0.828 | 0.824 | 0.840 | 0.791 | ≥ community, and rising |
+| Credits per experiment | 14 (exp7) to 1971 (exp16) | — | — | — | Stay within the 10,000/month free tier |
+
+Over the whole library the engine is only level with the community. Its lead on the 34 (exp5–exp8) does not carry over: see `docs/PLAN.md`, "exp16 result".
 
 **North star:** a viewer hears the intended phrase on the first try.
 

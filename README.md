@@ -84,12 +84,12 @@ Global flags: `--model <id>` (default `eleven_flash_v2_5`), `--all-scripts` (als
 Evaluation commands:
 
 ```sh
-mise run phono eval                 # score the sample messages and compress their phrases
+mise run phono eval                 # score the community library and compress its phrases
 mise run phono calibrate            # predicted vs. actual fidelity on harness clips
 mise run phono fit                  # fit scorer weights with cross-validation
 ```
 
-`eval` reads `sample/messages.json` (hand-made reference messages, gitignored). `calibrate` and `fit` need clips exported by the harness.
+`eval` reads `sample/library.json`, the community message library (gitignored; `mise run //tools:fetch-library` writes it, with the library URL from fnox). It also summarizes the 34 hand-picked messages that exp1–exp10 used (`tools/library-keys.tsv`). `--subset <keys>` scores only some entries, and `eval sample/messages.json` still reads the old file. `calibrate` and `fit` need clips exported by the harness.
 
 ### WASM binding
 
