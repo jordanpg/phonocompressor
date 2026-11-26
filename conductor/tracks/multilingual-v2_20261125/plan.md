@@ -30,11 +30,11 @@ Find out how Multilingual v2 reads each script and where it departs from the rea
 
 ### Tasks
 
-- [~] Task 1.1: exp11: probe Multilingual v2's scripts and reader rules. Link the main checkout's gitignored harness data into the worktree; confirm the model and its cost with `harness:models`; write `tools/experiments/exp11.toml` with exp0's 20 cases plus cases for hiragana, more katakana, the remaining scripts, numbers (`100.000`, glued digits, `2s`), capitals (`timE`, `checkhimPC`, `tHe`) and symbols, 2 seeds, a `max_credits` cap; dry run (exp0's seed-1 clips cached), approval, spend, transcribe, report; PLAN.md write-up with a draft script table and preference order ([#27](https://github.com/jordanpg/phonocompressor/issues/27))
+- [x] Task 1.1: exp11: probe Multilingual v2's scripts and reader rules. Link the main checkout's gitignored harness data into the worktree; confirm the model and its cost with `harness:models`; write `tools/experiments/exp11.toml` with exp0's 20 cases plus cases for hiragana, more katakana, the remaining scripts, numbers (`100.000`, glued digits, `2s`), capitals (`timE`, `checkhimPC`, `tHe`) and symbols, 2 seeds, a `max_credits` cap; dry run (exp0's seed-1 clips cached), approval, spend, transcribe, report; PLAN.md write-up with a draft script table and preference order ([#27](https://github.com/jordanpg/phonocompressor/issues/27))
 
 ### Verification
 
-- [ ] `tools/results/exp11.md` exists; PLAN.md's write-up records the credits spent and a draft script table covering every `Script`
+- [x] `tools/results/exp11.md` exists; PLAN.md's write-up records the credits spent and a draft script table covering every `Script`
 
 ## Phase 2: Community and replay data (exp12, exp13)
 
@@ -42,7 +42,7 @@ Collect the clips the baseline and the fit need.
 
 ### Tasks
 
-- [ ] Task 2.1: Let an experiment's `cases_from` take a list of files, dropping a text already seen for the same phrase; existing experiment files keep working (ruff clean; dry runs of exp1 and exp7 list the same cases as before) ([#28](https://github.com/jordanpg/phonocompressor/issues/28))
+- [~] Task 2.1: Let an experiment's `cases_from` take a list of files, dropping a text already seen for the same phrase; existing experiment files keep working (ruff clean; dry runs of exp1 and exp7 list the same cases as before) ([#28](https://github.com/jordanpg/phonocompressor/issues/28))
 - [ ] Task 2.2: exp12: the 34 community messages × 2 seeds on Multilingual v2; report; write-up next to exp1 (Whisper similarity, phone fidelity, language ID, silent clips). Stop point: if it isn't reading the messages through transliteration, ask before exp13 ([#29](https://github.com/jordanpg/phonocompressor/issues/29))
 - [ ] Task 2.3: exp13: the v1–v6 engine answers (126, community texts excluded) × 2 seeds on Multilingual v2; report; export one clips file of the model's default-setting clips from exp11–exp13; short PLAN.md entry ([#30](https://github.com/jordanpg/phonocompressor/issues/30))
 

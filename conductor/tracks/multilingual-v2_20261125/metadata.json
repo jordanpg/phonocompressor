@@ -19,14 +19,14 @@
   },
   "phases": {
     "total": 4,
-    "completed": 0
+    "completed": 1
   },
   "tasks": {
     "total": 9,
-    "completed": 0
+    "completed": 1
   },
-  "current_phase": 1,
-  "current_task": "1.1",
+  "current_phase": 2,
+  "current_task": "2.1",
   "commits": [
     "371802c: exp: add exp11 probe",
     "cc94483: exp: write up exp11"
