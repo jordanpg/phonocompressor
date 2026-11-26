@@ -175,6 +175,11 @@ fn make_pairs(answers: &[Answer], kind: TruthKind) -> Vec<Pair> {
     pairs
 }
 
+/// Sort key for experiment names, so that `exp16` comes after `exp9`.
+fn exp_order(name: &str) -> (usize, &str) {
+    (name.len(), name)
+}
+
 fn splitmix(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
     x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -361,7 +366,7 @@ pub fn run(
             *t += v;
         }
         e.1 += 1;
-        if c.exp < e.2 {
+        if exp_order(&c.exp) < exp_order(&e.2) {
             e.2 = c.exp.clone();
         }
     }
@@ -447,7 +452,8 @@ pub fn run(
         })
         .collect();
 
-    let mut best_lambda = (opts.lambdas[0], f32::MAX);
+    // The λ with the best held-out ranking (the search's decision), ties going to lower loss.
+    let mut best_lambda = (opts.lambdas[0], 0.0, f32::MAX);
     if opts.group == Grouping::Chunk {
         println!(
             "chunk groups: {} phrases in {} groups; {shared} groups join 2+ phrases, the largest {largest}",
@@ -498,17 +504,19 @@ pub fn run(
             "  λ {lambda:<6} held-out ranking {:.1}% [{spread}], loss {test_loss:.4}  ({evals} evaluations)",
             100.0 * right as f32 / total.max(1) as f32
         );
-        if test_loss < best_lambda.1 {
-            best_lambda = (lambda, test_loss);
+        let held_out = right as f32 / total.max(1) as f32;
+        if (held_out, -test_loss) > (best_lambda.1, -best_lambda.2) {
+            best_lambda = (lambda, held_out, test_loss);
         }
     }
     let lambda = best_lambda.0;
 
     let last_exp = answers
         .iter()
-        .map(|a| a.first_exp.clone())
-        .max()
-        .unwrap_or_default();
+        .map(|a| a.first_exp.as_str())
+        .max_by_key(|e| exp_order(e))
+        .unwrap_or_default()
+        .to_string();
     let is_new = |i: usize| answers[i].first_exp == last_exp;
     let train: Vec<&Pair> = pairs
         .iter()
@@ -581,6 +589,12 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn experiments_order_by_number() {
+        assert!(exp_order("exp9") < exp_order("exp16"));
+        assert!(exp_order("exp15") < exp_order("exp16"));
+    }
 
     #[test]
     fn chunk_keys_skip_latin_and_spaces() {
