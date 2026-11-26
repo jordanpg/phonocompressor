@@ -64,6 +64,7 @@ Only permissively licensed code and data ships (in the WASM bundle, on GitHub Pa
 
 - **Do:** Build the transliteration table from `deunicode` (BSD-3) plus overrides written from observed TTS behaviour. Attribute data sources in `THIRD_PARTY.md`.
 - **Do:** Check a new dependency's or dataset's license before adding it.
+- **Do:** Ship `third-party-notices.html` (`mise run //crates/wasm:notices`) with every deploy, and link it from the site. Add new data sources and bundled npm packages to it.
 - **Don't:** Let GPL-licensed `unidecode` (or anything derived from its table) feed shipped data. It stays a dev-only comparison in `tools/`.
 - **Don't:** Copy entries from `unidecode`'s table into overrides.
 

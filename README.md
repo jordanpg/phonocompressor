@@ -53,7 +53,7 @@ Against a set of hand-made reference messages (34 samples, Whisper transcripts o
 
 ## Getting started
 
-Requirements: [mise](https://mise.jdx.dev/) (it installs Rust with the wasm32 target, uv, fnox, Node and the wasm-bindgen CLI), and a clone with submodules.
+Requirements: [mise](https://mise.jdx.dev/) (it installs Rust with the wasm32 target, uv, fnox, Node, the wasm-bindgen CLI and cargo-about), and a clone with submodules.
 
 ```sh
 git clone --recurse-submodules https://github.com/jordanpg/phonocompressor.git
@@ -102,7 +102,8 @@ engine.compress("bad dream", { maxCodepoints: 6, topN: 10 });
 Options: `model` (default `eleven_flash_v2_5`), `maxCodepoints` (1–30, default 6), `topN` (1–50, default 10) and `allowedScripts` (names such as `latin`, `hangul`, `yi`; default: the model's default scripts). Invalid input throws an `Error` that says what to change. The TypeScript types are generated into `phono_wasm.d.ts`.
 
 ```sh
-mise run //crates/wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts (wasm-bindgen --target web)
+mise run //crates/wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts, third-party notices
+mise run //crates/wasm:notices   # just the notices: third-party-notices.html (cargo-about); --out <file>
 mise run //crates/wasm:check     # phono-core and phono-wasm build for wasm32
 mise run //crates/wasm:parity    # same guesses as `phono compress --json` on crates/wasm/parity/cases.json (Node)
 mise run //crates/wasm:serve     # test page at http://127.0.0.1:8000/; open /?bench to time it
@@ -142,4 +143,4 @@ The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.de
 | [`deunicode`](https://crates.io/crates/deunicode) | transliteration table, built by `phono-build` | BSD-3-Clause |
 | Python `unidecode` | dev comparison only (`mise run //tools:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
-Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The code is licensed MIT OR Apache-2.0.
+Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed MIT OR Apache-2.0.

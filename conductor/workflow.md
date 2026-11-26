@@ -158,7 +158,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
 | wasm32 | `phono-core` and `phono-wasm` still build for wasm | `mise run //crates/wasm:check` |
 | WASM parity | The binding still gives the CLI's guesses, if the core, `compress --json` or `crates/wasm` changed | `mise run //crates/wasm:parity` |
-| Licensing | No GPL code or data in anything shipped | Manual check of new deps and data |
+| Licensing | No GPL code or data in anything shipped. Crates in the `.wasm` only under a license accepted in `crates/wasm/about.toml` | `mise run //crates/wasm:notices` for the `.wasm`'s crates; a manual check for other deps and data |
 
 The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in the root `mise.toml`). The wasm-bindgen CLI is pinned in `crates/wasm/mise.toml`; the first `//crates/wasm:*` task installs it, or `mise install --monorepo` does.
 
@@ -188,7 +188,7 @@ mise run phono eval
 mise run //crates/wasm:check && mise run //crates/wasm:parity
 
 # Browser binding
-mise run //crates/wasm:build                 # target/wasm-pkg (.wasm, JS glue, .d.ts)
+mise run //crates/wasm:build                 # target/wasm-pkg (.wasm, JS glue, .d.ts, notices)
 mise run //crates/wasm:serve                 # test page at http://127.0.0.1:8000/ (/?bench times it)
 
 # Harness (free)

@@ -24,7 +24,7 @@ Cargo workspace, `resolver = "3"`, version 0.1.0, license `MIT OR Apache-2.0`.
 | `crates/core` (`phono-core`) | — | Phone features, G2P, reader, scorer, search. No I/O; builds for `wasm32`. | `serde` 1 (derive), `postcard` 1 (alloc) |
 | `crates/builder` (`phono-builder`) | `phono-build` | Builds `data/generated/phono.bin` from Phoible, CMUdict, the G2P model and the transliteration table | `phono-core`, `clap` 4, `deunicode` 1.6 |
 | `crates/cli` (`phono-cli`) | `phono` | `compress` (`--json`), `score`, `read`, `phones`, `spell`, `eval`, `calibrate`, `fit` | `phono-core`, `clap` 4, `serde_json` 1 |
-| `crates/wasm` (`phono-wasm`) | — | Browser binding: `Engine` from the data file's bytes and a typed `compress()`; option checks. Also a test page (`www/`), its dev server (`serve.mjs`) and the CLI parity check (`parity/`) | `phono-core`, `wasm-bindgen` =0.2.130, `tsify` 0.5 (`js`), `serde-wasm-bindgen` 0.6, `js-sys` 0.3 |
+| `crates/wasm` (`phono-wasm`) | — | Browser binding: `Engine` from the data file's bytes and a typed `compress()`; option checks. Also a test page (`www/`), its dev server (`serve.mjs`), the CLI parity check (`parity/`) and the third-party notices generator (`notices.mjs`, `about.toml`) | `phono-core`, `wasm-bindgen` =0.2.130, `tsify` 0.5 (`js`), `serde-wasm-bindgen` 0.6, `js-sys` 0.3 |
 
 Build profiles: dependencies build at `opt-level = 2` and the workspace at `opt-level = 1` in dev builds, so the builder's G2P training stays usable without `--release`.
 
@@ -69,7 +69,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 ## Infrastructure
 
-- **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file). No server.
+- **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file) and its `third-party-notices.html` (`mise run //crates/wasm:notices`; see `THIRD_PARTY.md`). No server.
 - **Code distribution:** GitHub (`jordanpg/phonocompressor`), with submodules.
 - **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`//tools:credits`, `//tools:models`, `//tools:voices`, `//tools:synth`). `fnox.toml` is gitignored.
 - **CI:** none yet. `mise run fmt:check` and `mise run lint` are written to be CI-ready.
@@ -79,9 +79,10 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 | Tool | Purpose | Config |
 |---|---|---|
-| mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node and the wasm-bindgen CLI (`mise install --monorepo`); runs all tasks | `mise.toml` (root), `tools/mise.toml`, `crates/wasm/mise.toml` |
+| mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node, the wasm-bindgen CLI and cargo-about (`mise install --monorepo`); runs all tasks | `mise.toml` (root), `tools/mise.toml`, `crates/wasm/mise.toml` |
 | wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `crates/wasm/mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
-| Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`) and the test page server (`//crates/wasm:serve`); later `web/` | `mise.toml` (root) |
+| cargo-about 0.9.3 | Finds the license texts of the crates in the `.wasm` for the third-party notices, and fails on a license `about.toml` doesn't accept | `crates/wasm/mise.toml` (`github:EmbarkStudios/cargo-about`), `crates/wasm/about.toml` |
+| Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`), the test page server (`//crates/wasm:serve`) and the notices generator (`//crates/wasm:notices`); later `web/` | `mise.toml` (root) |
 | cargo | Rust build and tests | `Cargo.toml` |
 | uv | Python env and runs | `tools/pyproject.toml`, `tools/uv.lock` |
 | fnox | Secret injection | `fnox.toml` (gitignored) |
