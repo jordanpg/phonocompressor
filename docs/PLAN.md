@@ -1255,6 +1255,83 @@ quality against Flash's answers, but on these 34 phrases it doesn't gain
 any either. The model reads everything about 0.07 worse than Flash, whoever
 wrote the text.
 
+**Offline baseline on the full community library (2026-11-26, no credits;
+`community-library_20261126`, #42).** `mise run //tools:fetch-library` puts
+the whole library (298 entries) in gitignored `sample/library.json`; the 34
+hand-picked messages keep their keys, the rest are keyed `u` + 8 hex digits
+of their UUID. Phrases stay out of this file, so cases are cited by key.
+Each entry is scored against its cleaned `target` (6 of 298 differ from the
+label: 3 by rule, 3 by hand override). Commands:
+`phono [--model …] eval sample/library.json --by-script`, plus
+`--subset tools/library-keys.tsv` for the 34. Predicted fidelity, top-1:
+
+| Set | n | Flash: community | Flash: ours | ours ≥ | Multilingual v2: community | ours | ours ≥ |
+|---|---|---|---|---|---|---|---|
+| All | 298 | 0.858 | 0.954 | 284 | 0.849 | 0.944 | 282 |
+| The 34 | 34 | 0.843 | 0.961 | 33 | 0.829 | 0.952 | 33 |
+| The rest | 264 | 0.859 | 0.954 | 251 | 0.852 | 0.943 | 249 |
+
+The earlier check (0.855 / 0.952) scored the raw `spoken` labels. Cleaned
+targets account for the +0.003 / +0.002. The 34 score slightly below the
+rest for the community and slightly above for us, so the full set doesn't
+make the job harder on average. What it adds is breadth.
+
+By script, where each entry counts once under every script in its community
+text (spaces and ASCII punctuation don't count). "Ours" is our answer for the
+same phrases, written in whatever scripts the search picked:
+
+| Script | n | Flash: community | ours | MLv2: community | ours |
+|---|---|---|---|---|---|
+| yi | 220 | 0.879 | 0.953 | 0.869 | 0.943 |
+| hangul | 186 | 0.852 | 0.947 | 0.840 | 0.932 |
+| latin | 169 | 0.871 | 0.962 | 0.870 | 0.956 |
+| cyrillic-number | 25 | 0.951 | 0.982 | 0.834 | 0.865 |
+| ucas | 22 | 0.692 | 0.920 | 0.685 | 0.921 |
+| cjk-unified | 18 | 0.757 | 0.948 | 0.738 | 0.941 |
+| hangul-compat-jamo | 17 | 0.880 | 0.938 | 0.876 | 0.934 |
+| cjk-compat | 16 | 0.930 | 0.963 | 0.889 | 0.913 |
+| ethiopic | 10 | 0.703 | 0.925 | 0.786 | 0.919 |
+| hangul-jamo | 10 | 0.723 | 0.906 | 0.749 | 0.906 |
+| hiragana | 7 | 0.753 | 0.907 | 0.647 | 0.907 |
+| katakana | 7 | 0.599 | 0.920 | 0.531 | 0.920 |
+| cherokee | 6 | 0.746 | 0.954 | 0.746 | 0.935 |
+| armenian | 2 | 0.753 | 0.964 | 0.697 | 0.908 |
+| other | 2 | 0.839 | 0.935 | 0.782 | 0.879 |
+| runic | 1 | 0.936 | 0.977 | 0.936 | 0.977 |
+| devanagari | 1 | 0.388 | 0.712 | 0.328 | 0.712 |
+| cyrillic | 1 | 0.853 | 0.672 | 0.853 | 0.695 |
+
+- **Lowest community entries.** On Flash these are `ua626e6e4` (0.13,
+  Ethiopic), `247` (0.26, Katakana), `81` (0.35, Yi + syllabics),
+  `u0e0888f4` (0.39, Hangul + Katakana + Devanagari), `u6f19f605` (0.43),
+  `ueb344e87`, `u9f99a25a`, `u091361af`, `10` and `u14b6de9d` (0.51–0.53).
+  On Multilingual v2 `247` drops to 0.05 and `ua626e6e4` rises to 0.52,
+  because that profile scores Katakana as read natively and Ethiopic by
+  transliteration.
+- **The low scripts are where the reader is least tested.** Katakana,
+  syllabics, Ethiopic, conjoining jamo, CJK unified, Hiragana and Cherokee
+  all average 0.60–0.76 for the community, against 0.85–0.88 for Yi and
+  Hangul. Our answers for those phrases score 0.91–0.95, partly because
+  Flash's profile leaves Ethiopic, syllabics, conjoining jamo and Runic off
+  by default, so the search writes them in other scripts. Only clips can say whether the community entries are
+  bad or the reader misreads these scripts. That is the Phase 3 probe.
+- **Script labels differ from the library's.** The earlier check grouped by
+  the library's own character types and found Cherokee at 0.66. Entry `81`'s
+  U+14B0 lies in the syllabics block, but the library labels it Cherokee.
+  Here it counts as `ucas`.
+- **Where ours scores below the community.** That's 14 entries on Flash
+  and 16 on Multilingual v2, nearly all within 0.05. The largest gap is
+  `uf4b4957b` (0.85 vs 0.67). Its community text uses ҂ (U+0482, Cyrillic
+  thousands sign), which transliterates to `*1000*` and reads as "one
+  thousand" in one codepoint. The search never offers it: `cyrillic-number`
+  starts at U+0483, so U+0482 counts as plain Cyrillic. Filed as #49, to
+  check live in the probe.
+- **Multilingual v2** lowers community and ours alike by about 0.01 overall.
+  It costs most where its profile is wary: `҈` (cyrillic-number, community
+  0.951 → 0.834, ours 0.982 → 0.865) and CJK compatibility. Community
+  entries in Ethiopic and conjoining jamo score higher there, because its
+  profile gives those scripts lower risks.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
