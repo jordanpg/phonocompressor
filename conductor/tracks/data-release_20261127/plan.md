@@ -70,7 +70,7 @@ One task produces everything a release contains, so CI and a local check run the
 
 ### Tasks
 
-- [ ] Task 4.1: Write `docs/RELEASES.md` ([#65](https://github.com/jordanpg/phonocompressor/issues/65)):
+- [~] Task 4.1: Write `docs/RELEASES.md` ([#65](https://github.com/jordanpg/phonocompressor/issues/65)):
   - the tag convention for every artifact (`<name>/v<semver>`, Cargo package names where they exist, the dist compatibility reason);
   - the data versioning rule and how to cut a data release;
   - the manifest schema;
