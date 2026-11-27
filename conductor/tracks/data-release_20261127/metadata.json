@@ -25,7 +25,7 @@
     "completed": 5
   },
   "current_phase": 3,
-  "current_task": "3.1",
+  "current_task": "3.2",
   "commits": [
     "56acf96: feat(data): write phono.bin maps in key order (data-release_20261127)",
     "60ced04: feat(builder): add phono-build --format-version (data-release_20261127)",

@@ -58,7 +58,7 @@ One task produces everything a release contains, so CI and a local check run the
 
 - [x] Task 3.1: Add `.github/workflows/release-data.yml`. On a pushed `phono-data/v*` tag: check out the tag with submodules, run `//crates/builder:repro`, then `//crates/builder:release-data` with the tag's version, then `gh release create <tag>` with the four files and notes listing the inputs. A dry run uploads the same files as a workflow artifact instead: on `workflow_dispatch`, and on pull requests that touch the workflow, `crates/builder/` or `notices.mjs` (`workflow_dispatch` only works once the file is on `main`). `permissions: contents: write` only on the publishing job, actions pinned by SHA as in `ci.yml`. ([#63](https://github.com/jordanpg/phonocompressor/issues/63))
   - Deviations: the dry run also runs on pull requests touching `crates/core/`, `Cargo.lock` and the `cmudict`/`phoible` submodules. The Rust cache is skipped for tag builds. A PR's dry run builds the merge commit, so its `source.commit` is that commit, not the branch head.
-- [ ] Task 3.2: Create a tag ruleset with `gh api`: target `tag`, include `refs/tags/phono-data/*`, rules creation, update and deletion, bypass for the repository admin role. Show the user the exact payload and apply it only after they confirm. Record the ruleset id in `docs/RELEASES.md`. ([#64](https://github.com/jordanpg/phonocompressor/issues/64))
+- [~] Task 3.2: Create a tag ruleset with `gh api`: target `tag`, include `refs/tags/phono-data/*`, rules creation, update and deletion, bypass for the repository admin role. Show the user the exact payload and apply it only after they confirm. Record the ruleset id in `docs/RELEASES.md`. ([#64](https://github.com/jordanpg/phonocompressor/issues/64))
 
 ### Verification
 
