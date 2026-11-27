@@ -141,6 +141,11 @@ mise run //tools:export                # clips → data/generated/clips.tsv for 
 
 The API key is `ELEVENLABS_API_KEY`, provided through [fnox](https://fnox.jdx.dev/) and only exposed to the tasks that call the API. Transcription uses PyTorch and is intended to run on a GPU.
 
+## slop
+
+hello this is human. this was larely developed with agentic coding methods, with my oversight and review over each turn. it's largely an experiment for me but I hope this turns out useful. just want to be honest about that up front aga
+
+
 ## Data and licenses
 
 | Source | Used for | License |
