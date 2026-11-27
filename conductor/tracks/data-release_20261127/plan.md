@@ -42,14 +42,15 @@ One task produces everything a release contains, so CI and a local check run the
 
 - [x] Task 2.1: Add `--data-only` to `crates/wasm/notices.mjs`: write only the data notices (Phoible citation and CC BY 4.0, CMUdict and `deunicode` license texts), without running cargo-about. The existing output is unchanged without the flag. ([#61](https://github.com/jordanpg/phonocompressor/issues/61))
   - Deviation: the bundle's page said phonocompressor is "MIT or Apache 2.0" and linked a `LICENSE-MIT` that doesn't exist. Fixed first (`b8c2ee7`), since the data page reuses that paragraph; that paragraph is the only change to the default output.
-- [~] Task 2.2: Add a `//crates/builder:release-data` task (Node script, as `notices.mjs` is) that writes `<out>/phono.bin.gz` (gzip, no name or timestamp), `manifest.json`, `third-party-notices.html` (from 2.1) and `SHA256SUMS`, given a version. The manifest records name, version, format (from `--format-version`), source commit, inputs (`deunicode` version from `cargo metadata`, CMUdict and Phoible submodule commits), and each file's size and SHA-256, plus `unpacked_size` and `unpacked_sha256` for the data file. It fails if the version's major isn't the format, or if the tree is dirty unless `--allow-dirty` is passed. ([#62](https://github.com/jordanpg/phonocompressor/issues/62))
+- [x] Task 2.2: Add a `//crates/builder:release-data` task (Node script, as `notices.mjs` is) that writes `<out>/phono.bin.gz` (gzip, no name or timestamp), `manifest.json`, `third-party-notices.html` (from 2.1) and `SHA256SUMS`, given a version. The manifest records name, version, format (from `--format-version`), source commit, inputs (`deunicode` version from `cargo metadata`, CMUdict and Phoible submodule commits), and each file's size and SHA-256, plus `unpacked_size` and `unpacked_sha256` for the data file. It fails if the version's major isn't the format, or if the tree is dirty unless `--allow-dirty` is passed. ([#62](https://github.com/jordanpg/phonocompressor/issues/62))
+  - Deviations: gzip comes from Node's zlib (level 9, no name, zero mtime: what `gzip -n` writes) rather than the gzip CLI. The manifest also has `schema`, `source.repository`, `source.dirty` and `unpacked_name`.
 
 ### Verification
 
-- [ ] Running the task twice on the same commit gives identical files.
-- [ ] `sha256sum -c SHA256SUMS` passes, and gunzipping `phono.bin.gz` gives the `unpacked_sha256` in the manifest.
-- [ ] A wrong major (e.g. `3.0.0`) is rejected.
-- [ ] The data-only notices page opens and holds the three data notices and no crate list.
+- [x] Running the task twice on the same commit gives identical files.
+- [x] `sha256sum -c SHA256SUMS` passes, and gunzipping `phono.bin.gz` gives the `unpacked_sha256` in the manifest.
+- [x] A wrong major (e.g. `3.0.0`) is rejected.
+- [x] The data-only notices page opens and holds the three data notices and no crate list.
 
 ## Phase 3: Workflow and tag protection
 
