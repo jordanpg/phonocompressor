@@ -110,5 +110,5 @@ run = [
 # Not `hk install`: that writes into .git/hooks, which every worktree shares, so worktrees on
 # branches without hk.pkl would fail. .githooks/ is relative to each worktree.
 [tasks.hooks]
-description = "Use the git hooks in .githooks/ (hk.pkl): staged-file format/lint on commit, ci:affected on push"
+description = "Use the git hooks in .githooks/: hk.pkl's staged-file format/lint on commit and ci:affected on push, plus new-worktree setup on checkout"
 run = "git config core.hooksPath .githooks"

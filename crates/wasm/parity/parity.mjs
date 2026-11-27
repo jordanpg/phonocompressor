@@ -2,7 +2,7 @@
 //
 // For every case in cases.json, runs the release CLI and the `--target web` package (under
 // Node, with initSync) on the same phrase and options, then compares the results: the same
-// text, Latin and phones in the same order, and scores within TOLERANCE (native and wasm
+// text, Latin, phones and close-enough flag in the same order, and scores within TOLERANCE (native and wasm
 // floating point may differ in the last bits). Exits 1 on any difference, 2 if an input is
 // missing.
 //
@@ -75,7 +75,7 @@ function compare(native, wasm) {
   let maxDelta = 0;
   for (let i = 0; i < Math.min(native.length, wasm.length); i++) {
     const [n, w] = [native[i], wasm[i]];
-    for (const key of ["text", "latin", "phones"]) {
+    for (const key of ["text", "latin", "phones", "closeEnough"]) {
       if (n[key] !== w[key]) {
         const [a, b] = [JSON.stringify(n[key]), JSON.stringify(w[key])];
         problems.push(`#${i + 1} ${key}: native ${a}, wasm ${b}`);

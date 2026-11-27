@@ -1514,6 +1514,47 @@ leaves +0.9 points, and the test closest to a new harness run (fit without
 exp16's answers, test on them) shows no gain for any refit. Refit again
 once #50 has set per-script risks.
 
+**Close-enough cut from the harness (#10, 2026-11-26, no credits): 0.90 on Flash v2.5, 0.88
+on Multilingual v2.** The web tool has to say when no result is good enough, so each profile
+now has a cut on predicted fidelity (`ModelProfile::close_enough`). `phono compress` prints
+"No string of N codepoints or fewer scores well…" when no guess reaches it, and `--json` and
+the wasm binding mark each guess with `closeEnough`.
+
+How the cut was set: `phono calibrate` prints a close-enough table. Each distinct answer
+(phrase and text, its clips averaged over seeds and replays) counts as heard well when its
+Whisper similarity is ≥ 0.8 (`--heard-well`). The table gives each cut's share heard well
+above and below it, and the cut with the highest Youden's J (share of the heard-well answers
+above the cut minus share of the rest above it). Clips: exp1–exp16 re-exported from the clip
+cache (`clips-all16.tsv`). That gives 1758 Flash clips, against 1764 in the refit above: six
+exp16 clips didn't come back, because the answers were regenerated and three hand-overridden
+targets weren't available. There are 406 Multilingual v2 clips.
+
+Flash v2.5, 699 answers, 473 heard well (68%):
+
+| cut | above | heard well | below | heard well | J |
+|---|---|---|---|---|---|
+| 0.86 | 475 | 83% | 224 | 35% | 0.48 |
+| 0.88 | 444 | 86% | 255 | 36% | 0.53 |
+| **0.90** | **416** | **88%** | **283** | **38%** | **0.55** |
+| 0.92 | 388 | 88% | 311 | 43% | 0.51 |
+| 0.94 | 343 | 90% | 356 | 46% | 0.50 |
+| 0.96 | 293 | 91% | 406 | 50% | 0.46 |
+
+- **It holds up.** 0.90 is also the best cut at heard-well level 0.7. It is the best cut on
+  exp15–exp16 alone too (588 answers, 88% above and 46% below, J 0.49), and no weights were
+  fitted on those clips. A strict level of 0.9 moves it to 0.96.
+- **It is sharper for the search's own answers.** On just our answers (exp2–exp8 and the
+  exp15–exp16 replays, from `--dump`), the cut leaves 89% of 390 answers heard well above
+  it and 21% of 137 below.
+- **Multilingual v2**, 173 answers, 71 heard well (41%): the best cut is 0.88 at heard-well
+  levels 0.7, 0.8 and 0.9. At 0.8, 72% of 79 answers are heard well above it and 15% of 94
+  below (J 0.59). The sample is a quarter of Flash's.
+
+What the cut means, plainly: above it, about 9 in 10 guesses were heard as the phrase. Below
+it, fewer than half were. It is not a guarantee either way, since the TTS varies between runs
+and the predictor over-predicts our answers by about 0.10 (exp16). Re-run the table after a
+refit or a new harness run, and move the cut if the best split moves.
+
 **Per-script risks on exp1–exp16 (#50, 2026-11-26): Katakana and Hiragana
 0.03 → 0, Canadian syllabics 0.05 → 0.01; weights and `risk_scale` stay.**
 New tools:
@@ -1587,6 +1628,8 @@ Effect on `phono eval`:
 - **Offline fidelity:** community 0.857 → 0.862, ours 0.954 → 0.955.
 - **Multilingual v2:** unchanged. It already sets its own kana and
   syllabics risks.
+- **Close-enough cut (#10):** re-run with these risks on exp1–exp18
+  (738 answers), the best split is still 0.90 (J 0.53).
 
 **exp17 result (real TTS, 2026-11-26, ≤ 36 credits): the 6 changed answers
 are heard better, 0.856 → 0.878.** Setup: the new answers for the 6 entries
@@ -1881,5 +1924,8 @@ To do:
   Library voices, so the harness uses premade Adam.
 - Whether a space between pseudo-words is worth its codepoint
   (`ꆌ rizz` suggests yes for word boundaries).
-- How far to trust the "close enough" behaviour the samples show. The
-  harness scores should set the threshold, not intuition.
+- ~~How far to trust the "close enough" behaviour the samples show. The
+  harness scores should set the threshold, not intuition.~~ Set from the
+  clips (#10): 0.90 on Flash v2.5 and 0.88 on Multilingual v2, re-checked
+  by `phono calibrate`'s close-enough table (see "Close-enough cut from the
+  harness").

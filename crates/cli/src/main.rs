@@ -113,6 +113,10 @@ enum Command {
         /// the script-risk penalty it paid and the over-prediction with and without it.
         #[arg(long)]
         by_script: bool,
+        /// Whisper text similarity from which an answer counts as heard well, for the
+        /// close-enough table (each answer is the mean over its clips).
+        #[arg(long, default_value_t = 0.8)]
+        heard_well: f32,
         /// Also estimate each script's risk from these clips: least squares of the
         /// over-prediction without risk on codepoints per script, with a baseline per source
         /// (community, ours, probes). Prints current and fitted risks with 90% intervals.
@@ -240,21 +244,25 @@ impl RiskArgs {
 /// One `phono compress --json` result. The wasm binding returns the same fields except
 /// `codepoints`, and `//crates/wasm:parity` compares the two.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Guess<'a> {
     text: &'a str,
     latin: &'a str,
     phones: String,
     score: f32,
+    /// `score` reaches the model profile's close-enough cut.
+    close_enough: bool,
     codepoints: usize,
 }
 
-impl<'a> From<&'a Candidate> for Guess<'a> {
-    fn from(c: &'a Candidate) -> Self {
+impl<'a> Guess<'a> {
+    fn new(c: &'a Candidate, profile: &phono_core::model::ModelProfile) -> Self {
         Guess {
             text: &c.text,
             latin: &c.latin,
             phones: fmt_word_phones(c.words.iter().map(|w| w.phones.as_slice())),
             score: c.fidelity,
+            close_enough: profile.is_close_enough(c.fidelity),
             codepoints: c.codepoints,
         }
     }
@@ -358,7 +366,10 @@ fn main() -> Result<(), String> {
             let results = searcher.search(&phrase, &cfg);
             eprintln!("searched in {:.2}s", t.elapsed().as_secs_f32());
             if json {
-                let guesses: Vec<Guess> = results.iter().map(Guess::from).collect();
+                let guesses: Vec<Guess> = results
+                    .iter()
+                    .map(|c| Guess::new(c, engine.profile))
+                    .collect();
                 let out = serde_json::to_string(&guesses).map_err(|e| e.to_string())?;
                 println!("{out}");
                 return Ok(());
@@ -392,6 +403,9 @@ fn main() -> Result<(), String> {
                     words_str(&c.words)
                 );
             }
+            if let Some(note) = no_good_result(&results, max, engine.profile) {
+                println!("{note}");
+            }
         }
         Command::Calibrate {
             clips,
@@ -405,6 +419,7 @@ fn main() -> Result<(), String> {
             dump,
             hand,
             by_script,
+            heard_well,
             fit_risks,
             risk_fit,
             risks,
@@ -431,23 +446,18 @@ fn main() -> Result<(), String> {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
             risks.apply(&mut engine)?;
-            let fit_risks = if fit_risks {
-                Some(risk_fit.opts()?)
-            } else {
-                None
-            };
-            calibrate(
-                &engine,
-                &clips,
+            let report = Report {
                 worst,
-                &heard,
-                &predict,
-                &CalibrateReports {
-                    dump: dump.as_ref(),
-                    by_script,
-                    fit_risks: fit_risks.as_ref(),
+                dump,
+                by_script,
+                heard_well,
+                fit_risks: if fit_risks {
+                    Some(risk_fit.opts()?)
+                } else {
+                    None
                 },
-            )?
+            };
+            calibrate(&engine, &clips, &heard, &predict, &report)?
         }
         Command::Fit {
             clips,
@@ -512,6 +522,23 @@ fn main() -> Result<(), String> {
         )?,
     }
     Ok(())
+}
+
+/// What to tell the user when no guess reaches the profile's close-enough cut, or `None`.
+fn no_good_result(
+    results: &[Candidate],
+    max: usize,
+    profile: &phono_core::model::ModelProfile,
+) -> Option<String> {
+    if results.iter().any(|c| profile.is_close_enough(c.fidelity)) {
+        return None;
+    }
+    Some(format!(
+        "No string of {max} codepoints or fewer scores well (close enough on {} is {:.2} or \
+         more). Try a higher budget or a shorter phrase.",
+        profile.id(),
+        profile.close_enough
+    ))
 }
 
 /// Reads a reference messages file: `[{"<key>": {"unicode": .., "spoken": .., "target": ..}}, ..]`.
@@ -903,28 +930,154 @@ fn within_phrase_ranking(rows: &[(&Clip, f32)], truth: &[f32]) -> (usize, usize)
     (right, pairs)
 }
 
-/// What `calibrate` reports beyond its summary.
-struct CalibrateReports<'a> {
-    /// Write per-clip rows here.
-    dump: Option<&'a PathBuf>,
+/// Distinct answers (phrase, text) with the mean predicted fidelity and mean Whisper similarity
+/// of their clips. A text replayed in several experiments is one answer.
+fn answer_means(rows: &[(&Clip, f32, f32)]) -> Vec<(f32, f32)> {
+    let mut by_text: std::collections::BTreeMap<(&str, &str), (f32, f32, f32)> = Default::default();
+    for &(clip, pred, whisper) in rows {
+        let e = by_text
+            .entry((clip.target.as_str(), clip.text.as_str()))
+            .or_default();
+        e.0 += pred;
+        e.1 += whisper;
+        e.2 += 1.0;
+    }
+    by_text.values().map(|&(p, w, n)| (p / n, w / n)).collect()
+}
+
+/// How a predicted-fidelity cut splits answers into heard well (Whisper ≥ the `heard_well`
+/// level) and not.
+#[derive(Debug, PartialEq)]
+struct Cut {
+    cut: f32,
+    above: usize,
+    above_well: usize,
+    below: usize,
+    below_well: usize,
+}
+
+impl Cut {
+    fn of(answers: &[(f32, f32)], heard_well: f32, cut: f32) -> Cut {
+        let (mut c, well) = (
+            Cut {
+                cut,
+                above: 0,
+                above_well: 0,
+                below: 0,
+                below_well: 0,
+            },
+            |w: f32| usize::from(w >= heard_well),
+        );
+        for &(pred, whisper) in answers {
+            if pred >= cut {
+                c.above += 1;
+                c.above_well += well(whisper);
+            } else {
+                c.below += 1;
+                c.below_well += well(whisper);
+            }
+        }
+        c
+    }
+
+    /// Share of the heard-well answers above the cut.
+    fn recall(&self) -> f32 {
+        self.above_well as f32 / (self.above_well + self.below_well).max(1) as f32
+    }
+
+    /// Youden's J: share of heard-well answers above the cut minus share of the rest above it.
+    fn youden(&self) -> f32 {
+        let bad_above = self.above - self.above_well;
+        let bad = bad_above + self.below - self.below_well;
+        self.recall() - bad_above as f32 / bad.max(1) as f32
+    }
+}
+
+/// Cuts 0.80, 0.82, … 0.98 and the profile's own, with the one that best separates heard-well
+/// answers (highest Youden's J; the lowest cut on a tie).
+fn close_enough_table(answers: &[(f32, f32)], heard_well: f32, own: f32) -> (Vec<Cut>, f32) {
+    let mut cuts: Vec<f32> = (40..=49).map(|i| i as f32 / 50.0).collect();
+    if !cuts.contains(&own) {
+        cuts.push(own);
+        cuts.sort_by(f32::total_cmp);
+    }
+    let table: Vec<Cut> = cuts
+        .iter()
+        .map(|&c| Cut::of(answers, heard_well, c))
+        .collect();
+    let best = table
+        .iter()
+        .fold(None::<&Cut>, |b, c| match b {
+            Some(b) if b.youden() >= c.youden() => Some(b),
+            _ => Some(c),
+        })
+        .map_or(own, |c| c.cut);
+    (table, best)
+}
+
+fn print_close_enough(
+    answers: &[(f32, f32)],
+    heard_well: f32,
+    profile: &phono_core::model::ModelProfile,
+) {
+    let well = answers.iter().filter(|a| a.1 >= heard_well).count();
+    println!(
+        "\nclose enough: {} answers (phrase and text, clips averaged), {well} heard well (Whisper ≥ {heard_well:.2})",
+        answers.len()
+    );
+    println!(
+        "  {:>5} {:>6} {:>10} {:>6} {:>10} {:>7} {:>6}",
+        "cut", "above", "heard well", "below", "heard well", "recall", "J"
+    );
+    let share = |k: usize, n: usize| {
+        if n == 0 {
+            "—".to_string()
+        } else {
+            format!("{:.0}%", 100.0 * k as f32 / n as f32)
+        }
+    };
+    let (table, best) = close_enough_table(answers, heard_well, profile.close_enough);
+    for c in &table {
+        let mark = if c.cut == profile.close_enough {
+            "  ← profile"
+        } else {
+            ""
+        };
+        println!(
+            "  {:>5.2} {:>6} {:>10} {:>6} {:>10} {:>7.2} {:>6.2}{mark}",
+            c.cut,
+            c.above,
+            share(c.above_well, c.above),
+            c.below,
+            share(c.below_well, c.below),
+            c.recall(),
+            c.youden()
+        );
+    }
+    println!(
+        "best split (Youden's J): {best:.2}; {} profile: {:.2}",
+        profile.id(),
+        profile.close_enough
+    );
+}
+
+/// What `phono calibrate` prints and writes besides its summary.
+struct Report {
+    worst: usize,
+    dump: Option<PathBuf>,
     by_script: bool,
+    heard_well: f32,
     /// Fit script risks with these options.
-    fit_risks: Option<&'a risks::Opts>,
+    fit_risks: Option<risks::Opts>,
 }
 
 fn calibrate(
     engine: &Engine,
     path: &PathBuf,
-    worst: usize,
     heard: &phono_core::score::Heard,
     predict: &phono_core::Predict,
-    reports: &CalibrateReports,
+    report: &Report,
 ) -> Result<(), String> {
-    let CalibrateReports {
-        dump,
-        by_script,
-        fit_risks,
-    } = *reports;
     let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
     let scorer =
@@ -949,7 +1102,7 @@ fn calibrate(
     let (pred, act, wh) = (col(|r| r.predicted), col(|r| r.actual), col(|r| r.whisper));
     // Ground truth: mean of the phone-level and Whisper-text measures (independent errors).
     let truth: Vec<f32> = act.iter().zip(&wh).map(|(a, w)| (a + w) / 2.0).collect();
-    if let Some(path) = dump {
+    if let Some(path) = &report.dump {
         let mut out = String::from(
             "exp\tcase\ttext\ttarget\tpredicted\tactual\twhisper\trisk\twords\tspell\tshare\n",
         );
@@ -1032,7 +1185,14 @@ fn calibrate(
             mean(|r| r.whisper)
         );
     }
-    if by_script {
+    let answers = answer_means(
+        &rows
+            .iter()
+            .map(|r| (r.clip, r.predicted, r.whisper))
+            .collect::<Vec<_>>(),
+    );
+    print_close_enough(&answers, report.heard_well, engine.profile);
+    if report.by_script {
         // Penalty as the predictor applies it: risk_scale × the profile's per-codepoint risk.
         let mut stats = ByScript::<3>::new(); // predicted, risk penalty, truth
         for (r, t) in rows.iter().zip(&truth) {
@@ -1052,7 +1212,7 @@ fn calibrate(
             );
         }
     }
-    if let Some(opts) = fit_risks {
+    if let Some(opts) = &report.fit_risks {
         let mut phrases = std::collections::BTreeMap::new();
         let items: Vec<risks::Item> = rows
             .iter()
@@ -1069,7 +1229,7 @@ fn calibrate(
     }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
-    for r in rows.iter().take(worst) {
+    for r in rows.iter().take(report.worst) {
         let (latin, words) = engine.read(&r.clip.text);
         println!(
             "  {:+.2} {:5} {:7} {:<10} {:<22} pred {:.2} act {:.2}  reads {:?} → heard {:?}  whisper {:?}",
@@ -1179,8 +1339,13 @@ fn print_risk_fit(engine: &Engine, items: &[risks::Item], risk_scale: f32, opts:
 
 #[cfg(test)]
 mod tests {
-    use super::{ByScript, Summary, parse_keys, parse_messages, scripts_in};
+    use super::{
+        ByScript, Clip, Cut, Summary, answer_means, close_enough_table, no_good_result, parse_keys,
+        parse_messages, scripts_in,
+    };
     use phono_core::chunks::Script;
+    use phono_core::model::FLASH_V2_5;
+    use phono_core::search::Candidate;
 
     #[test]
     fn messages_prefer_target_and_fall_back_to_spoken() {
@@ -1242,5 +1407,77 @@ mod tests {
         assert!((a - 0.6).abs() < 1e-6 && (b - 0.75).abs() < 1e-6);
         assert_eq!((rows[1].0, rows[1].1), (Script::Yi, 1));
         assert_eq!(rows[1].2, [0.5, 0.9]);
+    }
+
+    fn clip(target: &str, text: &str) -> Clip {
+        Clip {
+            exp: "exp".into(),
+            case: "c".into(),
+            text: text.into(),
+            target: target.into(),
+            whisper: String::new(),
+            phones: String::new(),
+        }
+    }
+
+    #[test]
+    fn answers_average_their_clips() {
+        let (a, b, c) = (clip("hi", "ꀠ"), clip("hi", "ꀠ"), clip("hi", "딧"));
+        let means = answer_means(&[(&a, 0.9, 1.0), (&b, 0.8, 0.5), (&c, 0.6, 0.2)]);
+        assert_eq!(means.len(), 2);
+        let (p, w) = means[0]; // "ꀠ" (U+A020) sorts before "딧"
+        assert!((p - 0.85).abs() < 1e-6 && (w - 0.75).abs() < 1e-6);
+        assert_eq!(means[1], (0.6, 0.2));
+    }
+
+    #[test]
+    fn cut_counts_heard_well_on_each_side() {
+        let answers = [(0.95, 0.9), (0.92, 0.5), (0.85, 0.85), (0.7, 0.1)];
+        let c = Cut::of(&answers, 0.8, 0.9);
+        assert_eq!(
+            c,
+            Cut {
+                cut: 0.9,
+                above: 2,
+                above_well: 1,
+                below: 2,
+                below_well: 1,
+            }
+        );
+        assert!((c.recall() - 0.5).abs() < 1e-6);
+        assert!((c.youden() - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn table_picks_the_cut_that_separates_best_and_includes_the_profiles() {
+        // Heard well exactly when predicted ≥ 0.9.
+        let answers = [(0.97, 0.9), (0.91, 0.85), (0.89, 0.4), (0.82, 0.3)];
+        let (table, best) = close_enough_table(&answers, 0.8, 0.91);
+        assert_eq!(best, 0.9);
+        assert!(table.iter().any(|c| c.cut == 0.91));
+        assert!(table.windows(2).all(|w| w[0].cut < w[1].cut));
+        assert_eq!(table.len(), 11);
+    }
+
+    #[test]
+    fn note_only_when_no_guess_is_close_enough() {
+        let guess = |fidelity| Candidate {
+            text: "x".into(),
+            latin: "x".into(),
+            words: Vec::new(),
+            fidelity,
+            codepoints: 1,
+            gen_cost: 0.0,
+        };
+        assert_eq!(
+            no_good_result(&[guess(0.8), guess(0.9)], 6, &FLASH_V2_5),
+            None
+        );
+        let note = no_good_result(&[guess(0.8)], 6, &FLASH_V2_5).unwrap();
+        assert!(
+            note.starts_with("No string of 6 codepoints or fewer scores well"),
+            "{note}"
+        );
+        assert!(no_good_result(&[], 6, &FLASH_V2_5).is_some());
     }
 }
