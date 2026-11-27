@@ -96,6 +96,45 @@ pub struct Alignment {
     pub ops: Vec<Op>,
 }
 
+/// One step of [`Scorer::align_segments`], by index into the target and the recognized
+/// segments, with its cost.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SegOp {
+    Match(usize, usize, f32),
+    Delete(usize, f32),
+    Insert(usize, f32),
+}
+
+#[derive(Clone, Debug)]
+pub struct SegAlignment {
+    pub cost: f32,
+    pub max_cost: f32,
+    pub fidelity: f32,
+    pub ops: Vec<SegOp>,
+}
+
+/// How one predicted word was heard ([`Scorer::heard_words`]).
+#[derive(Clone, Debug, PartialEq)]
+pub struct HeardWord {
+    /// Recognized segments aligned to the word, in order.
+    pub segments: Vec<usize>,
+    /// Cost of the word's alignment steps.
+    pub cost: f32,
+    /// Cost of deleting the word.
+    pub max_cost: f32,
+}
+
+impl HeardWord {
+    /// 1 − cost / cost of deleting the word, floored at 0.
+    pub fn fidelity(&self) -> f32 {
+        if self.max_cost > 0.0 {
+            (1.0 - self.cost / self.max_cost).max(0.0)
+        } else {
+            0.0
+        }
+    }
+}
+
 /// Leniency for comparing recognizer output with targets (see [`Scorer::fidelity_segments`]).
 #[derive(Clone, Copy, Debug)]
 pub struct Heard {
@@ -184,6 +223,18 @@ impl<'a> Scorer<'a> {
         cand: &[usize],
         heard: &Heard,
     ) -> f32 {
+        self.align_segments(space, target, cand, heard).fidelity
+    }
+
+    /// [`Scorer::fidelity_segments`] with its traceback: which recognized segments stand for
+    /// which target phones.
+    pub fn align_segments(
+        &self,
+        space: &FeatureSpace,
+        target: &[TargetPhone],
+        cand: &[usize],
+        heard: &Heard,
+    ) -> SegAlignment {
         let ins = |c: usize| {
             if space.is_vowel(c) {
                 (self.w.ins_stressed + self.w.ins_unstressed) / 2.0
@@ -202,26 +253,110 @@ impl<'a> Scorer<'a> {
             space.segment_distance_with(ts, c, heard.rhotic) * scale
                 + if tv != cv { self.w.class_mismatch } else { 0.0 }
         };
-        let m = cand.len();
-        let mut prev: Vec<f32> = (0..=m)
-            .map(|j| cand[..j].iter().map(|&c| ins(c)).sum())
-            .collect();
-        let mut cur = vec![0.0; m + 1];
-        for t in target {
-            cur[0] = prev[0] + self.del_cost(t);
+        let (n, m) = (target.len(), cand.len());
+        let mut d = vec![vec![0f32; m + 1]; n + 1];
+        for j in 1..=m {
+            d[0][j] = d[0][j - 1] + ins(cand[j - 1]);
+        }
+        for i in 1..=n {
+            let t = &target[i - 1];
+            d[i][0] = d[i - 1][0] + self.del_cost(t);
             for j in 1..=m {
-                cur[j] = (prev[j - 1] + sub(t.phone, cand[j - 1]))
-                    .min(prev[j] + self.del_cost(t))
-                    .min(cur[j - 1] + ins(cand[j - 1]));
+                d[i][j] = (d[i - 1][j - 1] + sub(t.phone, cand[j - 1]))
+                    .min(d[i - 1][j] + self.del_cost(t))
+                    .min(d[i][j - 1] + ins(cand[j - 1]));
             }
-            std::mem::swap(&mut prev, &mut cur);
         }
-        let max = self.max_cost(target);
-        if max > 0.0 {
-            (1.0 - prev[m] / max).max(0.0)
-        } else {
-            0.0
+        let mut ops = Vec::new();
+        let (mut i, mut j) = (n, m);
+        while i > 0 || j > 0 {
+            if i > 0 && j > 0 {
+                let s = sub(target[i - 1].phone, cand[j - 1]);
+                if (d[i][j] - (d[i - 1][j - 1] + s)).abs() < 1e-5 {
+                    ops.push(SegOp::Match(i - 1, j - 1, s));
+                    i -= 1;
+                    j -= 1;
+                    continue;
+                }
+            }
+            let del = i > 0
+                && (j == 0
+                    || (d[i][j] - (d[i - 1][j] + self.del_cost(&target[i - 1]))).abs() < 1e-5);
+            if del {
+                ops.push(SegOp::Delete(i - 1, self.del_cost(&target[i - 1])));
+                i -= 1;
+            } else {
+                ops.push(SegOp::Insert(j - 1, ins(cand[j - 1])));
+                j -= 1;
+            }
         }
+        ops.reverse();
+        let (cost, max_cost) = (d[n][m], self.max_cost(target));
+        SegAlignment {
+            cost,
+            max_cost,
+            fidelity: if max_cost > 0.0 {
+                (1.0 - cost / max_cost).max(0.0)
+            } else {
+                0.0
+            },
+            ops,
+        }
+    }
+
+    /// How each word of a predicted reading was heard: the recognized segments aligned to it and
+    /// its own fidelity (1 − the cost of its steps / the cost of deleting it). The words are
+    /// aligned as one sequence, so a word heard merged into its neighbour loses its phones.
+    /// Segments inserted between two words go to the earlier one.
+    pub fn heard_words(
+        &self,
+        space: &FeatureSpace,
+        words: &[&[Phone]],
+        heard_segs: &[usize],
+        heard: &Heard,
+    ) -> Vec<HeardWord> {
+        let owned: Vec<Vec<Phone>> = words.iter().map(|w| w.to_vec()).collect();
+        let target = flatten_target(&owned);
+        let mut word_of = Vec::with_capacity(target.len());
+        for (k, w) in words.iter().enumerate() {
+            word_of.extend(std::iter::repeat_n(k, w.len()));
+        }
+        let mut out: Vec<HeardWord> = words
+            .iter()
+            .scan(0, |start, w| {
+                let span = &target[*start..*start + w.len()];
+                *start += w.len();
+                Some(HeardWord {
+                    segments: Vec::new(),
+                    cost: 0.0,
+                    max_cost: self.max_cost(span),
+                })
+            })
+            .collect();
+        if out.is_empty() {
+            return out;
+        }
+        let align = self.align_segments(space, &target, heard_segs, heard);
+        // The word the last target phone belonged to (insertions before any go to the first).
+        let mut cur = word_of.first().copied().unwrap_or(0);
+        for op in align.ops {
+            match op {
+                SegOp::Match(t, s, c) => {
+                    cur = word_of[t];
+                    out[cur].segments.push(heard_segs[s]);
+                    out[cur].cost += c;
+                }
+                SegOp::Delete(t, c) => {
+                    cur = word_of[t];
+                    out[cur].cost += c;
+                }
+                SegOp::Insert(s, c) => {
+                    out[cur].segments.push(heard_segs[s]);
+                    out[cur].cost += c;
+                }
+            }
+        }
+        out
     }
 
     /// Alignment cost only (no traceback), for the search's inner loop.
@@ -373,6 +508,48 @@ mod tests {
         assert_eq!(costs[1], s.w.del_cluster);
         assert_eq!(costs[3], s.w.del_primary);
         assert_eq!(costs[5], s.w.del_schwa);
+    }
+
+    fn space() -> FeatureSpace {
+        let tsv = include_str!("../../../phoible/raw-data/FEATURES/phoible-segments-features.tsv");
+        FeatureSpace::new(FeatureTable::parse_tsv(tsv).unwrap())
+    }
+
+    fn segs(space: &FeatureSpace, ipa: &str) -> Vec<usize> {
+        ipa.split_whitespace()
+            .flat_map(|t| space.parse_ipa_token(t))
+            .collect()
+    }
+
+    #[test]
+    fn heard_words_split_the_alignment() {
+        let space = space();
+        let d = PhoneDistance::new(&space).unwrap();
+        let s = Scorer::new(&d);
+        let heard = Heard::default();
+        let doeg = parse_pron("D OW1 G").unwrap();
+        let did = parse_pron("D IH1 D").unwrap();
+        // exp5–exp7: "doeg" heard as "Dag", "did" as itself.
+        let h = segs(&space, "d æ ɡ d ɪ d");
+        let words = s.heard_words(&space, &[&doeg, &did], &h, &heard);
+        assert_eq!(words.len(), 2);
+        assert_eq!(words[0].segments, segs(&space, "d æ ɡ"));
+        assert_eq!(words[1].segments, segs(&space, "d ɪ d"));
+        assert!(words[1].fidelity() > 0.99, "{}", words[1].fidelity());
+        assert!(words[0].fidelity() < 0.9, "{}", words[0].fidelity());
+        // The word costs add up to the whole alignment's.
+        let t = flatten_target(&[doeg.clone(), did.clone()]);
+        let whole = s.align_segments(&space, &t, &h, &heard);
+        let sum: f32 = words.iter().map(|w| w.cost).sum();
+        assert!((sum - whole.cost).abs() < 1e-4);
+        assert!(
+            (whole.fidelity - s.fidelity_segments(&space, &t, &h, &heard)).abs() < 1e-6,
+            "fidelity_segments is the alignment's fidelity"
+        );
+        // A word heard as nothing keeps no segments and has fidelity 0.
+        let words = s.heard_words(&space, &[&doeg, &did], &segs(&space, "d ɪ d"), &heard);
+        assert!(words[0].segments.is_empty() || words[1].segments.is_empty());
+        assert!(words.iter().any(|w| w.fidelity() == 0.0));
     }
 }
 
