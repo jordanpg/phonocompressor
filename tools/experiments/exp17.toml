@@ -1,0 +1,16 @@
+name = "exp17"
+description = """
+Live check of #50's risk change on Flash v2.5: Katakana and Hiragana risk 0.03 → 0, Canadian
+syllabics 0.05 → 0.01. These are phono's new top answers for the 6 library entries whose answer
+changes (keys in exp17.keys); the old answers and the community entries for these phrases are
+cached from exp15–exp16. Same model, voice and seeds as exp1.
+Cases come from a gitignored file: `phono eval sample/library.json --export
+data/generated/ours-exp17.json` with the new profile (it contains the library's phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 40
+cases_from = ["data/generated/ours-exp17.json"]
+cases_keys = "tools/experiments/exp17.keys"

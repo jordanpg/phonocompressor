@@ -1,0 +1,17 @@
+name = "exp18"
+description = """
+Live check of the weight refit on exp1–exp16 (#50): v6's weights refitted with chunk-grouped
+cross-validation (λ 0.01), with the kana and syllabics risks from exp17 in place. The fit cuts
+`risk_scale` 1.3 → 0.52 and raises deletion costs, as #46's did. Cases: the refit's top answer
+for the 31 library entries where it differs from the adopted profile's (keys in exp18.keys), and
+the adopted profile's answer for the same entries (most cached from exp15–exp17).
+Cases come from gitignored files: `phono eval sample/library.json --export
+data/generated/ours-exp18.json` built with the refit weights, and ours-exp17.json.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 200
+cases_from = ["data/generated/ours-exp17.json", "data/generated/ours-exp18.json"]
+cases_keys = "tools/experiments/exp18.keys"

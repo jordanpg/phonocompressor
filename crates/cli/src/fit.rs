@@ -12,8 +12,14 @@
 //!   fold ([`Grouping::Chunk`]), since a chunk's reading learned in one phrase carries to the next;
 //! - "new in the last experiment": fit without the answers that first appeared in the last
 //!   experiment, test on pairs involving them (the situation of a new harness run).
+//!
+//! With `--refit-risks`, each fit first sets the per-script risks from its own training answers
+//! ([`crate::risks`], least squares of over-prediction), then fits the weights with those risks
+//! held, so the held-out numbers test the whole procedure.
 
+use crate::risks;
 use crate::{Clip, RANK_MARGIN, clip_truth, load_clips};
+use phono_core::chunks::Script;
 use phono_core::reading::Word;
 use phono_core::score::{Heard, Scorer, Weights};
 use phono_core::{Engine, Predict, Target};
@@ -34,6 +40,8 @@ struct Answer {
     /// Truth by each measure, indexed by [`TruthKind`] as usize.
     truths: [f32; 3],
     first_exp: String,
+    source: risks::Source,
+    clips: usize,
 }
 
 struct Pair {
@@ -48,6 +56,22 @@ struct Pair {
 pub struct Params {
     pub weights: Weights,
     pub predict: Predict,
+    /// Per-codepoint script risks ([`Engine::risks`]).
+    pub risks: [f32; Script::COUNT],
+}
+
+/// A risk coordinate of 1 is this much risk. Risks move in linear space (several are 0, which
+/// log space can't leave); with this unit the first step is ±0.035.
+const RISK_UNIT: f32 = 0.05;
+
+/// Every coordinate: [`NAMES`], then one risk per script (`risk.<script>`).
+const PARAMS: usize = NAMES.len() + Script::COUNT;
+
+fn param_name(i: usize) -> String {
+    match NAMES.get(i) {
+        Some(n) => n.to_string(),
+        None => format!("risk.{}", Script::ALL[i - NAMES.len()].name()),
+    }
 }
 
 /// Fitted parameters. `del_primary` stays at 1.0: scaling every cost together leaves fidelity
@@ -71,6 +95,9 @@ const NAMES: [&str; 15] = [
 ];
 
 fn field(p: &mut Params, i: usize) -> &mut f32 {
+    if i >= NAMES.len() {
+        return &mut p.risks[i - NAMES.len()];
+    }
     let w = &mut p.weights;
     match i {
         0 => &mut w.del_secondary,
@@ -96,18 +123,29 @@ fn get(p: &Params, i: usize) -> f32 {
     *field(&mut p.clone(), i)
 }
 
-/// Log-space coordinates of `p`.
+/// Coordinates of `p`: log space for weights, units of [`RISK_UNIT`] for risks.
 fn coords(p: &Params) -> Vec<f32> {
-    (0..NAMES.len()).map(|i| get(p, i).max(1e-4).ln()).collect()
+    (0..PARAMS)
+        .map(|i| {
+            if i < NAMES.len() {
+                get(p, i).max(1e-4).ln()
+            } else {
+                get(p, i) / RISK_UNIT
+            }
+        })
+        .collect()
 }
 
 fn from_coords(base: &Params, x: &[f32]) -> Params {
     let mut p = base.clone();
     for (i, &v) in x.iter().enumerate() {
-        let mut v = v.exp();
-        if NAMES[i] == "spelling" {
-            v = v.min(1.0); // a blend weight
-        }
+        let v = if i >= NAMES.len() {
+            (v * RISK_UNIT).max(0.0)
+        } else if NAMES[i] == "spelling" {
+            v.exp().min(1.0) // a blend weight
+        } else {
+            v.exp()
+        };
         *field(&mut p, i) = v;
     }
     p
@@ -115,6 +153,7 @@ fn from_coords(base: &Params, x: &[f32]) -> Params {
 
 fn predictions(engine: &mut Engine, answers: &[Answer], p: &Params) -> Vec<f32> {
     engine.weights = p.weights.clone();
+    engine.risks = p.risks;
     answers
         .iter()
         .map(|a| engine.predict_read(&a.text, &a.words, &a.target, &p.predict))
@@ -180,7 +219,7 @@ fn exp_order(name: &str) -> (usize, &str) {
     (name.len(), name)
 }
 
-fn splitmix(mut x: u64) -> u64 {
+pub(crate) fn splitmix(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
     x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
@@ -245,6 +284,12 @@ pub struct FitOpts {
     pub fix: Vec<String>,
     /// Where the fit starts and what the L2 term pulls towards.
     pub prior: Prior,
+    /// Refit the script risks on each fit's training answers first (`risk_scale` is then held).
+    pub refit_risks: Option<risks::Opts>,
+    /// Scripts whose risks are free parameters of the ranking fit,
+    /// if at least `risk_min_clips` clips use them.
+    pub free_risks: Vec<Script>,
+    pub risk_min_clips: f32,
 }
 
 /// Starting point and regularization centre of a fit.
@@ -341,7 +386,11 @@ pub fn run(
     let clips: Vec<Clip> = load_clips(path, engine.profile)?;
     let truth_scorer = Scorer::with_weights(&engine.dist, Weights::HAND);
     // Distinct answers, truth averaged over seeds and over experiments that reused a clip.
-    for name in &opts.fix {
+    let fix_all = opts.fix.iter().any(|f| f == "all");
+    if opts.refit_risks.is_some() && !opts.free_risks.is_empty() {
+        return Err("--refit-risks and --free-risks are alternatives".into());
+    }
+    for name in opts.fix.iter().filter(|f| *f != "all") {
         if !NAMES.contains(&name.as_str()) {
             return Err(format!(
                 "--fix: no parameter {name:?} (have {})",
@@ -349,31 +398,79 @@ pub fn run(
             ));
         }
     }
-    let free: Vec<bool> = NAMES
+    // Refitted risks and a free `risk_scale` would trade off against each other: hold the scale.
+    let mut script_clips = [0f32; Script::COUNT];
+    for c in &clips {
+        for (n, k) in script_clips.iter_mut().zip(risks::Item::counts(&c.text)) {
+            if k > 0.0 {
+                *n += 1.0;
+            }
+        }
+    }
+    let free_risks: Vec<Script> = opts
+        .free_risks
         .iter()
-        .map(|n| !opts.fix.iter().any(|f| f == n))
+        .copied()
+        .filter(|s| script_clips[s.index()] >= opts.risk_min_clips)
         .collect();
-    let mut by_answer: BTreeMap<(String, String), ([f32; 3], usize, String)> = BTreeMap::new();
+    if !opts.free_risks.is_empty() {
+        let names: Vec<&str> = free_risks.iter().map(|s| s.name()).collect();
+        println!("free risks: {}", names.join(", "));
+    }
+    // Least-squares risks and a free `risk_scale` would trade off against each other, so
+    // `--refit-risks` holds the scale. With `--free-risks` the L2 term separates the two (the
+    // scale is a shared cut, the risks each script's departure from it); `--fix risk_scale`
+    // holds it.
+    let free: Vec<bool> = (0..PARAMS)
+        .map(|i| match NAMES.get(i) {
+            Some(n) => {
+                !fix_all
+                    && !opts.fix.iter().any(|f| f == n)
+                    && !(opts.refit_risks.is_some() && *n == "risk_scale")
+            }
+            None => free_risks.contains(&Script::ALL[i - NAMES.len()]),
+        })
+        .collect();
+    /// An answer's clips so far: truth sums, count, earliest experiment, source.
+    struct Tally {
+        sums: [f32; 3],
+        n: usize,
+        first_exp: String,
+        source: risks::Source,
+    }
+    let mut by_answer: BTreeMap<(String, String), Tally> = BTreeMap::new();
     for c in &clips {
         let (actual, whisper) = clip_truth(engine, &truth_scorer, c, heard);
         let e = by_answer
             .entry((c.target.clone(), c.text.clone()))
-            .or_insert(([0.0; 3], 0, c.exp.clone()));
-        for (t, v) in
-            e.0.iter_mut()
-                .zip([(actual + whisper) / 2.0, actual, whisper])
+            .or_insert(Tally {
+                sums: [0.0; 3],
+                n: 0,
+                first_exp: c.exp.clone(),
+                source: risks::Source::of_case(&c.exp, &c.case),
+            });
+        for (t, v) in e
+            .sums
+            .iter_mut()
+            .zip([(actual + whisper) / 2.0, actual, whisper])
         {
             *t += v;
         }
-        e.1 += 1;
-        if exp_order(&c.exp) < exp_order(&e.2) {
-            e.2 = c.exp.clone();
+        e.n += 1;
+        if exp_order(&c.exp) < exp_order(&e.first_exp) {
+            e.first_exp = c.exp.clone();
         }
     }
     let mut phrases: Vec<String> = by_answer.keys().map(|(t, _)| t.clone()).collect();
     phrases.dedup();
     let mut answers = Vec::new();
-    for ((target, text), (sums, n, first_exp)) in by_answer {
+    for ((target, text), t) in by_answer {
+        let Tally {
+            sums,
+            n,
+            first_exp,
+            source,
+        } = t;
         let (_, words) = engine.read(&text);
         answers.push(Answer {
             phrase: phrases.binary_search(&target).unwrap(),
@@ -382,25 +479,41 @@ pub fn run(
             words,
             truths: sums.map(|v| v / n as f32),
             first_exp,
+            source,
+            clips: n,
         });
     }
     let pairs = make_pairs(&answers, opts.truth);
     let all: Vec<&Pair> = pairs.iter().collect();
+    // The risks every fit starts from: the profile's, or `--risks`.
+    let base_risks = engine.risks;
     let hand = Params {
         weights: Weights::HAND,
         predict: Predict::HAND,
+        risks: base_risks,
     };
     let base = match opts.prior {
         Prior::Hand => hand.clone(),
         Prior::Profile => Params {
             weights: engine.profile.weights.clone(),
             predict: engine.profile.predict,
+            risks: base_risks,
         },
     };
     let truths: Vec<f32> = answers
         .iter()
         .map(|a| a.truths[opts.truth as usize])
         .collect();
+    // Where each fit starts: `base`, with `--refit-risks` setting the risks from its training
+    // answers.
+    let start = |engine: &mut Engine, train: &dyn Fn(usize) -> bool| {
+        let mut p = base.clone();
+        if let Some(ro) = &opts.refit_risks {
+            let items = risk_items(engine, &answers, &base, opts.truth, train);
+            p.risks = risks::fit(&items, &base_risks, base.predict.risk_scale, ro).risks;
+        }
+        p
+    };
     let label = match opts.prior {
         Prior::Hand => "hand-set",
         Prior::Profile => "profile",
@@ -481,7 +594,8 @@ pub fn run(
             for k in 0..opts.folds {
                 let train: Vec<&Pair> = pairs.iter().filter(|p| fold_of[p.phrase] != k).collect();
                 let test: Vec<&Pair> = pairs.iter().filter(|p| fold_of[p.phrase] == k).collect();
-                let (fitted, e) = fit(engine, &answers, &train, &base, lambda, &free);
+                let s = start(engine, &|i| fold_of[answers[i].phrase] != k);
+                let (fitted, e) = fit(engine, &answers, &train, &s, lambda, &free);
                 evals += e;
                 let pred = predictions(engine, &answers, &fitted);
                 let (r, n) = ranking(&pred, &test);
@@ -526,7 +640,8 @@ pub fn run(
         .iter()
         .filter(|p| is_new(p.a) || is_new(p.b))
         .collect();
-    let (fitted, _) = fit(engine, &answers, &train, &base, lambda, &free);
+    let s = start(engine, &|i| !is_new(i));
+    let (fitted, _) = fit(engine, &answers, &train, &s, lambda, &free);
     let pred = predictions(engine, &answers, &fitted);
     let (hr, hn) = ranking(&hand_pred, &test);
     let (fr, fn_) = ranking(&pred, &test);
@@ -538,7 +653,8 @@ pub fn run(
         loss(&pred, &test)
     );
 
-    let (fitted, _) = fit(engine, &answers, &all, &base, lambda, &free);
+    let s = start(engine, &|_| true);
+    let (fitted, _) = fit(engine, &answers, &all, &s, lambda, &free);
     let pred = predictions(engine, &answers, &fitted);
     let (r, n) = ranking(&pred, &all);
     println!(
@@ -568,6 +684,7 @@ pub fn run(
     let current = Params {
         weights: engine.profile.weights.clone(),
         predict: engine.profile.predict,
+        risks: engine.profile.risks(),
     };
     for (i, name) in NAMES.iter().enumerate() {
         println!(
@@ -577,13 +694,57 @@ pub fn run(
             get(&current, i)
         );
     }
+    // Risks: only those that moved or differ from the profile.
+    for i in NAMES.len()..PARAMS {
+        let (h, f, c) = (get(&hand, i), get(&fitted, i), get(&current, i));
+        if h != f || h != c {
+            println!("{:<16} {h:>7.3} {f:>7.3} {c:>8.3}", param_name(i));
+        }
+    }
     let (r, n) = ranking(&predictions(engine, &answers, &current), &all);
     println!(
         "current defaults (in-sample): ranking {r}/{n} ({:.1}%)",
         100.0 * r as f32 / n as f32
     );
     engine.weights = engine.profile.weights.clone();
+    engine.risks = base_risks;
     Ok(())
+}
+
+/// The answers `keep` selects as items for [`risks::fit`], predicted with `p`'s weights.
+fn risk_items(
+    engine: &mut Engine,
+    answers: &[Answer],
+    p: &Params,
+    kind: TruthKind,
+    keep: &dyn Fn(usize) -> bool,
+) -> Vec<risks::Item> {
+    engine.weights = p.weights.clone();
+    engine.risks = p.risks;
+    let no_risk = Predict {
+        risk_scale: 0.0,
+        ..p.predict
+    };
+    answers
+        .iter()
+        .enumerate()
+        .filter(|&(i, _)| keep(i))
+        .map(|(_, a)| {
+            let share = match phono_core::words::spelling(&a.target.words, &a.words) {
+                Some((_, share)) if p.predict.spelling > 0.0 => 1.0 - p.predict.spelling * share,
+                _ => 1.0,
+            };
+            risks::Item {
+                counts: risks::Item::counts(&a.text),
+                share,
+                excess: engine.predict_read(&a.text, &a.words, &a.target, &no_risk)
+                    - a.truths[kind as usize],
+                source: a.source,
+                weight: a.clips as f32,
+                cluster: a.phrase,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

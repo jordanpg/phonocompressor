@@ -20,7 +20,7 @@ pub mod search;
 pub mod tile;
 pub mod words;
 
-use chunks::{ChunkSet, Scripts, Translit};
+use chunks::{ChunkSet, Script, Scripts, Translit};
 use features::{FeatureSpace, PhoneDistance};
 use g2p::G2p;
 use lexicon::Lexicon;
@@ -72,6 +72,10 @@ pub struct Engine {
     /// Alignment weights for prediction and generation ([`Engine::scorer`]). Starts as the
     /// profile's; calibration and fitting change it.
     pub weights: Weights,
+    /// Per-codepoint script risks for prediction ([`Engine::risk`]), indexed by
+    /// [`Script::index`]. Starts as the profile's ([`ModelProfile::risks`]); `phono fit` and
+    /// `calibrate` change it. The tiler's ordering keeps using the profile's.
+    pub risks: [f32; Script::COUNT],
 }
 
 impl Engine {
@@ -90,13 +94,14 @@ impl Engine {
             translit: data.translit,
             chunks,
             weights: profile.weights.clone(),
+            risks: profile.risks(),
         })
     }
 
     /// Switch the model and the scripts the search uses, without decoding the data file again.
     ///
     /// Rebuilds [`Engine::chunks`] when either changes. A new profile also brings its own
-    /// [`Engine::weights`]; switching scripts alone keeps the current ones (which `phono fit`
+    /// [`Engine::weights`] and [`Engine::risks`]; switching scripts alone keeps the current ones (which `phono fit`
     /// and `calibrate` may have changed). On error, nothing changes.
     pub fn configure(
         &mut self,
@@ -110,6 +115,7 @@ impl Engine {
         }
         if new_profile {
             self.weights = profile.weights.clone();
+            self.risks = profile.risks();
         }
         self.profile = profile;
         self.scripts = scripts;
@@ -138,6 +144,13 @@ impl Engine {
             g2p: &self.g2p,
             params: self.profile.reader,
         }
+    }
+
+    /// Script risk summed over `text`'s codepoints, from [`Engine::risks`].
+    pub fn risk(&self, text: &str) -> f32 {
+        text.chars()
+            .map(|c| self.risks[Script::of(c).index()])
+            .sum()
     }
 
     pub fn scorer(&self) -> Scorer<'_> {
@@ -262,7 +275,7 @@ impl Engine {
                 offset += w.phones.len();
             }
         }
-        (expected - opts.risk_scale * self.profile.risk(text)).max(0.0)
+        (expected - opts.risk_scale * self.risk(text)).max(0.0)
     }
 
     /// Score how well `text` (any Unicode) would be heard as `phrase`.
