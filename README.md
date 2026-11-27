@@ -91,6 +91,8 @@ mise run phono fit                  # fit scorer weights with cross-validation
 
 `eval` reads `sample/library.json`, the community message library (gitignored; `mise run //tools:fetch-library` writes it, with the library URL from fnox). It also summarizes the 34 hand-picked messages that exp1–exp10 used (`tools/library-keys.tsv`). `--subset <keys>` scores only some entries, and `eval sample/messages.json` still reads the old file. `calibrate` and `fit` need clips exported by the harness.
 
+Each model profile has a close-enough cut on predicted fidelity, set from its clips: 0.90 on Flash v2.5, 0.88 on Multilingual v2. On exp1–exp16, Whisper heard 88% of Flash answers predicted at 0.90 or more well (similarity ≥ 0.8), and 38% of those below. `compress` says so when no guess reaches the cut, and `--json` marks each guess with `closeEnough`. `calibrate` prints the table the cut comes from (`--heard-well` sets the Whisper level).
+
 ### WASM binding
 
 `crates/wasm` runs the same engine in a browser. The caller fetches `phono.bin` and passes its bytes in; the engine decodes them once and is reused for every phrase. The test page does this in a Web Worker so a search doesn't block the page.
@@ -101,10 +103,10 @@ import init, { Engine } from "./pkg/phono_wasm.js";
 await init();
 const engine = new Engine(new Uint8Array(await (await fetch("phono.bin")).arrayBuffer()));
 engine.compress("bad dream", { maxCodepoints: 6, topN: 10 });
-// → [{ text, latin, phones, score }, …]
+// → [{ text, latin, phones, score, closeEnough }, …]
 ```
 
-Options: `model` (default `eleven_flash_v2_5`), `maxCodepoints` (1–30, default 6), `topN` (1–50, default 10) and `allowedScripts` (names such as `latin`, `hangul`, `yi`; default: the model's default scripts). Invalid input throws an `Error` that says what to change. The TypeScript types are generated into `phono_wasm.d.ts`.
+Options: `model` (default `eleven_flash_v2_5`), `maxCodepoints` (1–30, default 6), `topN` (1–50, default 10) and `allowedScripts` (names such as `latin`, `hangul`, `yi`; default: the model's default scripts). Invalid input throws an `Error` that says what to change. When no guess has `closeEnough`, no string within the budget scores well, and the page should say so. The TypeScript types are generated into `phono_wasm.d.ts`.
 
 ```sh
 mise run //crates/wasm:build     # target/wasm-pkg: .wasm, JS glue, .d.ts, third-party notices

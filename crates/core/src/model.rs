@@ -51,9 +51,18 @@ pub struct ModelProfile {
     /// [`Weights::HAND`] whatever the model, so its numbers stay comparable.
     pub weights: Weights,
     pub predict: Predict,
+    /// Predicted fidelity from which a guess counts as close enough: below it, the harness heard
+    /// most guesses wrong, so a front end should say no result is good. Set from this model's
+    /// clips with `phono calibrate`'s close-enough table, not by hand.
+    pub close_enough: f32,
 }
 
 impl ModelProfile {
+    /// Whether a guess with this predicted fidelity is close enough ([`Self::close_enough`]).
+    pub fn is_close_enough(&self, fidelity: f32) -> bool {
+        fidelity >= self.close_enough
+    }
+
     /// The main model id (the first of [`ModelProfile::model_ids`]), for messages.
     pub fn id(&self) -> &'static str {
         self.model_ids
@@ -117,6 +126,7 @@ pub static FLASH_V2_5: ModelProfile = ModelProfile {
     reader: FLASH_READER,
     weights: FLASH_WEIGHTS,
     predict: FLASH_PREDICT,
+    close_enough: FLASH_CLOSE_ENOUGH,
 };
 
 /// Representative order shared by the calibrated profiles: when several codepoints
@@ -190,6 +200,14 @@ const FLASH_PREDICT: Predict = Predict {
     spelling: 0.52,
 };
 
+// #10: `phono calibrate --heard-well 0.8` on exp1–exp16 (1758 clips, 699 distinct answers, clips
+// averaged per answer). Answers predicted at ≥ 0.90 were heard well (Whisper similarity ≥ 0.8)
+// in 88% of cases (416 answers), those below in 38% (283). 0.90 is the cut that best separates
+// the two (Youden's J 0.55; 0.88 and 0.92 give 0.53 and 0.51). It is also the best cut for
+// heard-well levels 0.7 and on exp15–exp16 alone (no weights were fitted on those).
+// Being above it is not a promise: 12% of those answers were still misheard.
+const FLASH_CLOSE_ENOUGH: f32 = 0.90;
+
 /// `eleven_multilingual_v2`, probed in exp11 and calibrated on exp11–exp13 (338 clips). It reads
 /// most scripts by transliteration like Flash v2.5, but less clearly (mean truth 0.70 vs 0.78
 /// on the same 160 texts).
@@ -220,7 +238,14 @@ pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
     // (0.574 → 0.536) and made losing an onset cost 2.9 (here 1.22), so they are not used.
     weights: FLASH_WEIGHTS,
     predict: FLASH_PREDICT,
+    close_enough: MULTILINGUAL_V2_CLOSE_ENOUGH,
 };
+
+// #10: `phono --model eleven_multilingual_v2 calibrate` on exp11–exp14 (406 clips, 173
+// answers): 72% heard well at ≥ 0.88 (79 answers), 15% below (94). 0.88 is the best cut for
+// heard-well levels 0.7, 0.8 and 0.9 (J 0.59 at 0.8). The model is heard worse than Flash
+// overall (41% of answers heard well, against 68%), and its sample is a quarter of Flash's.
+const MULTILINGUAL_V2_CLOSE_ENOUGH: f32 = 0.88;
 
 /// Multilingual v2's scripts, from exp11–exp13:
 /// - Read natively: Cyrillic (`Привет` in Russian), Devanagari (`कमल` "Kamal", not unidecode's

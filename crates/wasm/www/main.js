@@ -70,6 +70,7 @@ function showResults(guesses, ms) {
       ["latin", JSON.stringify(g.latin)],
       ["phones", g.phones],
       ["score", g.score.toFixed(3)],
+      ["close", g.closeEnough ? "yes" : "no"],
     ];
     for (const [cls, value] of cells) {
       const cell = row.insertCell();
@@ -77,7 +78,10 @@ function showResults(guesses, ms) {
       cell.textContent = value;
     }
   });
-  $("caption").textContent = `${guesses.length} guesses in ${secs(ms)}`;
+  const none = guesses.some((g) => g.closeEnough)
+    ? ""
+    : " No string within the budget scores well. Try a higher budget or a shorter phrase.";
+  $("caption").textContent = `${guesses.length} guesses in ${secs(ms)}.${none}`;
   $("results").hidden = false;
 }
 
