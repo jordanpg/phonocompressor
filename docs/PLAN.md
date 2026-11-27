@@ -1514,6 +1514,110 @@ leaves +0.9 points, and the test closest to a new harness run (fit without
 exp16's answers, test on them) shows no gain for any refit. Refit again
 once #50 has set per-script risks.
 
+**Per-script risks on exp1–exp16 (#50, 2026-11-26): Katakana and Hiragana
+0.03 → 0, Canadian syllabics 0.05 → 0.01; weights and `risk_scale` stay.**
+New tools:
+- `phono calibrate --fit-risks` fits the over-prediction without risk by
+  weighted least squares on codepoints per script, with a baseline per
+  source: community entries, our answers, probes. It reports each script's
+  risk with a 90% interval from resampling phrases.
+- `phono fit --refit-risks` does the same inside each cross-validation fold.
+- `phono fit --free-risks` makes risks free parameters of the ranking fit.
+- `--risks script=value` tries values on both commands.
+
+Our answers get their own baseline because the search picks the top of
+many predictions, and that bias shouldn't be charged to the scripts it
+likes. The risk is subtracted from the sound score only, so each
+codepoint's term is scaled by the sound score's share of the prediction.
+The exp15 table's "gap without risk" added the whole penalty back, which
+overstated it wherever spelling counts.
+
+Least squares on the 1764 Flash clips, Latin, Hangul and Yi held at 0
+(per codepoint, at `risk_scale` 1.3):
+
+| script | current | community clips only | all clips | our answers only |
+|---|---|---|---|---|
+| baseline | | +0.019 | community +0.015, ours +0.085 | +0.078 |
+| katakana | 0.03 | −0.009 | −0.003 | +0.016 |
+| hiragana | 0.03 | +0.003 | −0.004 | – (no clips) |
+| ucas | 0.05 | −0.003 | +0.010 | +0.076 |
+| ethiopic | 0.05 | −0.006 | +0.003 | +0.083 |
+| hangul-jamo | 0.03 | +0.062 | +0.051 | – |
+| cjk-unified | 0.03 | +0.007 | +0.042 | +0.086 |
+| cjk-compat | 0 | +0.029 | +0.024 | +0.026 |
+| cyrillic-number (`҈`) | 0 | +0.069 | +0.073 | +0.066 |
+
+- **Kana and syllabics:** the readings are right and the risks too high,
+  as #50 said.
+- **Ethiopic, CJK unified and syllabics: our answers are worse than the
+  community's.** The search's picks in these scripts read about 0.08 worse
+  per codepoint than the hand-picked ones, which is the caveat #50 raised.
+  Katakana shows no such split.
+- **Ethiopic's community entries are over-penalized too.** exp15's "the
+  risk is earned" came from the overstated gap.
+- **`҈` and CJK compatibility are under-penalized** by every measure.
+
+Held-out within-phrase ranking (5 chunk-grouped folds × 4, 347 pairs):
+
+| risks | weights | held-out | new in exp16 (89 pairs) |
+|---|---|---|---|
+| v6 (current) | v6 | 76.4% (in-sample) | 56 |
+| **kana + syllabics, least squares per fold** | v6 | **77.2%** | 56 |
+| + `҈` and CJK compat | v6 | 76.7% | 56 |
+| every script, least squares per fold | v6 | 74.5% | 56 |
+| every script, least squares per fold | refit | 75.8% | – |
+| every script, ranking fit | v6 | 76.5% | 56 |
+| every script, ranking fit | refit (`risk_scale` free → 0.84) | 78.0% | 56 |
+| kana + syllabics | refit, `risk_scale` held | 76.9% | 56 |
+| kana + syllabics | refit, `risk_scale` free → 0.52 | 78.9% | 56 |
+| v6 (#46) | refit, `risk_scale` free → 0.48 | 78.7% | 56 |
+
+- **Calibration and ranking pull apart.** The least-squares risks fit the
+  absolute scores best (in-sample loss 0.527 → 0.474), but ranking falls.
+- **A ranking fit hardly moves the risks.** 347 pairs, few of them per
+  script, can't tell per-script risks apart.
+- **The weight refit gains only by cutting `risk_scale` to about 0.5,**
+  as #46's did. With the scale held it adds nothing, and no refit gains
+  on the answers new in exp16.
+- So only the three risks the issue named are adopted.
+
+Effect on `phono eval`:
+- **Answers:** 6 of 298 change. Answers use 11 kana codepoints instead of
+  5, among them `ヹ`, which no clip had tested.
+- **Offline fidelity:** community 0.857 → 0.862, ours 0.954 → 0.955.
+- **Multilingual v2:** unchanged. It already sets its own kana and
+  syllabics risks.
+
+**exp17 result (real TTS, 2026-11-26, ≤ 36 credits): the 6 changed answers
+are heard better, 0.856 → 0.878.** Setup: the new answers for the 6 entries
+(`tools/experiments/exp17.keys`), Flash v2.5, seeds 1 and 2, exp1's voice.
+The old answers and the community entries come from exp15–exp16's clips.
+- **2 improve by more than 0.05** (0.83 → 0.96, 0.71 → 0.87).
+- **3 tie,** all three with `ヹ` for "ve", read correctly.
+- **1 gets worse** (`81`, 0.79 → 0.64): its last word is heard split.
+- **All 1776 Flash clips:** within-phrase ranking 270/353 (76.5%).
+
+**exp18 result (real TTS, 2026-11-26, ≤ 168 credits): the refit's answers
+are heard worse, 0.782 → 0.739; v6's weights stay.** Setup: the refit's
+answers for the 31 entries where they differ from the adopted profile's
+(`tools/experiments/exp18.keys`). The refit is v6's weights refitted with
+these risks in place, λ 0.01, `risk_scale` 1.3 → 0.52, deletion costs about
+doubled. Same model, voice and seeds as exp17. Of the 62 cases, 60 clips
+were new; the adopted answers came from exp15–exp17's clips, plus one new.
+- **Refit better / worse / tied (±0.05):** 6 / 12 / 13.
+- **The 9 answers that gain a CJK unified character:** 0.751 → 0.689. The
+  lower scale makes CJK cheap, and our CJK answers were already the most
+  over-predicted (step 1).
+- **All 1900 Flash clips:** the refit's weights still rank within-phrase
+  pairs a little better (298/395 against 295/395), since they were fitted
+  on most of them.
+- **So held-out ranking on old answers doesn't predict the answers a refit
+  produces.** Each refit since v6 has cut `risk_scale`. That makes the
+  search reach for risky scripts it was never tested in, and the clips
+  can't see that.
+- **A future refit should hold `risk_scale`,** or be checked live on the
+  answers it changes, as here.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -1530,7 +1634,10 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
    ranking on held-out phrases improves by about 3 points, but the search's
    answers barely change. Refit after each new harness run (`phono fit
    data/generated/clips-allN.tsv`). The refit on exp1–exp16 was not
-   adopted (see "Refit on exp1–exp16"): set per-script risks first (#50).
+   adopted (see "Refit on exp1–exp16"), nor was a refit with #50's
+   per-script risks. Both gain only by cutting `risk_scale`, and exp18
+   heard the refit's answers worse (0.782 → 0.739). Hold `risk_scale` in
+   future refits, or test the changed answers live.
 5. **Readings of short pseudo-words.** The TTS reads `kwi` like "kawaii",
    `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
    read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or
