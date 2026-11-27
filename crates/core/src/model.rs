@@ -171,6 +171,12 @@ const FLASH_READER: ReaderParams = ReaderParams {
     // exp9: `&` → "and". `@` between words → "at" in 11 of 14 harness clips (clips-all9);
     // at the end of a text it was silent.
     symbol_words: crate::chunks::SYMBOL_WORDS,
+    // #4: wider n-bests (6, 10), stress variants merged and temperatures 1.5–5 calibrate
+    // better on exp1–exp18 (pearson 0.610 → up to 0.645) but rank within phrases no better
+    // (refit with the substitution scales and `risk_scale` held: 72.5–74.2% held out vs 74.5%),
+    // and on the hand-picked 34 they swap answers heard exactly for worse or untested ones
+    // (entry 295's answer, heard right, for one heard wrong). So the G2P's 3 best, as ranked.
+    g2p: crate::reading::G2pConfidence::V2,
 };
 
 // v6: deletion and insertion costs fitted by `phono fit` on 408 harness clips (exp1–exp6),

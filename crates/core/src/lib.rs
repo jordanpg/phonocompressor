@@ -26,7 +26,7 @@ use g2p::G2p;
 use lexicon::Lexicon;
 use model::ModelProfile;
 use phone::Phone;
-use reading::{Reader, Source, Word};
+use reading::{Reader, ReaderParams, Source, Word};
 use score::{Alignment, Scorer, TargetPhone, Weights, flatten_target};
 
 /// How candidates are scored before we trust them (see [`Engine::predict`]).
@@ -76,6 +76,9 @@ pub struct Engine {
     /// [`Script::index`]. Starts as the profile's ([`ModelProfile::risks`]); `phono fit` and
     /// `calibrate` change it. The tiler's ordering keeps using the profile's.
     pub risks: [f32; Script::COUNT],
+    /// How the reader splits and reads Latin ([`Engine::reader`]). Starts as the profile's
+    /// ([`ModelProfile::reader`]); calibration and fitting change it.
+    pub reader_params: ReaderParams,
 }
 
 impl Engine {
@@ -95,13 +98,14 @@ impl Engine {
             chunks,
             weights: profile.weights.clone(),
             risks: profile.risks(),
+            reader_params: profile.reader,
         })
     }
 
     /// Switch the model and the scripts the search uses, without decoding the data file again.
     ///
     /// Rebuilds [`Engine::chunks`] when either changes. A new profile also brings its own
-    /// [`Engine::weights`] and [`Engine::risks`]; switching scripts alone keeps the current ones (which `phono fit`
+    /// [`Engine::weights`], [`Engine::risks`] and [`Engine::reader_params`]; switching scripts alone keeps the current ones (which `phono fit`
     /// and `calibrate` may have changed). On error, nothing changes.
     pub fn configure(
         &mut self,
@@ -116,6 +120,7 @@ impl Engine {
         if new_profile {
             self.weights = profile.weights.clone();
             self.risks = profile.risks();
+            self.reader_params = profile.reader;
         }
         self.profile = profile;
         self.scripts = scripts;
@@ -142,7 +147,7 @@ impl Engine {
         Reader {
             lexicon: &self.lexicon,
             g2p: &self.g2p,
-            params: self.profile.reader,
+            params: self.reader_params,
         }
     }
 
@@ -314,6 +319,7 @@ mod tests {
             split_onset: 1.0,
             glued_number_drop: 1.0,
             symbol_words: chunks::SYMBOL_WORDS,
+            g2p: reading::G2pConfidence::V2,
         },
         weights: Weights::HAND,
         predict: Predict::HAND,

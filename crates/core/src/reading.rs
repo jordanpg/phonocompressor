@@ -270,7 +270,37 @@ pub struct ReaderParams {
     /// Symbols read as words (`&` → and). Any other symbol separates words silently. A subset of
     /// [`crate::chunks::SYMBOL_WORDS`].
     pub symbol_words: &'static [(char, &'static str)],
+    /// How the reader trusts the G2P on words not in the dictionary ([`G2pConfidence`]).
+    pub g2p: G2pConfidence,
 }
+
+/// Which G2P readings of an unknown word the prediction averages over, and how much it trusts
+/// the best one. The G2P is trained on dictionary words, so its probabilities say how English
+/// spells a word, not how sure a TTS is to read a pseudo-word that way.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct G2pConfidence {
+    /// Readings kept per word (the best one and `nbest − 1` alternatives).
+    pub nbest: usize,
+    /// Alternatives weigh `(p / p_best)^(1 / temperature)`: above 1 the best reading is
+    /// trusted less.
+    pub temperature: f32,
+    /// Readings that differ only in stress are one reading, with their probabilities summed,
+    /// so the alternatives are different sounds rather than stress variants (`dox`: D AA1 K S,
+    /// D AA0 K S, D AA2 K S).
+    pub merge_stress: bool,
+}
+
+impl G2pConfidence {
+    /// v2–v6: the 3 best readings as the G2P ranks them.
+    pub const V2: G2pConfidence = G2pConfidence {
+        nbest: READING_NBEST,
+        temperature: 1.0,
+        merge_stress: false,
+    };
+}
+
+/// Readings decoded per kept reading when merging stress variants: most words have 2–4.
+const MERGE_DECODE: usize = 4;
 
 impl ReaderParams {
     /// Word this model reads a symbol as, if any.
@@ -287,13 +317,47 @@ fn has_vowel(w: &str) -> bool {
 }
 
 impl Reader<'_> {
-    /// G2P reading plus alternatives weighted by probability relative to the best one.
+    /// G2P reading plus alternatives weighted by probability relative to the best one
+    /// ([`ReaderParams::g2p`]).
     fn g2p_word_nbest(&self, w: &str) -> Word {
-        let nbest = self.g2p.pronounce(w, READING_NBEST);
-        let best_lp = nbest.first().map(|(_, lp)| *lp).unwrap_or(0.0);
-        let mut it = nbest.into_iter();
-        let phones = it.next().map(|(p, _)| p).unwrap_or_default();
-        let alternatives = it.map(|(p, lp)| (p, (lp - best_lp).exp() as f32)).collect();
+        let conf = self.params.g2p;
+        let keep = conf.nbest.max(1);
+        let decoded = self.g2p.pronounce(
+            w,
+            if conf.merge_stress {
+                keep * MERGE_DECODE
+            } else {
+                keep
+            },
+        );
+        let best_lp = decoded.first().map(|(_, lp)| *lp).unwrap_or(0.0);
+        // (phones, probability relative to the best decoded reading)
+        let mut readings: Vec<(Vec<Phone>, f64)> = Vec::new();
+        for (p, lp) in decoded {
+            let rel = (lp - best_lp).exp();
+            // Same phones whatever their stress (AA0, AA1 and AA2 are one).
+            let same = |q: &Vec<Phone>| {
+                q.len() == p.len()
+                    && q.iter()
+                        .zip(&p)
+                        .all(|(a, b)| a.base() == b.base() && a.is_vowel() == b.is_vowel())
+            };
+            match readings
+                .iter_mut()
+                .find(|(q, _)| conf.merge_stress && same(q))
+            {
+                Some(r) => r.1 += rel,
+                None => readings.push((p, rel)),
+            }
+        }
+        // Merged readings can overtake the one that came first.
+        readings.sort_by(|a, b| b.1.total_cmp(&a.1));
+        readings.truncate(keep);
+        let mut it = readings.into_iter();
+        let (phones, best) = it.next().unwrap_or_default();
+        let alternatives = it
+            .map(|(p, rel)| (p, (rel / best).powf(1.0 / conf.temperature as f64) as f32))
+            .collect();
         Word {
             text: w.to_string(),
             phones,
@@ -487,6 +551,81 @@ fn plural_ending(last: Option<Phone>) -> Vec<Phone> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::g2p::{DEFAULT_ORDER, G2pModel, Unit};
+    use crate::phone::{fmt_phones, parse_pron};
+
+    /// A G2P that reads `ta` as T AA1, T AA0 or T EY1.
+    fn toy_g2p() -> G2p {
+        let u = |l: &str, p: &str| Unit {
+            letters: l.into(),
+            phones: parse_pron(p).unwrap(),
+        };
+        let words = [
+            vec![u("t", "T"), u("a", "AA1")],
+            vec![u("t", "T"), u("a", "AA1")],
+            vec![u("t", "T"), u("a", "AA0")],
+            vec![u("t", "T"), u("a", "EY1")],
+        ];
+        G2p::new(G2pModel::train(words.iter().map(|w| w.as_slice()), DEFAULT_ORDER).unwrap())
+    }
+
+    fn read_ta(g2p: &G2p, conf: G2pConfidence) -> Word {
+        let lexicon = Lexicon::default();
+        let params = ReaderParams {
+            g2p: conf,
+            ..crate::model::FLASH_V2_5.reader
+        };
+        Reader {
+            lexicon: &lexicon,
+            g2p,
+            params,
+        }
+        .g2p_word_nbest("ta")
+    }
+
+    #[test]
+    fn g2p_confidence_shapes_the_alternatives() {
+        let g2p = toy_g2p();
+        let v2 = read_ta(&g2p, G2pConfidence::V2);
+        assert_eq!(fmt_phones(&v2.phones), "T AA1");
+        let alts: Vec<String> = v2.alternatives.iter().map(|(p, _)| fmt_phones(p)).collect();
+        assert!(alts.contains(&"T AA0".to_string()), "{alts:?}");
+        let ey = |w: &Word| {
+            w.alternatives
+                .iter()
+                .find(|(p, _)| fmt_phones(p) == "T EY1")
+                .map(|&(_, r)| r)
+                .expect("T EY1 is an alternative")
+        };
+        // Temperature 2: each weight is the square root of its weight at 1.
+        let hot = read_ta(
+            &g2p,
+            G2pConfidence {
+                temperature: 2.0,
+                ..G2pConfidence::V2
+            },
+        );
+        assert!((ey(&hot) - ey(&v2).sqrt()).abs() < 1e-5);
+        // Merged: T AA0 joins T AA1, so the alternatives are other sounds and weigh less
+        // against the larger best reading.
+        let merged = read_ta(
+            &g2p,
+            G2pConfidence {
+                merge_stress: true,
+                ..G2pConfidence::V2
+            },
+        );
+        assert_eq!(fmt_phones(&merged.phones), "T AA1");
+        assert!(
+            merged
+                .alternatives
+                .iter()
+                .all(|(p, _)| fmt_phones(p) != "T AA0"),
+            "{:?}",
+            merged.alternatives
+        );
+        assert!(ey(&merged) < ey(&v2));
+    }
 
     #[test]
     fn numbers() {
