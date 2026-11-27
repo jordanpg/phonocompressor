@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-27T00:00:00Z",
-  "updated": "2026-11-27T14:05:00Z",
+  "updated": "2026-11-27T16:00:00Z",
   "issue": 9,
   "task_issues": {
     "1.1": 59,
@@ -18,15 +18,17 @@
   },
   "phases": {
     "total": 4,
-    "completed": 0
+    "completed": 1
   },
   "tasks": {
     "total": 8,
-    "completed": 1
+    "completed": 2
   },
   "current_phase": 1,
   "current_task": "1.2",
   "commits": [
-    "56acf96: feat(data): write phono.bin maps in key order (data-release_20261127)"
+    "56acf96: feat(data): write phono.bin maps in key order (data-release_20261127)",
+    "60ced04: feat(builder): add phono-build --format-version (data-release_20261127)",
+    "0732842: build(builder): add repro task for byte-identical phono.bin (data-release_20261127)"
   ]
 }

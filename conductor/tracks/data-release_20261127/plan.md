@@ -24,14 +24,15 @@ Same commit, same bytes, without changing the format.
 ### Tasks
 
 - [x] Task 1.1: Serialize `Translit.map` (`crates/core/src/chunks.rs`) and `Lexicon.words` (`crates/core/src/lexicon.rs`) in sorted key order with serde `serialize_with` helpers, keeping the `HashMap` types. Tests first: two maps with the same entries built in different insertion orders serialize to identical bytes, and the bytes still deserialize into the same `Data`. `FORMAT_VERSION` stays 2. ([#59](https://github.com/jordanpg/phonocompressor/issues/59))
-- [~] Task 1.2: Add `phono-build --format-version` (prints `FORMAT_VERSION` and exits) and a `//crates/builder:repro` task that builds `phono.bin` twice into a temp directory and fails unless they're byte-identical. If the G2P model's maps turn out unstable, sort them too. ([#60](https://github.com/jordanpg/phonocompressor/issues/60))
+- [x] Task 1.2: Add `phono-build --format-version` (prints `FORMAT_VERSION` and exits) and a `//crates/builder:repro` task that builds `phono.bin` twice into a temp directory and fails unless they're byte-identical. If the G2P model's maps turn out unstable, sort them too. ([#60](https://github.com/jordanpg/phonocompressor/issues/60))
+  - Done: the G2P model needed no sorting (training words are already sorted and its tables are sorted `Vec`s); two builds give the same bytes.
 
 ### Verification
 
-- [ ] `mise run //crates/builder:repro` passes.
-- [ ] `phono eval` output is identical before and after.
-- [ ] A `phono.bin` built before the change still loads (same format).
-- [ ] Gates pass (`mise run ci:affected`).
+- [x] `mise run //crates/builder:repro` passes.
+- [x] `phono eval` output is identical before and after (all 298 entries; `--export` byte-identical).
+- [x] A `phono.bin` built before the change still loads (same format).
+- [x] Gates pass (`mise run ci:affected`).
 
 ## Phase 2: Release files
 
