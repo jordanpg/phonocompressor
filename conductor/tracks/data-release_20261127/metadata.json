@@ -2,9 +2,9 @@
   "id": "data-release_20261127",
   "title": "Publish the runtime data release",
   "type": "feature",
-  "status": "pending",
+  "status": "in_progress",
   "created": "2026-11-27T00:00:00Z",
-  "updated": "2026-11-27T00:00:00Z",
+  "updated": "2026-11-27T12:00:00Z",
   "issue": 9,
   "task_issues": {
     "1.1": 59,
@@ -24,7 +24,7 @@
     "total": 8,
     "completed": 0
   },
-  "current_phase": null,
-  "current_task": null,
+  "current_phase": 1,
+  "current_task": "1.1",
   "commits": []
 }

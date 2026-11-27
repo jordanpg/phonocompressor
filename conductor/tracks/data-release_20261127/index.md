@@ -1,7 +1,7 @@
 # Track: Publish the runtime data release
 
 **ID:** data-release_20261127
-**Status:** Pending
+**Status:** In Progress
 **Issue:** [#9](https://github.com/jordanpg/phonocompressor/issues/9)
 
 ## Documents
