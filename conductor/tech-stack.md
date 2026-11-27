@@ -14,7 +14,7 @@
 | Database | None: one postcard-encoded data file | — |
 | Hosting | GitHub Pages (static) | Planned |
 | CI | GitHub Actions (`.github/workflows/ci.yml`), through mise | Working |
-| Data releases | GitHub Releases tagged `phono-data/vX.Y.Z`, built by `.github/workflows/release-data.yml` (`docs/RELEASES.md`) | Working; first tag after merge |
+| Data releases | GitHub Releases tagged `phono-data/vX.Y.Z`, built by `.github/workflows/release-data.yml` (`docs/RELEASES.md`) | Working; first release `phono-data/v2.0.0` |
 
 ## Rust workspace
 

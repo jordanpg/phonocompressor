@@ -5,7 +5,7 @@
 | [x] | [multilingual-v2_20261125](./tracks/_archive/multilingual-v2_20261125/index.md) | [Calibrate a second ElevenLabs model (Multilingual v2)](https://github.com/jordanpg/phonocompressor/issues/6) | 2026-11-25 | 2026-11-26 |
 | [x] | [wasm-binding_20261125](./tracks/_archive/wasm-binding_20261125/index.md) | [Build the WASM binding](https://github.com/jordanpg/phonocompressor/issues/14) | 2026-11-25 | 2026-11-25 |
 | [x] | [community-library_20261126](./tracks/community-library_20261126/index.md) | [Use the full community sample library](https://github.com/jordanpg/phonocompressor/issues/39) | 2026-11-26 | 2026-11-26 |
-| [x] | [data-release_20261127](./tracks/data-release_20261127/index.md) | [Publish the runtime data release](https://github.com/jordanpg/phonocompressor/issues/9) | 2026-11-27 | 2026-11-27 |
+| [x] | [data-release_20261127](./tracks/_archive/data-release_20261127/index.md) | [Publish the runtime data release](https://github.com/jordanpg/phonocompressor/issues/9) | 2026-11-27 | 2026-11-27 |
 
 <!-- Tracks registered by /conductor:new-track -->
 

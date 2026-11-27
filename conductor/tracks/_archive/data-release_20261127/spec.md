@@ -3,7 +3,7 @@
 **Track ID:** data-release_20261127
 **Type:** Feature
 **Created:** 2026-11-27
-**Status:** Complete (2026-11-27; archived after the first release is validated)
+**Status:** Complete (2026-11-27; archived after `phono-data/v2.0.0` was validated)
 **Issue:** [#9 Publish the transliteration tables](https://github.com/jordanpg/phonocompressor/issues/9)
 
 ## Summary
