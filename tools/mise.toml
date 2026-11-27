@@ -55,9 +55,11 @@ extends = "harness"
 vars = { cmd = "fetch-library" }
 secrets = ["PHONO_LIBRARY_URL"]
 
+# --no-group asr: the tests don't need torch or transformers, so CI never downloads them. uv run
+# keeps packages it isn't asked for, so a local venv that already has them keeps them.
 [tasks.test]
 description = "Run the harness's Python tests (pytest)"
-run = "uv run pytest -q"
+run = "uv run --no-group asr pytest -q"
 
 # Dev only: unidecode (GPL) output for diffing against the shipped table. Never feeds phono.bin
 # unless you pass it to the builder with --translit by hand.
@@ -66,16 +68,16 @@ description = "Dev only: export Python unidecode's table to data/generated/trans
 extends = "harness"
 vars = { cmd = "translit-table ../data/generated/translit-unidecode.tsv" }
 
-# --- Formatting & linting (ruff); the root fmt, fmt:check and lint run these too ---
+# --- Formatting & linting (ruff, from the root mise.toml); the root fmt, fmt:check and lint run these too ---
 
 [tasks.fmt]
 description = "Format Python (ruff format + import sorting)"
-run = ["uvx ruff format .", "uvx ruff check --select I --fix ."]
+run = ["ruff format .", "ruff check --select I --fix ."]
 
 [tasks."fmt:check"]
 description = "Check Python formatting without changing files"
-run = "uvx ruff format --check ."
+run = "ruff format --check ."
 
 [tasks.lint]
 description = "Lint Python (ruff check)"
-run = "uvx ruff check ."
+run = "ruff check ."

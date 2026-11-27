@@ -1,0 +1,7 @@
+[tasks.lint]
+description = "Lint this crate (clippy, warnings are errors)"
+extends = "cargo:lint"
+
+[tasks.test]
+description = "Run this crate's tests"
+extends = "cargo:test"
