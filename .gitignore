@@ -1,6 +1,6 @@
 /target
 /sample/
-/.cache/
+/.cache
 __pycache__/
 
 /tools/results/exp*.md

@@ -1,5 +1,5 @@
 {
-  "note": "Parity cases for `mise run //crates/wasm:parity`. Public or made-up phrases only: never anything from sample/messages.json. `zorblax` is made up, to exercise the G2P path.",
+  "note": "Parity cases for `mise run //crates/wasm:parity`. Public or made-up phrases only: never anything from sample/messages.json or sample/library.json. `zorblax` is made up, to exercise the G2P path.",
   "cases": [
     { "phrase": "bad dream" },
     { "phrase": "hundred thousand apartments" },

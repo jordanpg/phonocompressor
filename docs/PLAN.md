@@ -1255,6 +1255,265 @@ quality against Flash's answers, but on these 34 phrases it doesn't gain
 any either. The model reads everything about 0.07 worse than Flash, whoever
 wrote the text.
 
+**Offline baseline on the full community library (2026-11-26, no credits;
+`community-library_20261126`, #42).** `mise run //tools:fetch-library` puts
+the whole library (298 entries) in gitignored `sample/library.json`; the 34
+hand-picked messages keep their keys, the rest are keyed `u` + 8 hex digits
+of their UUID. Phrases stay out of this file, so cases are cited by key.
+Each entry is scored against its cleaned `target` (6 of 298 differ from the
+label: 3 by rule, 3 by hand override). Commands:
+`phono [--model …] eval sample/library.json --by-script`, plus
+`--subset tools/library-keys.tsv` for the 34. Predicted fidelity, top-1:
+
+| Set | n | Flash: community | Flash: ours | ours ≥ | Multilingual v2: community | ours | ours ≥ |
+|---|---|---|---|---|---|---|---|
+| All | 298 | 0.858 | 0.954 | 284 | 0.849 | 0.944 | 282 |
+| The 34 | 34 | 0.843 | 0.961 | 33 | 0.829 | 0.952 | 33 |
+| The rest | 264 | 0.859 | 0.954 | 251 | 0.852 | 0.943 | 249 |
+
+The earlier check (0.855 / 0.952) scored the raw `spoken` labels. Cleaned
+targets account for the +0.003 / +0.002. The 34 score slightly below the
+rest for the community and slightly above for us, so the full set doesn't
+make the job harder on average. What it adds is breadth.
+
+By script, where each entry counts once under every script in its community
+text (spaces and ASCII punctuation don't count). "Ours" is our answer for the
+same phrases, written in whatever scripts the search picked:
+
+| Script | n | Flash: community | ours | MLv2: community | ours |
+|---|---|---|---|---|---|
+| yi | 220 | 0.879 | 0.953 | 0.869 | 0.943 |
+| hangul | 186 | 0.852 | 0.947 | 0.840 | 0.932 |
+| latin | 169 | 0.871 | 0.962 | 0.870 | 0.956 |
+| cyrillic-number | 25 | 0.951 | 0.982 | 0.834 | 0.865 |
+| ucas | 22 | 0.692 | 0.920 | 0.685 | 0.921 |
+| cjk-unified | 18 | 0.757 | 0.948 | 0.738 | 0.941 |
+| hangul-compat-jamo | 17 | 0.880 | 0.938 | 0.876 | 0.934 |
+| cjk-compat | 16 | 0.930 | 0.963 | 0.889 | 0.913 |
+| ethiopic | 10 | 0.703 | 0.925 | 0.786 | 0.919 |
+| hangul-jamo | 10 | 0.723 | 0.906 | 0.749 | 0.906 |
+| hiragana | 7 | 0.753 | 0.907 | 0.647 | 0.907 |
+| katakana | 7 | 0.599 | 0.920 | 0.531 | 0.920 |
+| cherokee | 6 | 0.746 | 0.954 | 0.746 | 0.935 |
+| armenian | 2 | 0.753 | 0.964 | 0.697 | 0.908 |
+| other | 2 | 0.839 | 0.935 | 0.782 | 0.879 |
+| runic | 1 | 0.936 | 0.977 | 0.936 | 0.977 |
+| devanagari | 1 | 0.388 | 0.712 | 0.328 | 0.712 |
+| cyrillic | 1 | 0.853 | 0.672 | 0.853 | 0.695 |
+
+- **Lowest community entries.** On Flash these are `ua626e6e4` (0.13,
+  Ethiopic), `247` (0.26, Katakana), `81` (0.35, Yi + syllabics),
+  `u0e0888f4` (0.39, Hangul + Katakana + Devanagari), `u6f19f605` (0.43),
+  `ueb344e87`, `u9f99a25a`, `u091361af`, `10` and `u14b6de9d` (0.51–0.53).
+  On Multilingual v2 `247` drops to 0.05 and `ua626e6e4` rises to 0.52,
+  because that profile scores Katakana as read natively and Ethiopic by
+  transliteration.
+- **The low scripts are where the reader is least tested.** Katakana,
+  syllabics, Ethiopic, conjoining jamo, CJK unified, Hiragana and Cherokee
+  all average 0.60–0.76 for the community, against 0.85–0.88 for Yi and
+  Hangul. Our answers for those phrases score 0.91–0.95, partly because
+  Flash's profile leaves Ethiopic, syllabics, conjoining jamo and Runic off
+  by default, so the search writes them in other scripts. Only clips can say whether the community entries are
+  bad or the reader misreads these scripts. That is the Phase 3 probe.
+- **Script labels differ from the library's.** The earlier check grouped by
+  the library's own character types and found Cherokee at 0.66. Entry `81`'s
+  U+14B0 lies in the syllabics block, but the library labels it Cherokee.
+  Here it counts as `ucas`.
+- **Where ours scores below the community.** That's 14 entries on Flash
+  and 16 on Multilingual v2, nearly all within 0.05. The largest gap is
+  `uf4b4957b` (0.85 vs 0.67). Its community text uses ҂ (U+0482, Cyrillic
+  thousands sign), which transliterates to `*1000*` and reads as "one
+  thousand" in one codepoint. The search never offers it: `cyrillic-number`
+  starts at U+0483, so U+0482 counts as plain Cyrillic. Filed as #49, to
+  check live in the probe.
+- **Multilingual v2** lowers community and ours alike by about 0.01 overall.
+  It costs most where its profile is wary: `҈` (cyrillic-number, community
+  0.951 → 0.834, ours 0.982 → 0.865) and CJK compatibility. Community
+  entries in Ethiopic and conjoining jamo score higher there, because its
+  profile gives those scripts lower risks.
+
+**exp15 result (real TTS, 2026-11-26, 500 credits; 3342/10000 used after):
+in the low-scoring scripts the community entries are better than predicted,
+and our answers worse. Offline we led by 0.23; heard, we lead by 0.03.**
+Setup: the 52 library entries whose community text has Katakana, Cherokee,
+Ethiopic, Canadian syllabics, conjoining jamo, Hiragana, Armenian or
+Devanagari (`tools/experiments/exp15.keys`, 6 of them among the 34), plus our
+top answer for each phrase. Flash v2.5, seeds 1 and 2, exp1's voice. 212
+clips, 24 of them cached. There were also two ҂ checks (#49). Truth is as in
+`calibrate`: the mean of heard-phone and Whisper fidelity. Numbers come from
+`phono calibrate data/generated/clips-exp15.tsv --dump`, grouped by the
+scripts of each phrase's community text. For the community rows,
+`phono calibrate --by-script` on the community clips gives the same numbers.
+"Gap" is predicted − truth. The risk penalty is what the predictor
+subtracts (`risk_scale` 1.3 × the per-codepoint risk). "Gap without risk"
+adds it back. The reference is the scripts the risk barely touches: on exp1
+(the 34 community messages) Latin, Hangul and Yi clips have gap +0.03 to
++0.04, and +0.04 to +0.05 without risk. In exp15 the same scripts in these
+52 entries are at +0.05 to +0.06 without risk.
+
+| script | n | community: predicted | risk penalty | truth | gap | gap without risk | ours: predicted | truth | ours > community |
+|---|---|---|---|---|---|---|---|---|---|
+| ucas | 22 | 0.692 | 0.123 | 0.776 | −0.08 | +0.04 | 0.920 | 0.807 | 11 |
+| ethiopic | 10 | 0.703 | 0.111 | 0.725 | −0.02 | +0.09 | 0.925 | 0.666 | 3 |
+| hangul-jamo | 10 | 0.723 | 0.060 | 0.683 | +0.04 | +0.10 | 0.906 | 0.762 | 9 |
+| katakana | 7 | 0.599 | 0.124 | 0.706 | −0.11 | +0.02 | 0.920 | 0.780 | 4 |
+| hiragana | 7 | 0.753 | 0.136 | 0.829 | −0.08 | +0.06 | 0.907 | 0.808 | 3 |
+| cherokee | 6 | 0.746 | 0.071 | 0.750 | −0.00 | +0.07 | 0.954 | 0.778 | 5 |
+| armenian | 2 | 0.753 | 0.071 | 0.859 | −0.11 | −0.04 | 0.964 | 0.814 | 1 |
+| devanagari | 1 | 0.388 | 0.169 | 0.607 | −0.22 | −0.05 | 0.712 | 0.511 | 0 |
+| **all 52** | 52 | **0.696** | | **0.745** | −0.05 | | **0.921** | **0.771** | **30** |
+
+Harness Whisper similarity is 0.80 / 0.81 per seed. Within-phrase ranking is
+24 of 36 pairs (66.7%), against about 80% on exp1–exp14.
+
+Whether the reader or the entries were wrong, per script:
+
+- **Katakana, Canadian syllabics, Hiragana: the reader's readings are right,
+  but Flash's script risks are too high.** Without the risk, these entries
+  over-predict by +0.02 to +0.06, at or below the +0.05 reference. With it,
+  they are under-predicted by 0.08–0.11. The community entries are fine
+  (truth 0.71–0.83). Hiragana's beat ours (0.829 vs 0.808). Filed as #50.
+  A caveat: the community's characters are hand-picked ones that work, and
+  the search would use any chunk in the script.
+- **Ethiopic, conjoining jamo: the entries are weak, and the risk is
+  earned.** Even without the risk the readings over-predict by +0.09 and
+  +0.10, about 0.05 above the reference, and the entries are heard at 0.73
+  and 0.68. Keeping syllabics, Ethiopic and jamo off by default on Flash
+  stands. Our answers beat jamo 9 of 10 times.
+- **Cherokee: about right either way.** The gap is −0.00 with risk and +0.07
+  without, and the entries are heard at 0.75. Ours win 5 of 6.
+- **Armenian, Devanagari:** 3 entries in all, too few to say.
+
+Our answers were over-predicted by +0.15 here. Some of that is expected,
+since the search picks the top of many predictions, but it is far above the
+community's +0.02 on exp1. The worst cases aren't about scripts:
+
+- **Pseudo-word targets:** names and coinages are misheard (`u531d33fc`,
+  `uea38b3b8`, `u585b9961`, `247`). That's item 5 below, short pseudo-words.
+- **A dropped first word** (`ua60036ce`).
+- **A runaway loop:** `ua626e6e4`'s answer, one Hangul syllable repeated, made
+  Flash loop for about half a minute on one seed (truth 0.27). The predictor
+  can't see that (#51).
+- **Recognizer noise:** some answers heard word-perfect (`uf9fa9b27`,
+  `uc5786e8c`) still score about 0.73, because the phone recognizer is noisy.
+  That caps truth below 1 for short phrases.
+
+Our answers for Ethiopic phrases lose 7 of 10. Three of the cases above
+(`u585b9961`, `ua60036ce`, `ua626e6e4`) are among them, and our answers aren't written in Ethiopic
+(it's off by default).
+
+**҂ (#49).** It was heard as a thousand on all 4 clips, but "one" was dropped
+on 2 of them, like `҈`'s "hundred thousand". It's worth adding as a chunk for
+"thousand", with a risk for the dropped "one".
+
+So the low offline community scores in these scripts are half right. For
+Katakana, syllabics and Hiragana the risk table is too harsh. For Ethiopic
+and jamo the entries really are weak, and Cherokee is in between. The bigger lesson is that our
+lead shrinks a lot on hard phrases (0.92 vs 0.70 predicted, 0.77 vs 0.75
+heard). The full run (#45) and the refit (#46) should show whether that holds
+across the library.
+
+**exp16 result (real TTS, 2026-11-26, 1971 credits; 5313/10000 used after):
+across the whole library, our answers and the community's sound about the
+same. Heard, ours lead by 0.01; predicted, by 0.10.**
+Setup: the 246 library entries not in exp15 (`tools/experiments/exp16.keys`,
+the 34 among them), plus our top answer for each phrase. Six of our answers
+were identical to the community text, so they were merged. That gives 486
+cases and 972 clips, 862 of them new. Flash v2.5, seeds 1 and 2, exp1's
+voice. The cost was 81% of the dry-run estimate (≤ 2426).
+- Harness Whisper similarity: 0.91 and 0.92 per seed.
+- Identical transcripts across seeds: 317 of 486.
+
+With exp15, every one of the 298 entries now has clips. Numbers are
+`phono calibrate` on `clips-exp15-16.tsv` (`--dump`), truth as in exp15,
+paired by key:
+
+| entries | n | community: predicted | truth | ours: predicted | truth | ours better / tied / worse |
+|---|---|---|---|---|---|---|
+| **all 298** | 298 (ours 292) | 0.858 | **0.844** | 0.954 | **0.854** | 118 / 67 / 107 |
+| the 34 | 34 (ours 32) | 0.843 | 0.819 | 0.958 | 0.867 | 16 / 7 / 9 |
+| the other 264 | 264 (ours 260) | 0.859 | 0.847 | 0.953 | 0.853 | 102 / 60 / 98 |
+
+Within-phrase ranking over both experiments is 86 of 132 pairs (65.2%). On
+exp1–exp16 together (1764 Flash clips) v6's weights rank 264 of 346
+(76.3%), and the hand-set weights 251 (72.5%).
+
+- **The 34 flattered us.** On them we lead by 0.05 heard, as in exp5–exp8.
+  On the other 264 we lead by 0.006, winning 102 and losing 98.
+- **Our answers are over-predicted by +0.10; the community's by +0.01.**
+  Without the risk, community entries in Latin, Hangul and Yi over-predict
+  by +0.03 to +0.04 (`calibrate --by-script` on the community clips alone).
+  That is the cleanest reference so far. In the same scripts our answers are
+  at +0.08 to +0.10. Part of that is the winner's curse. The rest is what
+  the predictor doesn't see in the cases where we lose most:
+  - **Words run together.** Our answer drops a space or comma, or puts two
+    words in one run of glyphs, and the TTS blurs them into one:
+    `uca070d66`, `uffdeb2e3`, `uda8c79e2`. The community entries keep the
+    boundary.
+  - **Chunk misreads:** `u07765a28` (b heard as d), `u3454bfcc`.
+  - **Mixed-script mush:** `uf4b4957b`'s answer mixes Katakana, Yi, Hangul
+    and a CJK character, and two of its words were not heard at all.
+  - The exp15 cases (`u585b9961`, `ua626e6e4`, `uea38b3b8`) are still among
+    the ten worst.
+- **Script risks (#50), community clips over all 298.** The reference is
+  +0.03 without risk. The scripts exp15 covered are unchanged, since exp15
+  already had every entry in them. Two scripts are new:
+  - CJK unified, 36 clips: −0.01 with risk, +0.06 without, so the risk is
+    about earned.
+  - `҈` (Cyrillic number signs), 50 clips: +0.08 with risk and +0.09
+    without, so it is under-penalized. Our answers using it are at +0.13.
+
+**Refit on exp1–exp16 (#46): not adopted; v6's weights stay.**
+`phono fit` now keeps phrases that share a non-Latin chunk of two or more
+glyphs in the same cross-validation fold (`--group chunk`, the default).
+`--group phrase` is v6's per-phrase split.
+- **The groups:** on the 1764 clips, 311 phrases fall into 133 groups. One
+  group holds 142 phrases. Folds are balanced by phrase count, so that group
+  fills one fold.
+- **Effect on the estimate:** held-out ranking comes out 0.3–1.0 points lower
+  than with per-phrase folds, as expected.
+- **Two `fit` fixes:**
+  - It now picks λ by held-out ranking. Loss chose λ 0, whose weights
+    (`del_schwa` 30, free insertions, `risk_scale` 0) rank held-out pairs
+    below v6.
+  - The "new in the last experiment" check now orders experiments by number.
+    It had taken exp9 for the last.
+
+Held-out within-phrase ranking (5 chunk-grouped folds × 4, pairs ≥ 0.05
+apart, substitution scales fixed). v6's weights weren't fitted on these
+folds, so v6's row is its ranking of every pair. That includes the exp1–exp6
+pairs v6 was fitted on, which favours v6.
+
+| weights | held-out ranking | new in exp16 (fit without, 88 pairs) |
+|---|---|---|
+| v6 (current) | 76.3% | 55/88 |
+| refit from v6, λ 0.01 | **78.5%** (78.3–78.9) | 55/88 |
+| refit from hand-set, λ 0.003 | 77.7% | 55/88 |
+| refit from v6, `risk_scale` held at 1.3, λ 0.003 | 77.2% | 55/88 |
+
+The best refit raises deletion costs, as v6 did (`del_onset` 1.22 → 2.44,
+`del_consonant` 1.23 → 2.68). It also cuts `risk_scale` from 1.3 to 0.48.
+`phono eval` and `phono calibrate` with those weights compared with v6:
+- **Answers:** 30 of the 298 change. They lean to CJK unified characters
+  (32 → 40 codepoints across all answers).
+- **Offline fidelity** rises (community 0.858 → 0.900, ours 0.954 → 0.967),
+  but so does over-prediction. Community Latin, Hangul and Yi go from +0.01
+  to +0.05, so the absolute numbers get worse.
+- **Pooled correlation:** 0.605 → 0.609 on all clips, but 0.534 → 0.519 on
+  the community clips.
+- **Per script, a single lower `risk_scale` helps some and hurts others.**
+  Katakana, syllabics and Hiragana move to the reference. Conjoining jamo
+  (+0.14), Ethiopic (+0.08) and CJK unified (+0.08) end up under-penalized.
+  CJK is where the new answers go, and our CJK answers are already the most
+  over-predicted in exp15–exp16 (+0.135).
+
+The decision: the cross-validated gain is real but small (+2.2 points).
+Most of it is the `risk_scale` cut, which is the wrong fix: the scripts
+disagree, so they need risks set per script (#50). Holding `risk_scale`
+leaves +0.9 points, and the test closest to a new harness run (fit without
+exp16's answers, test on them) shows no gain for any refit. Refit again
+once #50 has set per-script risks.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -1270,7 +1529,8 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
 3. ~~The scorer's weights are hand-set.~~ Fitted in v6 (`phono fit`):
    ranking on held-out phrases improves by about 3 points, but the search's
    answers barely change. Refit after each new harness run (`phono fit
-   data/generated/clips-allN.tsv`).
+   data/generated/clips-allN.tsv`). The refit on exp1–exp16 was not
+   adopted (see "Refit on exp1–exp16"): set per-script risks first (#50).
 5. **Readings of short pseudo-words.** The TTS reads `kwi` like "kawaii",
    `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
    read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or

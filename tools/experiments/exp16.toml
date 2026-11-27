@@ -1,0 +1,18 @@
+name = "exp16"
+description = """
+Full run of the community library (track community-library_20261126, issue #45): the 246
+library entries not in exp15 (keys in exp16.keys; the 34 hand-picked messages are among them,
+and their exp1 clips are cached), plus phono's top answer for each phrase. Together with exp15
+this covers all 298 entries, community and ours, for the chunk-grouped refit (#46) and the
+Flash script-risk question (#50). Same model, voice and seeds as exp1.
+Cases come from gitignored files: `sample/library.json` (`mise run //tools:fetch-library`)
+and `phono eval sample/library.json --subset tools/experiments/exp16.keys --export
+data/generated/ours-exp16.json` (they contain the library's phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 2450
+cases_from = ["sample/library.json", "data/generated/ours-exp16.json"]
+cases_keys = "tools/experiments/exp16.keys"

@@ -4,7 +4,7 @@ mod fit;
 
 use clap::{Parser, Subcommand};
 use phono_core::Engine;
-use phono_core::chunks::Scripts;
+use phono_core::chunks::{Script, Scripts};
 use phono_core::phone::{fmt_phones, fmt_word_phones};
 use phono_core::reading::Word;
 use phono_core::score::Op;
@@ -108,6 +108,10 @@ enum Command {
         /// --risk-scale and --spelling).
         #[arg(long)]
         hand: bool,
+        /// Also summarize by script: each clip counts under every script in its own text, with
+        /// the script-risk penalty it paid and the over-prediction with and without it.
+        #[arg(long)]
+        by_script: bool,
     },
     /// Fit the scorer's weights to harness clips by within-phrase ranking, with cross-validation.
     Fit {
@@ -115,6 +119,10 @@ enum Command {
         clips: PathBuf,
         #[arg(long, default_value_t = 5)]
         folds: usize,
+        /// What each cross-validation fold keeps together: phrases sharing a non-Latin chunk
+        /// (default), or each phrase alone (v6's fit).
+        #[arg(long, value_enum, default_value_t = fit::Grouping::Chunk)]
+        group: fit::Grouping,
         #[arg(long, default_value_t = 4)]
         repeats: usize,
         /// What to fit against.
@@ -130,14 +138,27 @@ enum Command {
         #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
         lambdas: Vec<f32>,
     },
-    /// Score the community sample messages and compress their phrases.
+    /// Score the community library's entries and compress their phrases (each entry's
+    /// `target`, else its `spoken` label). `mise run //tools:fetch-library` writes the library.
     Eval {
-        #[arg(default_value = "sample/messages.json")]
+        #[arg(default_value = "sample/library.json")]
         messages: PathBuf,
         /// Also write our top answers in the same JSON shape, for a harness experiment
         /// (`cases_from`). It contains the sample phrases, so keep it out of git.
         #[arg(long)]
         export: Option<PathBuf>,
+        /// Also summarize by script (each entry counts once under every script in its
+        /// community text) and list the lowest-scoring community entries.
+        #[arg(long)]
+        by_script: bool,
+        /// Score only the entries whose keys are listed in this file: one per line, or the
+        /// last tab-separated field (so `tools/library-keys.tsv` selects the hand-picked 34).
+        #[arg(long)]
+        subset: Option<PathBuf>,
+        /// Also summarize the entries listed in this file (same format as `--subset`), if it
+        /// exists: by default the hand-picked 34 that exp1–exp10 used.
+        #[arg(long, default_value = "tools/library-keys.tsv")]
+        named_subset: PathBuf,
     },
 }
 
@@ -308,6 +329,7 @@ fn main() -> Result<(), String> {
             voicing,
             dump,
             hand,
+            by_script,
         } => {
             let heard = phono_core::score::Heard {
                 vowel_scale: heard_vowel_scale,
@@ -330,11 +352,20 @@ fn main() -> Result<(), String> {
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
-            calibrate(&engine, &clips, worst, &heard, &predict, dump.as_ref())?
+            calibrate(
+                &engine,
+                &clips,
+                worst,
+                &heard,
+                &predict,
+                dump.as_ref(),
+                by_script,
+            )?
         }
         Command::Fit {
             clips,
             folds,
+            group,
             repeats,
             truth,
             fix,
@@ -344,6 +375,7 @@ fn main() -> Result<(), String> {
             let mut engine = engine;
             let opts = fit::FitOpts {
                 folds,
+                group,
                 repeats,
                 lambdas,
                 truth,
@@ -357,88 +389,167 @@ fn main() -> Result<(), String> {
                 &opts,
             )?
         }
-        Command::Eval { messages, export } => eval(&engine, &messages, export.as_ref())?,
+        Command::Eval {
+            messages,
+            export,
+            by_script,
+            subset,
+            named_subset,
+        } => eval(
+            &engine,
+            &messages,
+            export.as_ref(),
+            by_script,
+            subset.as_ref(),
+            &named_subset,
+        )?,
     }
     Ok(())
 }
 
-/// Minimal reader for the community messages file: [{"<id>": {"unicode": .., "spoken": ..}}, ..].
+/// Reads a reference messages file: `[{"<key>": {"unicode": .., "spoken": .., "target": ..}}, ..]`.
+/// Returns `(key, unicode, phrase)` in file order, where the phrase is the entry's `target`
+/// (set by `//tools:fetch-library`) or, when that is missing or empty, its `spoken` label.
 fn load_messages(path: &PathBuf) -> Result<Vec<(String, String, String)>, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    parse_messages(&text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+fn parse_messages(text: &str) -> Result<Vec<(String, String, String)>, String> {
+    let items: Vec<serde_json::Map<String, serde_json::Value>> =
+        serde_json::from_str(text).map_err(|e| e.to_string())?;
+    let field = |m: &serde_json::Value, name: &str| {
+        m.get(name)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
     let mut out = Vec::new();
-    // Pull "unicode" and "spoken" string fields in order; ids are the keys before them.
-    let mut rest = text.as_str();
-    while let Some(pos) = rest.find("\"unicode\"") {
-        let before = &rest[..pos];
-        let id = before
-            .rfind("\": {")
-            .and_then(|e| before[..e].rfind('"').map(|s| before[s + 1..e].to_string()));
-        rest = &rest[pos..];
-        let unicode = json_string_field(rest, "unicode").ok_or("bad unicode field")?;
-        let spoken = json_string_field(rest, "spoken").ok_or("bad spoken field")?;
-        out.push((id.unwrap_or_default(), unicode, spoken));
-        rest = &rest[9..];
+    for item in &items {
+        for (key, m) in item {
+            let unicode = field(m, "unicode").ok_or(format!("{key}: no unicode field"))?;
+            let phrase = field(m, "target")
+                .or_else(|| field(m, "spoken"))
+                .ok_or(format!("{key}: no spoken field"))?;
+            out.push((key.clone(), unicode, phrase));
+        }
     }
     Ok(out)
 }
 
-fn json_string_field(s: &str, name: &str) -> Option<String> {
-    let start = s.find(&format!("\"{name}\""))?;
-    let after = &s[start + name.len() + 2..];
-    let q = after.find('"')?;
-    let mut out = String::new();
-    let mut chars = after[q + 1..].chars();
-    while let Some(c) = chars.next() {
-        match c {
-            '"' => return Some(out),
-            '\\' => match chars.next()? {
-                'n' => out.push('\n'),
-                'u' => {
-                    let hex: String = chars.by_ref().take(4).collect();
-                    out.push(char::from_u32(u32::from_str_radix(&hex, 16).ok()?)?);
-                }
-                other => out.push(other),
-            },
-            c => out.push(c),
-        }
-    }
-    None
+/// Keys from a subset file: one per line (the last tab-separated field), `#` comments skipped.
+fn parse_keys(text: &str) -> std::collections::HashSet<String> {
+    text.lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .filter_map(|l| l.rsplit('\t').next().map(|k| k.trim().to_string()))
+        .collect()
 }
 
-fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(), String> {
-    let messages = load_messages(path)?;
+/// The scripts a message is written in, in [`Script::ALL`] order. Whitespace and ASCII
+/// punctuation don't count, so `latin` means Latin letters or digits.
+fn scripts_in(text: &str) -> Vec<Script> {
+    let mut out: Vec<Script> = text
+        .chars()
+        .filter(|c| !c.is_whitespace() && !c.is_ascii_punctuation())
+        .map(Script::of)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Means of per-item values grouped by script, for `eval` and `calibrate --by-script`. Each
+/// item counts once under every script in its text ([`scripts_in`]).
+struct ByScript<const N: usize>(std::collections::BTreeMap<Script, (usize, [f32; N])>);
+
+impl<const N: usize> ByScript<N> {
+    fn new() -> Self {
+        Self(Default::default())
+    }
+
+    fn add(&mut self, text: &str, values: [f32; N]) {
+        for script in scripts_in(text) {
+            let (n, sums) = self.0.entry(script).or_insert((0, [0.0; N]));
+            *n += 1;
+            for (s, v) in sums.iter_mut().zip(values) {
+                *s += v;
+            }
+        }
+    }
+
+    /// (script, items, mean of each value), in [`Script::ALL`] order.
+    fn rows(&self) -> Vec<(Script, usize, [f32; N])> {
+        self.0
+            .iter()
+            .map(|(&s, &(n, sums))| (s, n, sums.map(|x| x / n as f32)))
+            .collect()
+    }
+}
+
+fn eval(
+    engine: &Engine,
+    path: &PathBuf,
+    export: Option<&PathBuf>,
+    by_script: bool,
+    subset: Option<&PathBuf>,
+    named_subset: &PathBuf,
+) -> Result<(), String> {
+    let mut messages = load_messages(path)?;
+    if let Some(keys_path) = subset {
+        let text = std::fs::read_to_string(keys_path)
+            .map_err(|e| format!("{}: {e}", keys_path.display()))?;
+        let keys = parse_keys(&text);
+        messages.retain(|(id, _, _)| keys.contains(id));
+        eprintln!(
+            "subset {}: {} of {} keys found",
+            keys_path.display(),
+            messages.len(),
+            keys.len()
+        );
+    }
+    if messages.is_empty() {
+        return Err("no messages to score".into());
+    }
     let searcher = Searcher::new(engine);
     let cfg = SearchConfig {
         top_n: 1,
         ..Default::default()
     };
-    let (mut theirs, mut ours, mut wins) = (0.0, 0.0, 0);
+    let mut results: Vec<(&str, f32, f32)> = Vec::new(); // id, community, ours
+    let mut stats = ByScript::<3>::new(); // community, ours, ours ≥ community
+    let mut scored: Vec<(f32, &str, &str)> = Vec::new();
     let mut exported = Vec::new();
+    // Library keys (`u` + 8 hex) are wider than the hand-picked ones.
+    let w = messages
+        .iter()
+        .map(|(id, _, _)| id.len())
+        .max()
+        .unwrap_or(0)
+        .max(6);
     println!(
-        "{:<6} {:<28} {:>6} {:<10} {:>6} {:<10}",
+        "{:<w$} {:<28} {:>6} {:<10} {:>6} {:<10}",
         "id", "phrase", "theirs", "", "ours", ""
     );
-    for (id, unicode, spoken) in &messages {
-        let target = engine.target_of(spoken);
+    for (id, unicode, phrase) in &messages {
+        let target = engine.target_of(phrase);
         let their = engine.predict(unicode, &target, &engine.profile.predict);
-        let best = searcher.search(spoken, &cfg);
+        let best = searcher.search(phrase, &cfg);
         let (our_text, our) = best
             .first()
             .map(|c| (c.text.clone(), c.fidelity))
             .unwrap_or_default();
-        theirs += their;
-        ours += our;
-        if our >= their {
-            wins += 1;
-        }
+        results.push((id, their, our));
+        stats.add(unicode, [their, our, f32::from(u8::from(our >= their))]);
+        scored.push((their, id, unicode));
         println!(
-            "{id:<6} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
-            truncate(spoken, 28)
+            "{id:<w$} {:<28} {their:>6.3} {unicode:<10} {our:>6.3} {our_text:<10}",
+            truncate(phrase, 28)
         );
         exported.push(format!(
             "  {{\"{id}\": {{\"unicode\": {}, \"spoken\": {}, \"notes\": \"phono top-1, predicted {our:.3} (community {their:.3})\"}}}}",
             json_quote(&our_text),
-            json_quote(spoken)
+            json_quote(phrase)
         ));
     }
     if let Some(out) = export {
@@ -446,14 +557,72 @@ fn eval(engine: &Engine, path: &PathBuf, export: Option<&PathBuf>) -> Result<(),
             .map_err(|e| format!("{}: {e}", out.display()))?;
         eprintln!("wrote {}", out.display());
     }
-    let n = messages.len() as f32;
+    if by_script {
+        println!(
+            "\n{:<20} {:>4} {:>9} {:>6} {:>6}",
+            "script", "n", "community", "ours", "ours≥"
+        );
+        for (script, n, [t, o, w]) in stats.rows() {
+            let w = (w * n as f32).round();
+            println!("{:<20} {n:>4} {t:>9.3} {o:>6.3} {w:>6}", script.name());
+        }
+        scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+        println!("\nlowest community scores:");
+        for (their, id, unicode) in scored.iter().take(15) {
+            let names: Vec<_> = scripts_in(unicode).into_iter().map(Script::name).collect();
+            println!("  {id:<w$} {their:>6.3}  {}", names.join(","));
+        }
+    }
+    let all = Summary::of(&results);
     println!(
-        "\nmean fidelity: community {:.3}, ours {:.3}; ours ≥ community on {wins}/{}",
-        theirs / n,
-        ours / n,
-        messages.len()
+        "\nmean fidelity: community {:.3}, ours {:.3}; ours ≥ community on {}/{}",
+        all.community, all.ours, all.wins, all.n
     );
+    // A missing file just means no named subset, e.g. outside this repo's layout.
+    if let Ok(text) = std::fs::read_to_string(named_subset) {
+        let keys = parse_keys(&text);
+        let picked: Vec<_> = results
+            .iter()
+            .copied()
+            .filter(|(id, _, _)| keys.contains(*id))
+            .collect();
+        if !picked.is_empty() && picked.len() < results.len() {
+            let sub = Summary::of(&picked);
+            println!(
+                "  {} ({} of {} keys): community {:.3}, ours {:.3}; ours ≥ community on {}/{}",
+                named_subset.display(),
+                sub.n,
+                keys.len(),
+                sub.community,
+                sub.ours,
+                sub.wins,
+                sub.n
+            );
+        }
+    }
     Ok(())
+}
+
+/// Mean community and ours fidelity over `eval` results, and how often ours ≥ community.
+struct Summary {
+    n: usize,
+    community: f32,
+    ours: f32,
+    wins: usize,
+}
+
+impl Summary {
+    fn of(results: &[(&str, f32, f32)]) -> Summary {
+        let n = results.len();
+        let mean =
+            |f: fn(&(&str, f32, f32)) -> f32| results.iter().map(f).sum::<f32>() / n.max(1) as f32;
+        Summary {
+            n,
+            community: mean(|r| r.1),
+            ours: mean(|r| r.2),
+            wins: results.iter().filter(|r| r.2 >= r.1).count(),
+        }
+    }
 }
 
 fn json_quote(s: &str) -> String {
@@ -634,6 +803,7 @@ fn calibrate(
     heard: &phono_core::score::Heard,
     predict: &phono_core::Predict,
     dump: Option<&PathBuf>,
+    by_script: bool,
 ) -> Result<(), String> {
     let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
@@ -742,6 +912,26 @@ fn calibrate(
             mean(|r| r.whisper)
         );
     }
+    if by_script {
+        // Penalty as the predictor applies it: risk_scale × the profile's per-codepoint risk.
+        let mut stats = ByScript::<3>::new(); // predicted, risk penalty, truth
+        for (r, t) in rows.iter().zip(&truth) {
+            let penalty = predict.risk_scale * engine.profile.risk(&r.clip.text);
+            stats.add(&r.clip.text, [r.predicted, penalty, *t]);
+        }
+        println!(
+            "\n{:<20} {:>5} {:>9} {:>7} {:>6} {:>6} {:>12}",
+            "script", "clips", "predicted", "penalty", "truth", "gap", "gap w/o risk"
+        );
+        for (script, n, [p, k, t]) in stats.rows() {
+            println!(
+                "{:<20} {n:>5} {p:>9.3} {k:>7.3} {t:>6.3} {:>+6.3} {:>+12.3}",
+                script.name(),
+                p - t,
+                p + k - t
+            );
+        }
+    }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
     for r in rows.iter().take(worst) {
@@ -762,4 +952,72 @@ fn calibrate(
         let _ = words;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ByScript, Summary, parse_keys, parse_messages, scripts_in};
+    use phono_core::chunks::Script;
+
+    #[test]
+    fn messages_prefer_target_and_fall_back_to_spoken() {
+        let text = r#"[
+            {"8": {"id": "x", "unicode": "ab", "spoken": "a/b", "target": "a", "notes": ""}},
+            {"u1": {"unicode": "cd", "spoken": "c d", "characters": [{"unicodeName": "C"}]}},
+            {"3": {"unicode": "ef", "spoken": "e f", "target": ""}}
+        ]"#;
+        let got = parse_messages(text).unwrap();
+        let want = [("8", "ab", "a"), ("u1", "cd", "c d"), ("3", "ef", "e f")];
+        assert_eq!(got.len(), want.len());
+        for ((k, u, p), (wk, wu, wp)) in got.iter().zip(want) {
+            assert_eq!((k.as_str(), u.as_str(), p.as_str()), (wk, wu, wp));
+        }
+    }
+
+    #[test]
+    fn messages_need_unicode_and_a_phrase() {
+        assert!(parse_messages(r#"[{"1": {"spoken": "a"}}]"#).is_err());
+        assert!(parse_messages(r#"[{"1": {"unicode": "a"}}]"#).is_err());
+        assert!(parse_messages("not json").is_err());
+    }
+
+    #[test]
+    fn subset_keys_take_the_last_tab_field_and_skip_comments() {
+        let keys = parse_keys("# header\n\n8\nabcd-1234\t10\n  u1a2b3c4d  \n");
+        let mut got: Vec<_> = keys.into_iter().collect();
+        got.sort();
+        assert_eq!(got, ["10", "8", "u1a2b3c4d"]);
+    }
+
+    #[test]
+    fn summary_means_and_counts_ties_as_wins() {
+        let s = Summary::of(&[("a", 0.8, 0.9), ("b", 0.6, 0.6), ("c", 1.0, 0.5)]);
+        assert_eq!((s.n, s.wins), (3, 2));
+        assert!((s.community - 0.8).abs() < 1e-6);
+        assert!((s.ours - 2.0 / 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn scripts_ignore_spaces_and_punctuation() {
+        assert_eq!(scripts_in("ꀠ 딧-잇!"), [Script::Hangul, Script::Yi]);
+        assert_eq!(
+            scripts_in("Z Q丁낫x"),
+            [Script::Latin, Script::Hangul, Script::CjkUnified]
+        );
+        assert!(scripts_in(" -!? ").is_empty());
+    }
+
+    #[test]
+    fn by_script_counts_each_item_once_per_script() {
+        let mut stats = ByScript::<2>::new();
+        stats.add("ꀠ딧", [0.5, 0.9]);
+        stats.add("딧잇", [0.7, 0.6]);
+        let rows = stats.rows();
+        assert_eq!(rows.len(), 2);
+        let (script, n, [a, b]) = rows[0];
+        assert_eq!((script, n), (Script::Hangul, 2));
+        assert!((a - 0.6).abs() < 1e-6 && (b - 0.75).abs() < 1e-6);
+        assert_eq!((rows[1].0, rows[1].1), (Script::Yi, 1));
+        assert_eq!(rows[1].2, [0.5, 0.9]);
+    }
 }

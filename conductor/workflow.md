@@ -16,7 +16,7 @@ Tickets are GitHub Issues on `jordanpg/phonocompressor`, tracked on the user pro
 **The repo is public, so issues are public**, even though the board is private. Never put these in an issue, comment or PR:
 
 - secrets (`ELEVENLABS_API_KEY`, fnox config) or account details beyond credit counts;
-- the contents of `sample/messages.json` (gitignored reference messages) or audio clips;
+- the contents of `sample/library.json` or `sample/messages.json` (gitignored reference messages), submitter names, the library URL, or audio clips. Cite library cases by key;
 - personal details such as accounts or specific channels and people. Naming Twitch chat as the original use case is fine where it gives context.
 
 Issue, comment and PR text follows the same rule as commits: **no AI attribution lines**.
@@ -153,8 +153,9 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Format | No diffs | `mise run fmt:check` |
 | Lint | Clippy with `-D warnings`; ruff clean | `mise run lint` |
 | Rust tests | All passing | `cargo test --workspace` |
+| Python tests | All passing, if `tools/` changed | `mise run //tools:test` |
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
-| Engine output | `phono eval` checked before vs. after; regressions explained | `mise run phono eval` |
+| Engine output | `phono eval` checked before vs. after, on all library entries and the hand-picked 34; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
 | wasm32 | `phono-core` and `phono-wasm` still build for wasm | `mise run //crates/wasm:check` |
 | WASM parity | The binding still gives the CLI's guesses, if the core, `compress --json` or `crates/wasm` changed | `mise run //crates/wasm:parity` |
@@ -162,7 +163,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 
 The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in the root `mise.toml`). The wasm-bindgen CLI is pinned in `crates/wasm/mise.toml`; the first `//crates/wasm:*` task installs it, or `mise install --monorepo` does.
 
-`phono eval` needs `sample/messages.json`, and `calibrate` needs exported clips; both are gitignored and local. `//crates/wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
+`phono eval` needs `sample/library.json` (`mise run //tools:fetch-library`; the URL comes from fnox, so a fresh worktree needs the main checkout's `fnox.toml`), and `calibrate` needs exported clips; both are gitignored and local. Compare `eval`'s summary for all entries and for the hand-picked 34. Re-fetching can add or change entries, so check the fetch's content hash before comparing runs. Over all 298 entries `eval` takes about 10 minutes (release build); `--subset tools/library-keys.tsv` scores only the 34, for a quick check while iterating. `//crates/wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
 
 In a fresh git worktree, run `git submodule update --init` before the gates: the core's tests read Phoible's feature table from `phoible/`.
 
@@ -192,6 +193,7 @@ mise run //crates/wasm:build                 # target/wasm-pkg (.wasm, JS glue, 
 mise run //crates/wasm:serve                 # test page at http://127.0.0.1:8000/ (/?bench times it)
 
 # Harness (free)
+mise run //tools:fetch-library               # community library to sample/library.json (URL from fnox)
 mise run //tools:credits
 mise run //tools:synth <exp>                 # dry run: estimated cost
 mise run //tools:transcribe <exp>
