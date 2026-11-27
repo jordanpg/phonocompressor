@@ -6,30 +6,11 @@ extends = "cargo:lint"
 description = "Run this crate's tests"
 extends = "cargo:test"
 
-# The data release's reproducibility gate: two builds of the same commit must be byte-identical,
-# or a release's checksum would change on every rebuild. Two separate processes, so each
-# HashMap gets a different random seed.
+# The data release's reproducibility gate (repro.sh): two builds of the same commit must be
+# byte-identical, or a release's checksum would change on every rebuild.
 [tasks.repro]
 description = "Check phono.bin is reproducible: build it twice into a temp directory and fail unless the bytes match"
-run = '''
-#!/usr/bin/env bash
-set -euo pipefail
-cd ../..
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-for n in 1 2; do
-  echo "build $n"
-  if ! cargo run --release -q -p phono-builder -- --out "$tmp/phono-$n.bin" > "$tmp/build-$n.log" 2>&1; then
-    cat "$tmp/build-$n.log" >&2
-    exit 1
-  fi
-done
-if ! cmp "$tmp/phono-1.bin" "$tmp/phono-2.bin"; then
-  echo "phono.bin is not reproducible: two builds of the same tree differ" >&2
-  exit 1
-fi
-echo "reproducible: $(sha256sum "$tmp/phono-1.bin" | cut -d' ' -f1)  phono.bin (format $(cargo run --release -q -p phono-builder -- --format-version))"
-'''
+run = "./repro.sh"
 
 # What a `phono-data/vX.Y.Z` release holds; the release workflow runs it after repro.
 [tasks.release-data]
