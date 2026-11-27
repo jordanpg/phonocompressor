@@ -1,6 +1,7 @@
 //! `phono`: try the phonocompressor engine from the command line.
 
 mod fit;
+mod risks;
 
 use clap::{Parser, Subcommand};
 use phono_core::Engine;
@@ -112,6 +113,15 @@ enum Command {
         /// the script-risk penalty it paid and the over-prediction with and without it.
         #[arg(long)]
         by_script: bool,
+        /// Also estimate each script's risk from these clips: least squares of the
+        /// over-prediction without risk on codepoints per script, with a baseline per source
+        /// (community, ours, probes). Prints current and fitted risks with 90% intervals.
+        #[arg(long)]
+        fit_risks: bool,
+        #[command(flatten)]
+        risk_fit: RiskFitArgs,
+        #[command(flatten)]
+        risks: RiskArgs,
     },
     /// Fit the scorer's weights to harness clips by within-phrase ranking, with cross-validation.
     Fit {
@@ -128,7 +138,8 @@ enum Command {
         /// What to fit against.
         #[arg(long, value_enum, default_value_t = fit::TruthKind::Mean)]
         truth: fit::TruthKind,
-        /// Hold these parameters at their starting values (comma-separated names).
+        /// Hold these parameters at their starting values (comma-separated names, or `all` to
+        /// fit nothing, e.g. to measure `--refit-risks` alone).
         #[arg(long, value_delimiter = ',')]
         fix: Vec<String>,
         /// Start from, and regularize towards, the hand-set weights or the model profile's.
@@ -137,6 +148,19 @@ enum Command {
         /// L2 pull towards the hand-set weights (log space); cross-validation picks among these.
         #[arg(long, value_delimiter = ',', default_value = "0,0.003,0.01,0.03")]
         lambdas: Vec<f32>,
+        /// Before each fit, set the script risks from its training answers as `calibrate
+        /// --fit-risks` does, and hold `risk_scale`.
+        #[arg(long)]
+        refit_risks: bool,
+        /// Make these scripts' risks free parameters of the ranking fit (comma-separated names,
+        /// or `all`: every script but --risk-hold's). Scripts with fewer than --risk-min-clips
+        /// clips stay put.
+        #[arg(long, value_delimiter = ',', conflicts_with = "refit_risks")]
+        free_risks: Vec<String>,
+        #[command(flatten)]
+        risk_fit: RiskFitArgs,
+        #[command(flatten)]
+        risks: RiskArgs,
     },
     /// Score the community library's entries and compress their phrases (each entry's
     /// `target`, else its `spoken` label). `mise run //tools:fetch-library` writes the library.
@@ -160,6 +184,57 @@ enum Command {
         #[arg(long, default_value = "tools/library-keys.tsv")]
         named_subset: PathBuf,
     },
+}
+
+/// How `calibrate --fit-risks` and `fit --refit-risks` estimate script risks.
+#[derive(clap::Args)]
+struct RiskFitArgs {
+    /// Scripts whose risk stays as it is (the reference the others are measured against).
+    #[arg(long, value_delimiter = ',', default_value = "latin,hangul,yi")]
+    risk_hold: Vec<String>,
+    /// Fit a script's risk only if at least this many clips use it.
+    #[arg(long, default_value_t = risks::Opts::default().min_clips)]
+    risk_min_clips: f32,
+}
+
+impl RiskFitArgs {
+    fn opts(&self) -> Result<risks::Opts, String> {
+        Ok(risks::Opts {
+            hold: self
+                .risk_hold
+                .iter()
+                .map(|n| Script::from_name(n))
+                .collect::<Result<_, _>>()?,
+            min_clips: self.risk_min_clips,
+            ..risks::Opts::default()
+        })
+    }
+}
+
+/// Per-script risk overrides for prediction, to try values before they go in a profile.
+#[derive(clap::Args)]
+struct RiskArgs {
+    /// Predict with these per-codepoint risks instead of the profile's (comma-separated
+    /// `script=value`, e.g. `katakana=0.01,ucas=0.02`). The search's tiler still orders by the
+    /// profile's.
+    #[arg(long, value_delimiter = ',')]
+    risks: Vec<String>,
+}
+
+impl RiskArgs {
+    fn apply(&self, engine: &mut Engine) -> Result<(), String> {
+        for spec in &self.risks {
+            let (name, value) = spec
+                .split_once('=')
+                .ok_or(format!("--risks: expected script=value, got {spec:?}"))?;
+            let value: f32 = value
+                .trim()
+                .parse()
+                .map_err(|e| format!("--risks {spec:?}: {e}"))?;
+            engine.risks[Script::from_name(name)?.index()] = value;
+        }
+        Ok(())
+    }
 }
 
 /// One `phono compress --json` result. The wasm binding returns the same fields except
@@ -330,6 +405,9 @@ fn main() -> Result<(), String> {
             dump,
             hand,
             by_script,
+            fit_risks,
+            risk_fit,
+            risks,
         } => {
             let heard = phono_core::score::Heard {
                 vowel_scale: heard_vowel_scale,
@@ -352,14 +430,23 @@ fn main() -> Result<(), String> {
             if let Some(v) = voicing {
                 engine.set_feature_weight("periodicGlottalSource", v)?;
             }
+            risks.apply(&mut engine)?;
+            let fit_risks = if fit_risks {
+                Some(risk_fit.opts()?)
+            } else {
+                None
+            };
             calibrate(
                 &engine,
                 &clips,
                 worst,
                 &heard,
                 &predict,
-                dump.as_ref(),
-                by_script,
+                &CalibrateReports {
+                    dump: dump.as_ref(),
+                    by_script,
+                    fit_risks: fit_risks.as_ref(),
+                },
             )?
         }
         Command::Fit {
@@ -371,8 +458,25 @@ fn main() -> Result<(), String> {
             fix,
             lambdas,
             prior,
+            refit_risks,
+            free_risks,
+            risk_fit,
+            risks,
         } => {
             let mut engine = engine;
+            risks.apply(&mut engine)?;
+            let risk_opts = risk_fit.opts()?;
+            let free_risks: Vec<Script> = if free_risks.iter().any(|n| n == "all") {
+                Script::ALL
+                    .into_iter()
+                    .filter(|s| !risk_opts.hold.contains(s))
+                    .collect()
+            } else {
+                free_risks
+                    .iter()
+                    .map(|n| Script::from_name(n))
+                    .collect::<Result<_, _>>()?
+            };
             let opts = fit::FitOpts {
                 folds,
                 group,
@@ -381,6 +485,9 @@ fn main() -> Result<(), String> {
                 truth,
                 fix,
                 prior,
+                risk_min_clips: risk_opts.min_clips,
+                refit_risks: refit_risks.then_some(risk_opts),
+                free_risks,
             };
             fit::run(
                 &mut engine,
@@ -796,15 +903,28 @@ fn within_phrase_ranking(rows: &[(&Clip, f32)], truth: &[f32]) -> (usize, usize)
     (right, pairs)
 }
 
+/// What `calibrate` reports beyond its summary.
+struct CalibrateReports<'a> {
+    /// Write per-clip rows here.
+    dump: Option<&'a PathBuf>,
+    by_script: bool,
+    /// Fit script risks with these options.
+    fit_risks: Option<&'a risks::Opts>,
+}
+
 fn calibrate(
     engine: &Engine,
     path: &PathBuf,
     worst: usize,
     heard: &phono_core::score::Heard,
     predict: &phono_core::Predict,
-    dump: Option<&PathBuf>,
-    by_script: bool,
+    reports: &CalibrateReports,
 ) -> Result<(), String> {
+    let CalibrateReports {
+        dump,
+        by_script,
+        fit_risks,
+    } = *reports;
     let clips = load_clips(path, engine.profile)?;
     // Truth is measured with the hand-set weights whatever the engine predicts with.
     let scorer =
@@ -850,7 +970,7 @@ fn calibrate(
                     )
                 })
                 .collect();
-            let risk = engine.profile.risk(&r.clip.text);
+            let risk = engine.risk(&r.clip.text);
             let (spell, share) = phono_core::words::spelling(&target, &read).unwrap_or((0.0, 0.0));
             out += &format!(
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -916,7 +1036,7 @@ fn calibrate(
         // Penalty as the predictor applies it: risk_scale × the profile's per-codepoint risk.
         let mut stats = ByScript::<3>::new(); // predicted, risk penalty, truth
         for (r, t) in rows.iter().zip(&truth) {
-            let penalty = predict.risk_scale * engine.profile.risk(&r.clip.text);
+            let penalty = predict.risk_scale * engine.risk(&r.clip.text);
             stats.add(&r.clip.text, [r.predicted, penalty, *t]);
         }
         println!(
@@ -931,6 +1051,21 @@ fn calibrate(
                 p + k - t
             );
         }
+    }
+    if let Some(opts) = fit_risks {
+        let mut phrases = std::collections::BTreeMap::new();
+        let items: Vec<risks::Item> = rows
+            .iter()
+            .zip(&truth)
+            .map(|(r, &t)| {
+                let n = phrases.len();
+                risks::Item {
+                    cluster: *phrases.entry(r.clip.target.as_str()).or_insert(n),
+                    ..risk_item(engine, predict, r.clip, t, 1.0)
+                }
+            })
+            .collect();
+        print_risk_fit(engine, &items, predict.risk_scale, opts);
     }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
@@ -952,6 +1087,94 @@ fn calibrate(
         let _ = words;
     }
     Ok(())
+}
+
+/// A clip (or an answer averaged over `weight` clips) as an item for [`risks::fit`], in
+/// cluster 0 (the caller sets the phrase).
+fn risk_item(
+    engine: &Engine,
+    predict: &phono_core::Predict,
+    clip: &Clip,
+    truth: f32,
+    weight: f32,
+) -> risks::Item {
+    let target = engine.target_of(&clip.target);
+    let (_, words) = engine.read(&clip.text);
+    let no_risk = phono_core::Predict {
+        risk_scale: 0.0,
+        ..*predict
+    };
+    let share = match phono_core::words::spelling(&target.words, &words) {
+        Some((_, share)) if predict.spelling > 0.0 => 1.0 - predict.spelling * share,
+        _ => 1.0,
+    };
+    risks::Item {
+        counts: risks::Item::counts(&clip.text),
+        share,
+        excess: engine.predict_read(&clip.text, &words, &target, &no_risk) - truth,
+        source: risks::Source::of_case(&clip.exp, &clip.case),
+        weight,
+        cluster: 0,
+    }
+}
+
+/// Fit script risks on `items` and print the table.
+fn print_risk_fit(engine: &Engine, items: &[risks::Item], risk_scale: f32, opts: &risks::Opts) {
+    let f = risks::fit(items, &engine.risks, risk_scale, opts);
+    let boot = risks::bootstrap(items, &engine.risks, risk_scale, opts, 200);
+    let held: Vec<&str> = opts.hold.iter().map(|s| s.name()).collect();
+    println!(
+        "\nscript risks fitted on {} items (risk_scale {risk_scale}; held: {}; fitted if ≥ {} clips; 90% interval by resampling phrases):",
+        items.len(),
+        held.join(", "),
+        opts.min_clips
+    );
+    let base: Vec<String> = risks::Source::ALL
+        .iter()
+        .zip(f.baseline)
+        .filter_map(|(s, b)| b.map(|b| format!("{} {b:+.3}", s.name())))
+        .collect();
+    println!("baseline over-prediction: {}", base.join(", "));
+    println!(
+        "{:<20} {:>6} {:>6} {:>6} {:>8} {:>8} {:>8} {:>17}",
+        "script", "comm.", "ours", "probe", "cp/clip", "current", "fitted", "90% interval"
+    );
+    for (i, script) in Script::ALL.iter().enumerate() {
+        let mut clips = [0f32; 3];
+        let mut cps = 0f32;
+        for it in items.iter().filter(|it| it.counts[i] > 0.0) {
+            clips[it.source as usize] += it.weight;
+            cps += it.weight * it.counts[i];
+        }
+        let total: f32 = clips.iter().sum();
+        if total == 0.0 {
+            continue;
+        }
+        let interval = if f.free[i] {
+            let mut v: Vec<f32> = boot.iter().map(|b| b[i]).collect();
+            v.sort_by(f32::total_cmp);
+            let q = |p: f32| v[((v.len() - 1) as f32 * p).round() as usize];
+            format!("[{:+.3}, {:+.3}]", q(0.05), q(0.95))
+        } else {
+            "held".to_string()
+        };
+        let fitted = if f.free[i] {
+            format!("{:+.3}", f.raw[i])
+        } else {
+            "-".to_string()
+        };
+        println!(
+            "{:<20} {:>6} {:>6} {:>6} {:>8.2} {:>8.3} {:>8} {:>17}",
+            script.name(),
+            clips[0],
+            clips[1],
+            clips[2],
+            cps / total,
+            engine.risks[i],
+            fitted,
+            interval
+        );
+    }
 }
 
 #[cfg(test)]
