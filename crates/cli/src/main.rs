@@ -1,5 +1,6 @@
 //! `phono`: try the phonocompressor engine from the command line.
 
+mod by_word;
 mod fit;
 mod risks;
 
@@ -113,6 +114,11 @@ enum Command {
         /// the script-risk penalty it paid and the over-prediction with and without it.
         #[arg(long)]
         by_script: bool,
+        /// Also summarize how each word of the reading was heard (recognized phones aligned
+        /// per word), by word source and answer source, and list the worst-heard G2P words with
+        /// any lower-ranked G2P reading that matches what was heard better.
+        #[arg(long)]
+        by_word: bool,
         /// Whisper text similarity from which an answer counts as heard well, for the
         /// close-enough table (each answer is the mean over its clips).
         #[arg(long, default_value_t = 0.8)]
@@ -419,6 +425,7 @@ fn main() -> Result<(), String> {
             dump,
             hand,
             by_script,
+            by_word,
             heard_well,
             fit_risks,
             risk_fit,
@@ -450,6 +457,7 @@ fn main() -> Result<(), String> {
                 worst,
                 dump,
                 by_script,
+                by_word,
                 heard_well,
                 fit_risks: if fit_risks {
                     Some(risk_fit.opts()?)
@@ -1066,6 +1074,7 @@ struct Report {
     worst: usize,
     dump: Option<PathBuf>,
     by_script: bool,
+    by_word: bool,
     heard_well: f32,
     /// Fit script risks with these options.
     fit_risks: Option<risks::Opts>,
@@ -1226,6 +1235,16 @@ fn calibrate(
             })
             .collect();
         print_risk_fit(engine, &items, predict.risk_scale, opts);
+    }
+    if report.by_word {
+        by_word::report(
+            engine,
+            &clips,
+            &scorer,
+            heard,
+            phono_core::reading::READING_NBEST,
+            report.worst,
+        );
     }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
