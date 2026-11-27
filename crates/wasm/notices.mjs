@@ -1,5 +1,7 @@
 // Write the web bundle's third-party notices: one HTML page with the licenses of the Rust crates
 // compiled into the .wasm and of the data in phono.bin. The deploy serves it with the bundle.
+// With --data-only, write just the data notices, for the phono-data release (no crates, so no
+// cargo-about or wasm32 target needed).
 //
 // Crates: cargo-about (config: about.toml) picks each crate's license from its license expression
 // and finds the text in the crate's own files. The list is phono-wasm's dependency graph on wasm32
@@ -11,7 +13,8 @@
 // Data: the CMUdict and deunicode license texts are read from cmudict/ and the crate's source,
 // and the submodule commits from git, so they match what `mise run data` builds from.
 //
-// Usage: mise run //crates/wasm:notices [--out <file>] (default: target/wasm-pkg/third-party-notices.html)
+// Usage: mise run //crates/wasm:notices [--data-only] [--out <file>]
+// (default: target/wasm-pkg/third-party-notices.html, or target/phono-data/ with --data-only)
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -23,10 +26,13 @@ const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const TARGET = "wasm32-unknown-unknown";
 const REPO = "https://github.com/jordanpg/phonocompressor";
 
-const { values: flags } = parseArgs({ options: { out: { type: "string" } } });
+const { values: flags } = parseArgs({
+  options: { out: { type: "string" }, "data-only": { type: "boolean" } },
+});
+const DATA_ONLY = flags["data-only"] ?? false;
 const OUT = flags.out
   ? resolve(flags.out)
-  : join(ROOT, "target/wasm-pkg/third-party-notices.html");
+  : join(ROOT, DATA_ONLY ? "target/phono-data" : "target/wasm-pkg", "third-party-notices.html");
 
 function fail(message) {
   console.error(`notices: ${message}`);
@@ -228,8 +234,32 @@ ${texts}`,
   };
 }
 
-const licenses = crateLicenses(shippedCrates());
-const crates = crateSection(licenses);
+/** The page's opening paragraph, contents and body, for the bundle or the data release. */
+function content() {
+  if (DATA_ONLY) {
+    return {
+      what: `phonocompressor's data file, <code>phono.bin</code>, contains other people's work, under
+  the licenses below.`,
+      toc: `<li><a href="#data">Data in <code>phono.bin</code></a></li>`,
+      body: dataSection(),
+      summary: "3 data sources",
+    };
+  }
+  const licenses = crateLicenses(shippedCrates());
+  const crates = crateSection(licenses);
+  return {
+    what: `phonocompressor runs in your browser from a WebAssembly module and a data file,
+  <code>phono.bin</code>. Both contain other people's work, under the licenses below.`,
+    toc: `<li><a href="#data">Data in <code>phono.bin</code></a></li>
+<li><a href="#crates">Rust crates in the WebAssembly module</a></li>
+<li><a href="#licenses">License texts</a></li>`,
+    body: `${dataSection()}
+${crates.body}`,
+    summary: `${crates.count} crates, ${licenses.length} license texts, 3 data sources`,
+  };
+}
+
+const { what, toc, body, summary } = content();
 const page = `<!doctype html>
 <html lang="en">
 <head>
@@ -252,8 +282,7 @@ const page = `<!doctype html>
 <main>
 <h1>Third-party notices</h1>
 <p>
-  phonocompressor runs in your browser from a WebAssembly module and a data file,
-  <code>phono.bin</code>. Both contain other people's work, under the licenses below.
+  ${what}
 </p>
 <p>
   phonocompressor itself is licensed under the Apache License 2.0
@@ -261,12 +290,9 @@ const page = `<!doctype html>
   <a href="${REPO}">${REPO.replace("https://", "")}</a>.
 </p>
 <ul>
-<li><a href="#data">Data in <code>phono.bin</code></a></li>
-<li><a href="#crates">Rust crates in the WebAssembly module</a></li>
-<li><a href="#licenses">License texts</a></li>
+${toc}
 </ul>
-${dataSection()}
-${crates.body}
+${body}
 </main>
 </body>
 </html>
@@ -274,7 +300,4 @@ ${crates.body}
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, page);
-console.log(
-  `notices: wrote ${OUT} ` +
-    `(${crates.count} crates, ${licenses.length} license texts, 3 data sources)`,
-);
+console.log(`notices: wrote ${OUT} (${summary})`);

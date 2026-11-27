@@ -30,7 +30,7 @@ run = [
 
 # The license gate for the bundle: fails on a crate license not accepted in about.toml.
 [tasks.notices]
-description = "Write target/wasm-pkg/third-party-notices.html: licenses of the .wasm's crates (cargo-about) and phono.bin's data; --out"
+description = "Write target/wasm-pkg/third-party-notices.html: licenses of the .wasm's crates (cargo-about) and phono.bin's data; --out, --data-only (just the data, for the phono-data release)"
 run = "node notices.mjs"
 
 [tasks.parity]
