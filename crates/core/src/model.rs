@@ -237,7 +237,8 @@ pub static MULTILINGUAL_V2: ModelProfile = ModelProfile {
 ///     exp11 heard it as "Hander a thousand" and exp12's worst messages contain it.
 ///   - Canadian syllabics, Ethiopic, conjoining jamo: −0.04, −0.08, −0.09 vs +0.03, +0.03,
 ///     −0.01 (20 or so codepoints each), so their risks come down (0.05 → 0.02, 0.05 → 0,
-///     0.03 → 0). `phono fit` pointed the same way: without this it cut `risk_scale` to 0.14,
+///     0.03 → 0). These are this model's own values: Flash's syllabics risk later fell to 0.01
+///     (#50), and this one stays at 0.02. `phono fit` pointed the same way: without this it cut `risk_scale` to 0.14,
 ///     because answers in these scripts beat the risk's prediction within phrases (8 pairs).
 ///     All three stay off by default, so this changes scoring, not the default search.
 ///   - Every other script's excess was within the ±0.03 that Flash's in-sample check shows.
@@ -266,9 +267,13 @@ fn multilingual_v2_scripts(s: Script) -> ScriptProfile {
     }
 }
 
-/// Flash v2.5's scripts, from exp0–exp4:
+/// Flash v2.5's scripts, from exp0–exp4 (risks for kana and syllabics revised on exp1–exp16):
 /// - Latin, Hangul and Yi behaved; CJK, kana, syllabics, Ethiopic and conjoining jamo produced
 ///   most misreadings (the risk values).
+/// - Kana and syllabics read better than those risks said (#50). `phono calibrate --fit-risks`
+///   on exp1–exp16's 1764 clips puts Katakana and Hiragana at 0 per codepoint (0.03 before) and
+///   syllabics at 0.01 (0.05). Set from each cross-validation fold's training clips, these three
+///   raise held-out within-phrase ranking from 76.4% to 77.2% with the weights below.
 /// - Ethiopic, Canadian syllabics and conjoining Hangul jamo were misread often (mean outcome
 ///   0.59, 0.69 and 0.64 across clips vs 0.76–0.80 for Hangul, Latin, Yi), and Runic came out
 ///   silent or as "Yeah." (exp0 `ᚠ`), so they are off by default.
@@ -278,11 +283,13 @@ fn flash_v2_5_scripts(s: Script) -> ScriptProfile {
     use Script::*;
     use ScriptReading::*;
     let (reading, risk) = match s {
-        Latin | Hangul | Yi | CjkCompat | CyrillicNumber => (Transliterated, 0.0),
-        HangulCompatJamo | Cherokee => (Transliterated, 0.01),
-        CjkUnified | Hiragana | Katakana | HangulJamo => (Transliterated, 0.03),
+        Latin | Hangul | Yi | CjkCompat | CyrillicNumber | Hiragana | Katakana => {
+            (Transliterated, 0.0)
+        }
+        HangulCompatJamo | Cherokee | Ucas => (Transliterated, 0.01),
+        CjkUnified | HangulJamo => (Transliterated, 0.03),
         Runic | Armenian => (Transliterated, 0.04),
-        Ucas | Ethiopic => (Transliterated, 0.05),
+        Ethiopic => (Transliterated, 0.05),
         Devanagari | Cyrillic => (Native, 0.1),
         Other => (Unmeasured, 0.1),
     };
@@ -374,10 +381,12 @@ mod tests {
             p.script(Script::CyrillicNumber).risk > FLASH_V2_5.script(Script::CyrillicNumber).risk
         );
         assert!(p.preference(Script::Hangul) < p.preference(Script::Yi));
-        // Syllabics, Ethiopic and conjoining jamo read better here than Flash's risks say.
-        for s in [Script::Ucas, Script::Ethiopic, Script::HangulJamo] {
+        // Ethiopic and conjoining jamo read better here than Flash's risks say. Syllabics keep
+        // this model's own risk (exp11–exp13), whatever Flash's is.
+        for s in [Script::Ethiopic, Script::HangulJamo] {
             assert!(p.script(s).risk < FLASH_V2_5.script(s).risk, "{s:?}");
         }
+        assert_eq!(p.script(Script::Ucas).risk, 0.02);
     }
 
     #[test]
@@ -404,6 +413,14 @@ mod tests {
         assert!(p.script(Script::Hangul).default_on);
         assert!(!p.script(Script::Runic).default_on);
         assert!(p.preference(Script::Hangul) < p.preference(Script::Yi));
-        assert!((p.risk("ᐊ가") - 0.05).abs() < 1e-6);
+        assert!((p.risk("ᐊ가") - 0.01).abs() < 1e-6);
+        // #50: kana and syllabics read about as well as Latin once picked by hand.
+        assert_eq!(p.script(Script::Katakana).risk, 0.0);
+        assert_eq!(p.script(Script::Hiragana).risk, 0.0);
+        assert!(p.script(Script::Hiragana).default_on);
+        assert!(
+            !p.script(Script::Ucas).default_on,
+            "syllabics stay off by default"
+        );
     }
 }
