@@ -158,6 +158,10 @@ enum Command {
         /// any lower-ranked G2P reading that matches what was heard better.
         #[arg(long)]
         by_word: bool,
+        /// With --by-word, also write one row per reader word (what it reads, what was heard
+        /// for it, its fidelity and any G2P reading that matches better) as TSV.
+        #[arg(long, requires = "by_word")]
+        word_dump: Option<PathBuf>,
         /// Whisper text similarity from which an answer counts as heard well, for the
         /// close-enough table (each answer is the mean over its clips).
         #[arg(long, default_value_t = 0.8)]
@@ -466,6 +470,7 @@ fn main() -> Result<(), String> {
             hand,
             by_script,
             by_word,
+            word_dump,
             heard_well,
             fit_risks,
             risk_fit,
@@ -498,6 +503,7 @@ fn main() -> Result<(), String> {
                 dump,
                 by_script,
                 by_word,
+                word_dump,
                 heard_well,
                 fit_risks: if fit_risks {
                     Some(risk_fit.opts()?)
@@ -1115,6 +1121,7 @@ struct Report {
     dump: Option<PathBuf>,
     by_script: bool,
     by_word: bool,
+    word_dump: Option<PathBuf>,
     heard_well: f32,
     /// Fit script risks with these options.
     fit_risks: Option<risks::Opts>,
@@ -1284,7 +1291,8 @@ fn calibrate(
             heard,
             engine.reader_params.g2p.nbest,
             report.worst,
-        );
+            report.word_dump.as_deref(),
+        )?;
     }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");

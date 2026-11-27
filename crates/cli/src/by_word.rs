@@ -17,6 +17,7 @@ use phono_core::phone::{Phone, fmt_phones};
 use phono_core::reading::Source;
 use phono_core::score::{Heard, Scorer, flatten_target};
 use std::collections::BTreeMap;
+use std::path::Path;
 
 /// Readings checked per G2P word.
 pub const WIDE_NBEST: usize = 10;
@@ -88,8 +89,12 @@ pub fn report(
     heard: &Heard,
     reader_nbest: usize,
     worst: usize,
-) {
+    dump: Option<&Path>,
+) -> Result<(), String> {
     let space = &engine.features;
+    let mut rows = String::from(
+        "exp\tcase\tanswer\ttext\twhisper\tword\tkind\treads\theard\tfidelity\tbetter\n",
+    );
     let mut by_kind: BTreeMap<(Answer, Kind), Tally> = BTreeMap::new();
     let mut ranks: BTreeMap<(Answer, bool, Rank), usize> = BTreeMap::new();
     let mut words: BTreeMap<String, WordStats> = BTreeMap::new();
@@ -106,11 +111,30 @@ pub fn report(
         for (w, hw) in read.iter().zip(&heard_words) {
             let kind = Kind::of(w.source, &w.text);
             let f = hw.fidelity();
+            let ipa: Vec<&str> = hw.segments.iter().map(|&g| space.segment_name(g)).collect();
+            let ipa = ipa.join(" ");
+            let row = |better: &str| {
+                format!(
+                    "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.3}\t{}\n",
+                    c.exp,
+                    c.case,
+                    answer.name(),
+                    c.text,
+                    c.whisper,
+                    w.text,
+                    kind.name(),
+                    fmt_phones(&w.phones),
+                    ipa,
+                    f,
+                    better
+                )
+            };
             let t = by_kind.entry((answer, kind)).or_default();
             t.n += 1;
             t.fidelity += f;
             let control = w.source == Source::Dictionary;
             if w.source != Source::G2p && !control {
+                rows += &row("");
                 continue;
             }
             let fid = |p: &[Phone]| {
@@ -142,6 +166,9 @@ pub fn report(
                 Some(_) => Rank::Wide,
             };
             *ranks.entry((answer, control, rank)).or_default() += 1;
+            rows += &row(&best
+                .map(|(k, _, p)| format!("#{} {}", k + 1, fmt_phones(p)))
+                .unwrap_or_default());
             if control {
                 continue;
             }
@@ -153,8 +180,7 @@ pub fn report(
                 s.better.entry(fmt_phones(p)).or_insert((0, k + 1)).0 += 1;
             }
             if s.clips == 1 || f < s.example.0 {
-                let ipa: Vec<&str> = hw.segments.iter().map(|&g| space.segment_name(g)).collect();
-                s.example = (f, ipa.join(" "), c.whisper.clone());
+                s.example = (f, ipa, c.whisper.clone());
             }
         }
     }
@@ -224,4 +250,8 @@ pub fn report(
             s.example.2
         );
     }
+    if let Some(path) = dump {
+        std::fs::write(path, rows).map_err(|e| format!("{}: {e}", path.display()))?;
+    }
+    Ok(())
 }
