@@ -30,3 +30,8 @@ if ! cmp "$tmp/phono-1.bin" "$tmp/phono-2.bin"; then
 fi
 echo "reproducible: $(sha256sum "$tmp/phono-1.bin" | cut -d' ' -f1)  phono.bin (format $(cargo run --release -q -p phono-builder -- --format-version))"
 '''
+
+# What a `phono-data/vX.Y.Z` release holds; the release workflow runs it after repro.
+[tasks.release-data]
+description = "Write a phono-data release to target/phono-data/: phono.bin.gz, manifest.json, data notices, SHA256SUMS. Args: <X.Y.Z> (major = data format), --out, --allow-dirty"
+run = "node release-data.mjs"
