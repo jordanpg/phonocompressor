@@ -7,6 +7,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Default)]
 pub struct Lexicon {
     /// Lowercase word → pronunciations, most common first (CMUdict order).
+    #[serde(serialize_with = "crate::data::sorted_map")]
     pub words: HashMap<String, Vec<Vec<Phone>>>,
 }
 
