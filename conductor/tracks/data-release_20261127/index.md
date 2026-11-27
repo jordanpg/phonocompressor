@@ -12,7 +12,7 @@
 ## Progress
 
 - Phases: 0/4 complete
-- Tasks: 0/8 complete
+- Tasks: 1/8 complete
 
 ## Quick Links
 

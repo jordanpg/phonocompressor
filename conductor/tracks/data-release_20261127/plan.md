@@ -23,7 +23,7 @@ Same commit, same bytes, without changing the format.
 
 ### Tasks
 
-- [~] Task 1.1: Serialize `Translit.map` (`crates/core/src/chunks.rs`) and `Lexicon.words` (`crates/core/src/lexicon.rs`) in sorted key order with serde `serialize_with` helpers, keeping the `HashMap` types. Tests first: two maps with the same entries built in different insertion orders serialize to identical bytes, and the bytes still deserialize into the same `Data`. `FORMAT_VERSION` stays 2. ([#59](https://github.com/jordanpg/phonocompressor/issues/59))
+- [x] Task 1.1: Serialize `Translit.map` (`crates/core/src/chunks.rs`) and `Lexicon.words` (`crates/core/src/lexicon.rs`) in sorted key order with serde `serialize_with` helpers, keeping the `HashMap` types. Tests first: two maps with the same entries built in different insertion orders serialize to identical bytes, and the bytes still deserialize into the same `Data`. `FORMAT_VERSION` stays 2. ([#59](https://github.com/jordanpg/phonocompressor/issues/59))
 - [ ] Task 1.2: Add `phono-build --format-version` (prints `FORMAT_VERSION` and exits) and a `//crates/builder:repro` task that builds `phono.bin` twice into a temp directory and fails unless they're byte-identical. If the G2P model's maps turn out unstable, sort them too. ([#60](https://github.com/jordanpg/phonocompressor/issues/60))
 
 ### Verification
