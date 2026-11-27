@@ -152,8 +152,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 |---|---|---|
 | Format | No diffs | `mise run fmt:check` |
 | Lint | Clippy with `-D warnings`; ruff clean | `mise run lint` |
-| Rust tests | All passing | `cargo test --workspace` |
-| Python tests | All passing, if `tools/` changed | `mise run //tools:test` |
+| Tests | All passing: `cargo test --workspace`, then the harness's pytest | `mise run test` |
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after, on all library entries and the hand-picked 34; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
@@ -169,9 +168,11 @@ In a fresh git worktree, run `git submodule update --init` before the gates: the
 
 To fix formatting: `mise run fmt`.
 
+`mise run ci` runs format, lint, tests and the wasm32 check in turn; GitHub Actions' `checks` job runs it on `main`. `mise run ci:affected` runs the same gates only in the projects changed since `origin/main` and the projects that depend on them; the pre-push hook and CI on pull requests run that. CI's `wasm` job also runs the data build, the notices license gate and WASM parity on every PR. Engine output and prediction stay local, since they need gitignored files. Run `mise run hooks` once per clone to enable the hooks: pre-commit fixes and checks the staged files (rustfmt, ruff), pre-push runs `ci:affected`.
+
 ## Development commands
 
-Run these from the repo root. Workspace tasks (`data`, `phono`, `fmt`, `fmt:check`, `lint`) are in the root `mise.toml`; the harness and the binding have their own, in `tools/` and `crates/wasm/`, and their tasks are named by path. `mise tasks --all` lists every task. Inside a project directory, `mise run :<task>` runs that project's task, and root tasks need `//:` (e.g. `mise run //:phono`).
+Run these from the repo root. Workspace tasks (`data`, `phono`, `fmt`, `fmt:check`, `lint`, `test`, `ci`, `ci:affected`, `hooks`) are in the root `mise.toml`; the harness and each crate have their own, in `tools/` and `crates/*/`, and their tasks are named by path. `mise tasks --all` lists every task. Inside a project directory, `mise run :<task>` runs that project's task, and root tasks need `//:` (e.g. `mise run //:phono`).
 
 ```sh
 # Setup (clone with --recurse-submodules first)
@@ -184,7 +185,9 @@ mise run phono score '҈㌀s' 'hundred thousand apartments'
 mise run phono read 'ꀠddꏒꀊm'
 
 # Check
-mise run fmt:check && mise run lint && cargo test --workspace
+mise run hooks                               # once per clone: staged-file fixes on commit, ci:affected on push
+mise run ci                                  # fmt:check, lint, test, wasm32 check (what CI runs on main)
+mise run ci:affected                         # the same, in projects changed since origin/main (PRs, pre-push)
 mise run phono eval
 mise run //crates/wasm:check && mise run //crates/wasm:parity
 

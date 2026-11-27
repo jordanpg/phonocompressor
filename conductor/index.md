@@ -46,7 +46,8 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 ```sh
 mise run data                                          # build data/generated/phono.bin
 mise run phono compress 'bad dream'                    # use the engine
-mise run fmt:check && mise run lint && cargo test --workspace
+mise run ci                                            # fmt:check, lint, test, wasm32 check (= CI on main)
+mise run ci:affected                                   # the same, only in projects changed since origin/main
 mise run phono eval                                    # engine regression check
 ```
 

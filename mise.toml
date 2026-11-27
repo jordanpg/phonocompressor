@@ -6,7 +6,20 @@ monorepo_root = true
 # workspace. `mise tasks --all` lists every task; `mise install --monorepo` installs every
 # project's tools (plain `mise install` only reads this file).
 [monorepo]
-config_roots = ["tools", "crates/wasm"]
+config_roots = ["tools", "crates/core", "crates/cli", "crates/builder", "crates/wasm"]
+
+# The project graph behind `mise run --affected`: the Cargo crates come from Cargo.toml, with
+# their path dependencies as edges. A changed file outside every project counts for all of them,
+# so the directories that aren't Cargo packages are declared here. Root files (mise.toml,
+# Cargo.lock, README.md, ...) and the submodules still count for everything.
+[monorepo.projects."custom:tools"]
+root = "tools"
+
+[monorepo.projects."custom:docs"]
+root = "docs"
+
+[monorepo.projects."custom:conductor"]
+root = "conductor"
 
 [tools]
 fnox = "latest"
@@ -15,6 +28,16 @@ fnox = "latest"
 rust = { version = "stable", targets = ["wasm32-unknown-unknown"] }
 uv = "latest"
 node = "26"                 # LTS; the wasm parity check and test page (and later web/)
+# Git hooks (hk.pkl). Keep the version equal to the hk package that hk.pkl imports.
+hk = "2.14.0"
+ruff = "latest"             # Python format and lint, here so the hooks find it from the repo root
+
+# Shared by every crate's mise.toml. cargo run in a member's directory acts on that package only.
+[task_templates."cargo:lint"]
+run = "cargo clippy --all-targets -- -D warnings"
+
+[task_templates."cargo:test"]
+run = "cargo test"
 
 [settings]
 experimental = true         # mise secrets is experimental
@@ -32,9 +55,12 @@ run = "cargo run --release -p phono-builder"
 description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"
 run = "cargo run --release -q -p phono-cli --"
 
-# --- Formatting & linting: Rust here, then each project's task of the same name ---
-# Use depends_post, not `mise run '//...:fmt'` in `run`: `...` also matches this root, so the
-# latter recurses. mise leaves the task itself out of its own depends_post.
+# --- Formatting, linting, tests ---
+# fmt and fmt:check run cargo once for the whole workspace, then each project's task of the same
+# name (ruff in tools/). lint and test only gather each project's task: every crate has its own
+# (crates/*/mise.toml), so `mise run --affected` can pick just the crates a change touches.
+# Use depends/depends_post, not `mise run '//...:x'` in `run`: `...` also matches this root, so
+# the latter recurses. mise leaves a task out of its own dependencies.
 
 [tasks.fmt]
 description = "Format all code: rustfmt, then every project's fmt (ruff in tools/)"
@@ -47,6 +73,42 @@ run = "cargo fmt --all --check"
 depends_post = ["//...:fmt:check"]
 
 [tasks.lint]
-description = "Lint: clippy (warnings are errors), then every project's lint (ruff in tools/)"
-run = "cargo clippy --workspace --all-targets -- -D warnings"
-depends_post = ["//...:lint"]
+description = "Lint every project: clippy per crate (warnings are errors), ruff in tools/"
+depends = ["//...:lint"]
+
+[tasks.test]
+description = "Run every project's tests: cargo test per crate, pytest in tools/"
+depends = ["//...:test"]
+
+# --- Gates: what CI and the git hooks run (hk.pkl; `mise run hooks` installs them) ---
+
+# One step at a time, so a failure is easy to find in the log. CI's wasm job adds the data build,
+# the license gate and the parity check, which take longer and need phono.bin.
+[tasks.ci]
+description = "Run every fast gate CI runs: fmt:check, lint, test, then the wasm32 build check"
+run = [
+  { task = "fmt:check" },
+  { task = "lint" },
+  { task = "test" },
+  { task = "//crates/wasm:check" },
+]
+
+# The same gates, in only the projects that changed since BASE (by merge base, plus uncommitted
+# and untracked files) and the projects that depend on them; see `[monorepo.projects]`. A change
+# to a root file (mise.toml, Cargo.lock, ...) selects every project. fmt:check stays whole-repo:
+# it takes under a second. The pre-push hook and CI on pull requests run this.
+[tasks."ci:affected"]
+description = "Run the ci gates only in projects changed since BASE (default origin/main) and their dependents"
+usage = 'arg "[base]" help="Git revision to compare against" default="origin/main"'
+run = [
+  { task = "fmt:check" },
+  "mise run --affected --affected-base {{usage.base}} lint",
+  "mise run --affected --affected-base {{usage.base}} test",
+  "mise run --affected --affected-base {{usage.base}} check",
+]
+
+# Not `hk install`: that writes into .git/hooks, which every worktree shares, so worktrees on
+# branches without hk.pkl would fail. .githooks/ is relative to each worktree.
+[tasks.hooks]
+description = "Use the git hooks in .githooks/ (hk.pkl): staged-file format/lint on commit, ci:affected on push"
+run = "git config core.hooksPath .githooks"

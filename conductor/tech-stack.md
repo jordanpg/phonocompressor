@@ -13,7 +13,7 @@
 | Backend | None: the engine runs client-side | — |
 | Database | None: one postcard-encoded data file | — |
 | Hosting | GitHub Pages (static) | Planned |
-| CI | None yet | — |
+| CI | GitHub Actions (`.github/workflows/ci.yml`), through mise | Working |
 
 ## Rust workspace
 
@@ -49,10 +49,12 @@ Package `phono-harness` 0.1.0, built with `uv_build`, run through the mise tasks
 | Dependency | Purpose |
 |---|---|
 | `httpx` ≥ 0.28 | ElevenLabs API |
-| `numpy` ≥ 2.0 | Audio and metrics |
-| `torch` ≥ 2.6 | Local ASR (GPU intended) |
-| `transformers` ≥ 4.56 | Whisper (words) and wav2vec2 (IPA phones) |
+| `numpy` ≥ 2.0 | Audio and metrics (`asr` group) |
+| `torch` ≥ 2.6 | Local ASR, GPU intended (`asr` group) |
+| `transformers` ≥ 4.56 | Whisper (words) and wav2vec2 (IPA phones) (`asr` group) |
 | `unidecode` ≥ 1.3 | Dev-only reading-model-T predictions (GPL; never shipped) |
+
+The ASR packages are a dependency group, `asr`, on by default (`default-groups`); `//tools:test` leaves it out (`--no-group asr`), so the tests and CI don't download torch.
 
 Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are defined in `tools/experiments/exp*.toml`. Clips and transcripts are cached in `.cache/harness/`, and reports go to `tools/results/` (both gitignored).
 
@@ -72,14 +74,15 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 - **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file) and its `third-party-notices.html` (`mise run //crates/wasm:notices`; see `THIRD_PARTY.md`). No server.
 - **Code distribution:** GitHub (`jordanpg/phonocompressor`), with submodules.
 - **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`//tools:credits`, `//tools:models`, `//tools:voices`, `//tools:synth`). `fnox.toml` is gitignored.
-- **CI:** none yet. `mise run fmt:check` and `mise run lint` are written to be CI-ready.
+- **CI:** GitHub Actions, `.github/workflows/ci.yml`, on every pull request and push to `main`. Job `checks` runs `mise run ci:affected origin/<base>` on a pull request, the same task as the pre-push hook, and `mise run ci` (fmt:check, lint, test, wasm32 check, everywhere) on `main`. Job `wasm` runs `mise run data` and `mise run //crates/wasm:parity`, which builds the binding and its notices (the license gate) first. No secrets: nothing in CI calls ElevenLabs or needs `sample/library.json`, so `phono eval` stays a local gate. Actions are pinned by commit SHA.
+- **Git hooks:** hk (`hk.pkl`), run from the wrappers in `.githooks/`; `mise run hooks` enables them per clone (sets `core.hooksPath`, relative, so a worktree on a branch without `.githooks/` runs none). pre-commit fixes and checks only the staged files (rustfmt, ruff format, ruff), with unstaged work stashed under hk's own refs, not the shared `git stash` list. pre-push runs `mise run ci:affected`. `--no-verify` or `HK=0` skips them.
 - **Issue tracking:** GitHub Issues on the public repo, planned on the private user project `phonocompressor` (#8), which is linked to the repo. Managed with the `gh` CLI (2.105; needs the `project` scope). Issue types: Feature, Bug, Task. Board fields: Status, Priority, Size, Iteration. See `workflow.md`.
 
 ## Development tools
 
 | Tool | Purpose | Config |
 |---|---|---|
-| mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node, the wasm-bindgen CLI and cargo-about (`mise install --monorepo`); runs all tasks | `mise.toml` (root), `tools/mise.toml`, `crates/wasm/mise.toml` |
+| mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node, hk, ruff, the wasm-bindgen CLI and cargo-about (`mise install --monorepo`); runs all tasks; picks the projects a change affects (`--affected`) | `mise.toml` (root), `tools/mise.toml`, `crates/*/mise.toml` |
 | wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `crates/wasm/mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
 | cargo-about 0.9.3 | Finds the license texts of the crates in the `.wasm` for the third-party notices, and fails on a license `about.toml` doesn't accept | `crates/wasm/mise.toml` (`github:EmbarkStudios/cargo-about`), `crates/wasm/about.toml` |
 | Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`), the test page server (`//crates/wasm:serve`) and the notices generator (`//crates/wasm:notices`); later `web/` | `mise.toml` (root) |
@@ -88,13 +91,14 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | fnox | Secret injection | `fnox.toml` (gitignored) |
 | rustfmt | Rust formatting | `rustfmt.toml` (edition 2024) |
 | clippy | Rust lint, warnings as errors | `mise run lint` |
-| ruff | Python format, lint, import sort | `[tool.ruff]` in `tools/pyproject.toml` |
+| ruff | Python format, lint, import sort (installed by mise) | `[tool.ruff]` in `tools/pyproject.toml` |
+| hk 2.14.0 | Git hooks: staged-file fixes on commit, `ci:affected` on push. Must equal the hk package `hk.pkl` imports | `hk.pkl`, `.githooks/` |
 
 ### Testing
 
 | Kind | Tool | Command |
 |---|---|---|
-| Rust unit tests | `cargo test` (inline `#[cfg(test)] mod tests`) | `cargo test --workspace` |
+| Rust unit tests | `cargo test` (inline `#[cfg(test)] mod tests`) | `cargo test --workspace` (or `mise run test`, which adds the harness's pytest) |
 | Engine regression | `phono eval` over the community library (`sample/library.json`, gitignored), with the hand-picked 34 as a subset | `mise run phono eval` |
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
 | Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run //tools:…` (spends credits) |
@@ -185,6 +189,16 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 **Decision:** Use mise's monorepo layout. The root keeps shared tools, fnox secrets and workspace tasks (`data`, `phono`, `fmt`, `fmt:check`, `lint`); `tools/` and `crates/wasm/` (later `web/`) have their own `mise.toml`, and their tasks are named by path (`//tools:synth`, `//crates/wasm:build`). No aliases for the old names. The harness tasks share a task template for `uv run phono-harness`.
 
 **Consequences:** Root `fmt`, `fmt:check` and `lint` run cargo, then each project's task of the same name (`depends_post = ["//...:fmt"]`), so a new project only adds its own tasks. mise forbids `secrets` in templates, so each API task lists the key itself. The wasm32 target stays on the root `rust`, because a second `rust@stable` request with other options breaks `mise install --monorepo`. Plain `mise install` only installs the root's tools; use `--monorepo`. Inside a project directory, a bare task name only finds that project's tasks.
+
+### Git hooks with hk, gates scoped with `mise run --affected`
+
+**Date:** 2026-11-26 · **Status:** accepted
+
+**Context:** Hooks that run the whole repo's gates on every commit or push get slower with each project, and the web front end will add the slowest (type checks, browser tests). Most changes touch one project.
+
+**Decision:** Hooks are hk's (`hk.pkl`). pre-commit fixes and checks the staged files with per-file tools only (rustfmt, ruff format, ruff). pre-push, and CI on pull requests, run `mise run ci:affected`: `lint`, `test` and `check` in the projects changed since the base and in the projects that depend on them, using mise's project graph. Cargo crates and their path dependencies come from `Cargo.toml`; `tools/`, `docs/` and `conductor/` are declared in `[monorepo.projects]`, since a file outside every project counts as a change to all of them. Each crate has its own `lint` and `test` (root templates `cargo:lint`, `cargo:test`); root `lint` and `test` only gather every project's. CI on `main` runs every gate (`mise run ci`). `fmt:check` stays whole-repo; it takes under a second.
+
+**Consequences:** A change to one crate lints and tests only that crate and its dependents; a docs or conductor change runs no lint or tests; root files (`mise.toml`, `Cargo.lock`, `README.md`, ...) and the submodules select everything. Clippy and tests now run once per crate, so dependencies can build twice with different features. Not `hk install`: it writes into `.git/hooks`, which worktrees share, and fails on branches without `hk.pkl`. The `.githooks/` wrappers resolve per worktree. When `web/` lands, mise finds it as a Node project; add `depends_add = ["cargo:phono-wasm"]` so a core or binding change runs its tests too.
 
 ## Version requirements
 

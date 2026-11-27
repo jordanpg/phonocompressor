@@ -1,0 +1,64 @@
+# Build, test and lint gates. On a pull request the `checks` job runs `mise run ci:affected`, the
+# same task as the pre-push hook: the gates in the projects the PR changes and in the projects
+# that depend on them (mise's project graph; see `[monorepo.projects]` in mise.toml). On main it
+# runs every gate (`mise run ci`). `wasm` builds phono.bin and the browser binding, runs the
+# license gate (notices) and checks the binding against the CLI, every time.
+# Neither job needs secrets: nothing here calls ElevenLabs or fetches the community library.
+# Both jobs always run (no `paths` filter), so they can be required checks.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  checks:
+    name: fmt, lint, test, wasm32 check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Submodules: phoible's feature table is include_str!'d by the tests; cmudict feeds the builder.
+      # Full history, so ci:affected can find the merge base with the PR's base branch.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: checks
+      - if: github.event_name == 'pull_request'
+        run: mise run ci:affected "origin/$BASE_REF"
+        env:
+          BASE_REF: ${{ github.base_ref }}
+      - if: github.event_name != 'pull_request'
+        run: mise run ci
+
+  wasm:
+    name: data, wasm build + notices, parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: wasm
+      - run: mise run data
+      # parity depends on build, which depends on notices (fails on a license about.toml rejects).
+      - run: mise run //crates/wasm:parity
