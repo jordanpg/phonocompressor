@@ -67,7 +67,7 @@ cd phonocompressor
 mise run data      # export transliteration table + build data/generated/phono.bin (~15 s)
 ```
 
-Tasks are split across three mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`), the harness in `tools/` and the binding in `crates/wasm/`. Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front.
+Tasks are split across mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`, `test`, `ci`, `ci:affected`, `hooks`), the harness in `tools/`, and each crate in `crates/` (`lint`, `test`; the binding's build tasks too). Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front. `mise run ci` runs the format, lint, test and wasm32 checks that GitHub Actions runs, and `mise run ci:affected` runs them only in the projects changed since `origin/main` (and the ones that depend on them). `mise run hooks` turns on the git hooks (`hk.pkl`): each commit formats and lints its staged files, and each push runs `ci:affected`.
 
 ### CLI
 
