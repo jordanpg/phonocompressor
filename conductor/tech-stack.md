@@ -14,6 +14,7 @@
 | Database | None: one postcard-encoded data file | — |
 | Hosting | GitHub Pages (static) | Planned |
 | CI | GitHub Actions (`.github/workflows/ci.yml`), through mise | Working |
+| Data releases | GitHub Releases tagged `phono-data/vX.Y.Z`, built by `.github/workflows/release-data.yml` (`docs/RELEASES.md`) | Working; first tag after merge |
 
 ## Rust workspace
 
@@ -22,7 +23,7 @@ Cargo workspace, `resolver = "3"`, version 0.1.0, license `Apache-2.0`.
 | Crate | Binary | Purpose | Dependencies |
 |---|---|---|---|
 | `crates/core` (`phono-core`) | — | Phone features, G2P, reader, scorer, search. No I/O; builds for `wasm32`. | `serde` 1 (derive), `postcard` 1 (alloc) |
-| `crates/builder` (`phono-builder`) | `phono-build` | Builds `data/generated/phono.bin` from Phoible, CMUdict, the G2P model and the transliteration table | `phono-core`, `clap` 4, `deunicode` 1.6 |
+| `crates/builder` (`phono-builder`) | `phono-build` | Builds `data/generated/phono.bin` from Phoible, CMUdict, the G2P model and the transliteration table; `--format-version` prints the data format. Tasks `repro` (two builds must be byte-identical) and `release-data` (`release-data.mjs`: writes a `phono-data` release) | `phono-core`, `clap` 4, `deunicode` 1.6 |
 | `crates/cli` (`phono-cli`) | `phono` | `compress` (`--json`), `score`, `read`, `phones`, `spell`, `eval`, `calibrate`, `fit` | `phono-core`, `clap` 4, `serde_json` 1 |
 | `crates/wasm` (`phono-wasm`) | — | Browser binding: `Engine` from the data file's bytes and a typed `compress()`; option checks. Also a test page (`www/`), its dev server (`serve.mjs`), the CLI parity check (`parity/`) and the third-party notices generator (`notices.mjs`, `about.toml`) | `phono-core`, `wasm-bindgen` =0.2.130, `tsify` 0.5 (`js`), `serde-wasm-bindgen` 0.6, `js-sys` 0.3 |
 
@@ -32,6 +33,8 @@ Build profiles: dependencies build at `opt-level = 2` and the workspace at `opt-
 
 - `data/generated/phono.bin`, postcard-encoded, built by `mise run data` (about 15 s). Not committed.
 - 12.5 MB since v3, mostly unpruned G2P tables (u64 keys + f32). Shrinking it (delta-coded keys, u16 log-probs, entropy pruning) matters for the WASM bundle.
+- Byte-reproducible: `Translit.map` and `Lexicon.words` stay `HashMap`s but are written in key order (`data::sorted_map`), so the same commit always gives the same bytes. `mise run //crates/builder:repro` checks a full build.
+- Format `FORMAT_VERSION` (2, in `crates/core/src/data.rs`); an engine rejects any other. Published as `phono-data/vX.Y.Z` releases with major = format (`docs/RELEASES.md`).
 
 ### Data sources
 
@@ -71,7 +74,12 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 ## Infrastructure
 
-- **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file) and its `third-party-notices.html` (`mise run //crates/wasm:notices`; see `THIRD_PARTY.md`). No server.
+- **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file) and its `third-party-notices.html` (`mise run //crates/wasm:notices`; see `THIRD_PARTY.md`). No server. The deploy mirrors the data file from a `phono-data` release, since GitHub Releases sends no CORS headers (`docs/RELEASES.md`).
+- **Data releases:** `.github/workflows/release-data.yml`.
+  - **On a pushed `phono-data/v*` tag:** it runs `//crates/builder:repro` and `//crates/builder:release-data <version>`, checks the files, then creates a GitHub Release with `phono.bin.gz`, `manifest.json`, the data-only `third-party-notices.html` and `SHA256SUMS`.
+  - **Permissions:** only the `publish` job has `contents: write`, and it runs no repository code.
+  - **Dry runs:** on pull requests that touch the data's inputs, and on `workflow_dispatch`. They upload the files as a workflow artifact without creating a release.
+  - **Tag protection:** `phono-data/*` tags are protected by ruleset 28262654, so only the admin can create, move or delete them.
 - **Code distribution:** GitHub (`jordanpg/phonocompressor`), with submodules.
 - **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`//tools:credits`, `//tools:models`, `//tools:voices`, `//tools:synth`). `fnox.toml` is gitignored.
 - **CI:** GitHub Actions, `.github/workflows/ci.yml`, on every pull request and push to `main`. Job `checks` runs `mise run ci:affected origin/<base>` on a pull request, the same task as the pre-push hook, and `mise run ci` (fmt:check, lint, test, wasm32 check, everywhere) on `main`. Job `wasm` runs `mise run data`, `mise run //crates/cli:e2e` and `mise run //crates/wasm:parity`, which builds the binding and its notices (the license gate) first. No secrets: nothing in CI calls ElevenLabs or needs `sample/library.json`, so `phono eval` stays a local gate. Actions are pinned by commit SHA.
@@ -85,7 +93,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | mise (≥ 2026.11.7) | Installs Rust (with the wasm32 target), uv, fnox, Node, hk, ruff, the wasm-bindgen CLI and cargo-about (`mise install --monorepo`); runs all tasks; picks the projects a change affects (`--affected`) | `mise.toml` (root), `tools/mise.toml`, `crates/*/mise.toml` |
 | wasm-bindgen CLI 0.2.130 | Generates the JS glue and `.d.ts` for `crates/wasm`. Must equal the `wasm-bindgen` crate version | `crates/wasm/mise.toml` (`github:wasm-bindgen/wasm-bindgen`), `Cargo.toml` |
 | cargo-about 0.9.3 | Finds the license texts of the crates in the `.wasm` for the third-party notices, and fails on a license `about.toml` doesn't accept | `crates/wasm/mise.toml` (`github:EmbarkStudios/cargo-about`), `crates/wasm/about.toml` |
-| Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`), the test page server (`//crates/wasm:serve`) and the notices generator (`//crates/wasm:notices`); later `web/` | `mise.toml` (root) |
+| Node 26 (LTS) | Runs the parity check (`//crates/wasm:parity`), the test page server (`//crates/wasm:serve`), the notices generator (`//crates/wasm:notices`) and the data release script (`//crates/builder:release-data`); later `web/` | `mise.toml` (root) |
 | cargo | Rust build and tests | `Cargo.toml` |
 | uv | Python env and runs | `tools/pyproject.toml`, `tools/uv.lock` |
 | fnox | Secret injection | `fnox.toml` (gitignored) |
@@ -104,6 +112,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
 | Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run //tools:…` (spends credits) |
 | wasm32 build | `phono-core` and `phono-wasm` build for `wasm32-unknown-unknown` | `mise run //crates/wasm:check` |
+| Reproducible data | Two full builds of `phono.bin` compared byte for byte (also the release workflow's first step) | `mise run //crates/builder:repro` |
 | Binding vs. CLI | Node runs `crates/wasm/parity/cases.json` through both and compares | `mise run //crates/wasm:parity` |
 | Binding in a browser | Test page with the engine in a Web Worker; `/?bench` times it | `mise run //crates/wasm:serve` |
 | Python tests | none yet | — |
@@ -135,11 +144,30 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 
 **Date:** 2026-11-25 · **Status:** accepted
 
-**Context:** The table ships inside the WASM bundle and will be published on GitHub. A table derived from GPL-2.0+ `unidecode` would put both under the GPL.
+**Context:** The table ships inside the WASM bundle and is published on GitHub (inside `phono.bin`, in the `phono-data` releases). A table derived from GPL-2.0+ `unidecode` would put both under the GPL.
 
 **Decision:** Build the table from `deunicode` (BSD-3) in Rust, with ten overrides justified by exp10 clips. Keep `unidecode` for dev comparisons only.
 
 **Consequences:** The repo is Apache-2.0. The 34 sample answers and `calibrate` output were unchanged. `mise run data` no longer needs Python.
+
+### Tags `<name>/v<semver>`; data versioned by its format
+
+**Date:** 2026-11-27 · **Status:** accepted (`data-release_20261127`, [#9](https://github.com/jordanpg/phonocompressor/issues/9))
+
+**Context:** The web tool should download `phono.bin` once, keep it, and offer updates. The data changes without code (retrained G2P, overrides, input bumps) and code without data, so they need separate versions. CLI builds will be released too, probably with dist.
+
+**Decision:**
+- **Tags:** every artifact is released on a tag `<name>/v<semver>`, named after the Cargo package where there is one (`phono-cli/v…` later). dist reads a `PACKAGE/VERSION` tag as a release of one package; `@` is not one of its forms.
+- **Data versions:** `phono-data/vX.Y.Z`. X is `FORMAT_VERSION`, Y a change to `phono.bin`, and Z a rebuild with the same `phono.bin`.
+- **Release contents:** the release is `phono.bin.gz` (Node zlib, level 9, no name or timestamp), `manifest.json` (schema 1), the data-only notices and `SHA256SUMS`.
+- **Where releases are built:** always in CI from the tag, never from a local file.
+
+**Consequences:**
+- `phono.bin` had to become byte-reproducible (sorted map serialization; same format, same reader).
+- Clients check `unpacked_sha256`, which doesn't depend on the compressor.
+- Browsers can't fetch release assets (no CORS), so the web deploy mirrors them.
+- No readable transliteration table is published.
+- When dist is added, its tag-triggered workflow must ignore `phono-data/*` tags.
 
 ### Svelte + Vite for the web tool
 

@@ -160,3 +160,5 @@ hello this is human. this was larely developed with agentic coding methods, with
 | Python `unidecode` | dev comparison only (`mise run //tools:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
 Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed Apache-2.0.
+
+The built data file is published as GitHub Releases tagged `phono-data/vX.Y.Z`, built in CI from the tag. Each release has `phono.bin.gz`, a `manifest.json` with checksums and inputs, `SHA256SUMS`, and the data's own `third-party-notices.html`, which must ship with any copy. The tag convention, versioning and how a client should use a release are in [docs/RELEASES.md](docs/RELEASES.md).

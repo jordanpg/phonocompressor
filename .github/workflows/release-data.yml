@@ -1,0 +1,127 @@
+# phono-data releases (docs/RELEASES.md). Pushing a `phono-data/vX.Y.Z` tag builds phono.bin from
+# that tag, checks two builds are byte-identical, and publishes a GitHub Release with
+# phono.bin.gz, manifest.json, the data's third-party notices and SHA256SUMS. The tag's major must
+# equal the data format (release-data checks it against `phono-build --format-version`).
+#
+# Dry run: on workflow_dispatch, and on pull requests that touch what goes into the data, the same
+# build runs and uploads the files as a workflow artifact, without a release.
+#
+# Only the publish job can write to the repo, and it runs no repo code: it downloads the build
+# job's artifact, checks it and calls `gh release create`.
+name: release-data
+
+on:
+  push:
+    tags: ["phono-data/v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release-data.yml
+      - crates/builder/**
+      - crates/core/**
+      - crates/wasm/notices.mjs
+      - Cargo.lock
+      - cmudict
+      - phoible
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-data-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: build phono-data
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+      # No cache for a release: it's built from the tag alone.
+      - if: github.ref_type != 'tag'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: release-data
+      - id: version
+        name: "version: from the tag; a dry run uses <format>.0.0"
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="${GITHUB_REF_NAME#phono-data/v}"
+          else
+            version="$(cargo run --release --locked -q -p phono-builder -- --format-version).0.0"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "phono-data $version"
+      - run: mise run //crates/builder:repro
+      - run: mise run //crates/builder:release-data "$VERSION"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+      - run: cd target/phono-data && sha256sum -c SHA256SUMS && cat manifest.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: phono-data-${{ steps.version.outputs.version }}
+          path: target/phono-data/
+          if-no-files-found: error
+          compression-level: 0 # phono.bin.gz is already compressed
+
+  publish:
+    name: publish the release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: phono-data-${{ needs.build.outputs.version }}
+          path: phono-data
+      - name: check the files
+        working-directory: phono-data
+        run: |
+          sha256sum -c SHA256SUMS
+          test "$(jq -r .version manifest.json)" = "$VERSION"
+          test "$(jq -r .source.commit manifest.json)" = "$GITHUB_SHA"
+          test "$(jq -r .source.dirty manifest.json)" = false
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+      - name: release notes
+        working-directory: phono-data
+        run: |
+          jq -r --arg repo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" '
+            .files[0] as $data |
+            "`phono.bin` for data format \(.format), built in CI from \(.source.commit[0:12]).\n",
+            "| Input | Version |", "|---|---|",
+            "| deunicode | \(.inputs.deunicode.version) |",
+            "| CMUdict | [\(.inputs.cmudict.commit[0:12])](\(.inputs.cmudict.repository)/tree/\(.inputs.cmudict.commit)) |",
+            "| PHOIBLE | [\(.inputs.phoible.commit[0:12])](\(.inputs.phoible.repository)/tree/\(.inputs.phoible.commit)) |",
+            "",
+            "Unpacked `phono.bin`: \($data.unpacked_size) bytes, SHA-256 `\($data.unpacked_sha256)`.",
+            "",
+            "The data is redistributed under its own licenses: see `third-party-notices.html`.",
+            "",
+            "How to version, verify and use a release: [docs/RELEASES.md](\($repo)/blob/\(.source.commit)/docs/RELEASES.md)."
+          ' manifest.json > ../notes.md
+          cat ../notes.md
+      - name: create the release
+        working-directory: phono-data
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "phono-data $VERSION" --notes-file ../notes.md \
+            phono.bin.gz manifest.json third-party-notices.html SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}

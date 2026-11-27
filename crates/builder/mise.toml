@@ -5,3 +5,14 @@ extends = "cargo:lint"
 [tasks.test]
 description = "Run this crate's tests"
 extends = "cargo:test"
+
+# The data release's reproducibility gate (repro.sh): two builds of the same commit must be
+# byte-identical, or a release's checksum would change on every rebuild.
+[tasks.repro]
+description = "Check phono.bin is reproducible: build it twice into a temp directory and fail unless the bytes match"
+run = "./repro.sh"
+
+# What a `phono-data/vX.Y.Z` release holds; the release workflow runs it after repro.
+[tasks.release-data]
+description = "Write a phono-data release to target/phono-data/: phono.bin.gz, manifest.json, data notices, SHA256SUMS. Args: <X.Y.Z> (major = data format), --out, --allow-dirty"
+run = "node release-data.mjs"

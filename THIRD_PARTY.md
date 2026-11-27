@@ -44,3 +44,16 @@ text instead of its own.
 
 The page covers the Rust and data parts of the bundle only. npm packages bundled by the front end
 need their notices added to it.
+
+## Notices shipped with the data releases
+
+`phono.bin` is published on its own as GitHub Releases tagged `phono-data/vX.Y.Z`
+([`docs/RELEASES.md`](docs/RELEASES.md)). Each release includes a `third-party-notices.html` with
+only the data notices: the Phoible citation and CC BY 4.0 notice, and the CMUdict and `deunicode`
+license texts. `phono.bin` holds no code, so there is no crate list. The same generator writes it
+(`node crates/wasm/notices.mjs --data-only`, called by `mise run //crates/builder:release-data`),
+and it doesn't need cargo-about. Anyone redistributing the data must ship this page with it.
+
+Releases are built in CI from the tag, in a fresh checkout, never from a local
+`data/generated/`. Data built before the switch to `deunicode` was derived from `unidecode`
+(GPL-2.0+) and must not be published.

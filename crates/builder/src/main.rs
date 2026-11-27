@@ -42,6 +42,10 @@ struct Args {
     /// N-gram order of the G2P model.
     #[arg(long, default_value_t = phono_core::g2p::DEFAULT_ORDER)]
     g2p_order: usize,
+    /// Print the data format version (`FORMAT_VERSION`) and exit without building. A data
+    /// release's major version must equal it.
+    #[arg(long)]
+    format_version: bool,
 }
 
 fn read(path: &PathBuf) -> Result<String, String> {
@@ -50,6 +54,10 @@ fn read(path: &PathBuf) -> Result<String, String> {
 
 fn main() -> Result<(), String> {
     let args = Args::parse();
+    if args.format_version {
+        println!("{FORMAT_VERSION}");
+        return Ok(());
+    }
     let t0 = Instant::now();
 
     let features = FeatureTable::parse_tsv(&read(&args.phoible)?)?;

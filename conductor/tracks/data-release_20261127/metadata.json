@@ -1,0 +1,43 @@
+{
+  "id": "data-release_20261127",
+  "title": "Publish the runtime data release",
+  "type": "feature",
+  "status": "complete",
+  "created": "2026-11-27T00:00:00Z",
+  "updated": "2026-11-27T23:45:00Z",
+  "issue": 9,
+  "task_issues": {
+    "1.1": 59,
+    "1.2": 60,
+    "2.1": 61,
+    "2.2": 62,
+    "3.1": 63,
+    "3.2": 64,
+    "4.1": 65,
+    "4.2": 66
+  },
+  "phases": {
+    "total": 4,
+    "completed": 4
+  },
+  "tasks": {
+    "total": 8,
+    "completed": 8
+  },
+  "current_phase": 4,
+  "current_task": null,
+  "commits": [
+    "56acf96: feat(data): write phono.bin maps in key order (data-release_20261127)",
+    "60ced04: feat(builder): add phono-build --format-version (data-release_20261127)",
+    "0732842: build(builder): add repro task for byte-identical phono.bin (data-release_20261127)",
+    "b8c2ee7: fix(wasm): name Apache-2.0 as the project license in the notices (data-release_20261127)",
+    "ed9ac85: feat(wasm): add --data-only to the notices script (data-release_20261127)",
+    "4f81083: build(builder): add release-data task for phono-data releases (data-release_20261127)",
+    "cd91825: ci: add release-data workflow for phono-data releases (data-release_20261127)",
+    "89bc1e7: docs: add RELEASES.md, the tag convention and data release contract (data-release_20261127)",
+    "bd7c985: docs: describe the phono-data releases across the docs (data-release_20261127)",
+    "b50f76c: Merge remote-tracking branch 'origin/main' into kepler/9-publish-transliteration-tables",
+    "c9fe0e1: chore(conductor): mark task 4.2 and phase 4 complete (data-release_20261127)"
+  ],
+  "tag_ruleset_id": 28262654
+}

@@ -27,6 +27,8 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
+- [x] [Publish the runtime data release](./tracks/data-release_20261127/index.md) (`data-release_20261127`, [#9](https://github.com/jordanpg/phonocompressor/issues/9)): byte-reproducible `phono.bin` published as `phono-data/vX.Y.Z` GitHub Releases (gzip, manifest, data notices, checksums), a tag ruleset, and `docs/RELEASES.md` as the contract for the web tool. 8/8 tasks, complete; archived after the first release is validated.
+
 - [x] [Use the full community sample library](./tracks/community-library_20261126/index.md) (`community-library_20261126`, [#39](https://github.com/jordanpg/phonocompressor/issues/39)): fetch the full community library (298 entries) locally, baseline it offline, probe low-scoring scripts live, run the rest and refit (not adopted). 8/8 tasks.
 
 ## Archived Tracks
@@ -40,6 +42,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 - Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`; `eleven_multilingual_v2` has a calibrated profile too (`--model`).
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
 - Phase 3: WASM binding built (`wasm-binding_20261125`); the front end and deploy are next.
+- Runtime data published as `phono-data/vX.Y.Z` GitHub Releases, built in CI from the tag (`data-release_20261127`, [`docs/RELEASES.md`](../docs/RELEASES.md)); the first tag follows the merge.
 
 ## Commands
 
@@ -49,6 +52,8 @@ mise run phono compress 'bad dream'                    # use the engine
 mise run ci                                            # fmt:check, lint, test, wasm32 check (= CI on main)
 mise run ci:affected                                   # the same, only in projects changed since origin/main
 mise run phono eval                                    # engine regression check
+mise run //crates/builder:repro                        # check two phono.bin builds are byte-identical
+mise run //crates/builder:release-data 2.0.0           # write a phono-data release to target/phono-data/
 ```
 
 ## Getting Started

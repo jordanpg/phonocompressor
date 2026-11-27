@@ -11,6 +11,7 @@ use std::collections::HashMap;
 /// Raw transliteration of each codepoint (the builder's table, from `deunicode`), e.g. `嬶` → `"Kaka "`.
 #[derive(Serialize, Deserialize, Default)]
 pub struct Translit {
+    #[serde(serialize_with = "crate::data::sorted_map")]
     pub map: HashMap<char, String>,
 }
 
