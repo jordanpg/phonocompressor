@@ -9,7 +9,7 @@ accepted = ["MIT", "Apache-2.0", "Unicode-3.0"]
 targets = ["wasm32-unknown-unknown"]
 ignore-build-dependencies = true
 ignore-dev-dependencies = true
-# phono-wasm is ours (LICENSE-MIT, LICENSE-APACHE); notices.mjs drops phono-core the same way.
+# phono-wasm is ours (Apache-2.0, LICENSE-APACHE); notices.mjs drops phono-core the same way.
 private = { ignore = true }
 
 # tsify packages its licenses as LICENSE_MIT / LICENSE_APACHE, which cargo-about doesn't find, so

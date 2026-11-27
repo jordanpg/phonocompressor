@@ -4,7 +4,7 @@
 // Crates: cargo-about (config: about.toml) picks each crate's license from its license expression
 // and finds the text in the crate's own files. The list is phono-wasm's dependency graph on wasm32
 // without proc-macro crates, which only run while compiling (`cargo tree -e no-proc-macro`).
-// Our own crates are left out: they are MIT OR Apache-2.0 like the rest of the repo. Fails if a
+// Our own crates are left out: they are Apache-2.0 like the rest of the repo. Fails if a
 // crate's text didn't come from its own files: cargo-about then falls back to a generic text with
 // no copyright line (for example when a clarification's checksum no longer matches).
 //
@@ -256,9 +256,8 @@ const page = `<!doctype html>
   <code>phono.bin</code>. Both contain other people's work, under the licenses below.
 </p>
 <p>
-  phonocompressor itself is licensed under the MIT License or the Apache License 2.0, at your
-  option (<a href="${REPO}/blob/main/LICENSE-MIT">LICENSE-MIT</a>,
-  <a href="${REPO}/blob/main/LICENSE-APACHE">LICENSE-APACHE</a>). Source:
+  phonocompressor itself is licensed under the Apache License 2.0
+  (<a href="${REPO}/blob/main/LICENSE-APACHE">LICENSE-APACHE</a>). Source:
   <a href="${REPO}">${REPO.replace("https://", "")}</a>.
 </p>
 <ul>
