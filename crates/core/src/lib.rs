@@ -304,6 +304,7 @@ mod tests {
         },
         weights: Weights::HAND,
         predict: Predict::HAND,
+        close_enough: 0.9,
     };
 
     fn engine() -> Engine {
