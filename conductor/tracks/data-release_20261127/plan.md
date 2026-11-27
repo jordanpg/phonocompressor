@@ -4,7 +4,7 @@
 **Spec:** [spec.md](./spec.md)
 **Issue:** [#9](https://github.com/jordanpg/phonocompressor/issues/9)
 **Created:** 2026-11-27
-**Status:** [~] In Progress
+**Status:** [x] Complete
 
 ## Overview
 
@@ -92,10 +92,10 @@ One task produces everything a release contains, so CI and a local check run the
 
 ## Final Verification
 
-- [ ] All acceptance criteria in `spec.md` met
-- [ ] Gates pass and the PR's dry run is green
-- [ ] Documentation updated
-- [ ] Ready for review. After merge, the first tag `phono-data/v2.0.0` is pushed from `main` only with the user's go-ahead (out of scope for the track).
+- [x] All acceptance criteria in `spec.md` met
+- [x] Gates pass and the PR's dry run is green
+- [x] Documentation updated
+- [x] Ready for review. After merge, the first tag `phono-data/v2.0.0` is pushed from `main` only with the user's go-ahead (out of scope for the track).
 
 ---
 

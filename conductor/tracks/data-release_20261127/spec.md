@@ -3,7 +3,7 @@
 **Track ID:** data-release_20261127
 **Type:** Feature
 **Created:** 2026-11-27
-**Status:** Draft
+**Status:** Complete (2026-11-27; archived after the first release is validated)
 **Issue:** [#9 Publish the transliteration tables](https://github.com/jordanpg/phonocompressor/issues/9)
 
 ## Summary
@@ -28,12 +28,12 @@ As the maintainer of the future web tool, and anyone else running the engine, I 
 
 ## Acceptance Criteria
 
-- [ ] **Reproducible.** Two `mise run data` builds from the same commit produce byte-identical `phono.bin`, checked by a unit test on the serialized maps and a `//crates/builder:repro` task over the full build. The layout is unchanged: `FORMAT_VERSION` stays 2 and existing files still load.
-- [ ] **Tag convention.** Releases are tagged `<name>/v<semver>`, with the Cargo package name where there is one (`phono-cli/v0.1.0` later). Data uses `phono-data/vX.Y.Z`: major = `FORMAT_VERSION`, minor = a content change, patch = a notices- or metadata-only rebuild.
-- [ ] **Release workflow.** Pushing a `phono-data/v*` tag builds from that tag in CI and creates a GitHub Release with `phono.bin.gz`, `manifest.json`, a data-only `third-party-notices.html` and `SHA256SUMS`. The workflow fails if the tag's major isn't `FORMAT_VERSION` or if two builds differ. A `workflow_dispatch` dry run uploads the same files as a workflow artifact without creating a release.
-- [ ] **Tag protection.** A repository ruleset restricts creating, updating and deleting `phono-data/*` tags to the repository admin.
-- [ ] **Contract.** `docs/RELEASES.md` sets out the tag convention, the versioning rule, the manifest schema, and how a web client should use a release: the deploy mirrors it to the site's origin, the client checks the SHA-256 of the unpacked file, a new format downloads without asking, and only a newer compatible version prompts.
-- [ ] **Docs.** README "Data and licenses", THIRD_PARTY.md, `conductor/tech-stack.md` and PLAN.md (step 5 marked done, the stale branch note fixed) describe the release. #9 is closed when the track is verified.
+- [x] **Reproducible.** Two `mise run data` builds from the same commit produce byte-identical `phono.bin`, checked by a unit test on the serialized maps and a `//crates/builder:repro` task over the full build. The layout is unchanged: `FORMAT_VERSION` stays 2 and existing files still load.
+- [x] **Tag convention.** Releases are tagged `<name>/v<semver>`, with the Cargo package name where there is one (`phono-cli/v0.1.0` later). Data uses `phono-data/vX.Y.Z`: major = `FORMAT_VERSION`, minor = a content change, patch = a notices- or metadata-only rebuild.
+- [x] **Release workflow.** Pushing a `phono-data/v*` tag builds from that tag in CI and creates a GitHub Release with `phono.bin.gz`, `manifest.json`, a data-only `third-party-notices.html` and `SHA256SUMS`. The workflow fails if the tag's major isn't `FORMAT_VERSION` or if two builds differ. A `workflow_dispatch` dry run uploads the same files as a workflow artifact without creating a release. (Verified by pull request dry runs; `workflow_dispatch` works once the workflow is on `main`, and the publish job first runs on the first real tag.)
+- [x] **Tag protection.** A repository ruleset restricts creating, updating and deleting `phono-data/*` tags to the repository admin.
+- [x] **Contract.** `docs/RELEASES.md` sets out the tag convention, the versioning rule, the manifest schema, and how a web client should use a release: the deploy mirrors it to the site's origin, the client checks the SHA-256 of the unpacked file, a new format downloads without asking, and only a newer compatible version prompts.
+- [x] **Docs.** README "Data and licenses", THIRD_PARTY.md, `conductor/tech-stack.md` and PLAN.md (step 5 marked done, the stale branch note fixed) describe the release. #9 is closed when the track is verified.
 
 ## Dependencies
 
