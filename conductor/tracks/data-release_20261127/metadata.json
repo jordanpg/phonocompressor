@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-27T00:00:00Z",
-  "updated": "2026-11-27T22:30:00Z",
+  "updated": "2026-11-27T23:00:00Z",
   "issue": 9,
   "task_issues": {
     "1.1": 59,
@@ -22,7 +22,7 @@
   },
   "tasks": {
     "total": 8,
-    "completed": 6
+    "completed": 7
   },
   "current_phase": 4,
   "current_task": "4.1",
@@ -33,7 +33,8 @@
     "b8c2ee7: fix(wasm): name Apache-2.0 as the project license in the notices (data-release_20261127)",
     "ed9ac85: feat(wasm): add --data-only to the notices script (data-release_20261127)",
     "4f81083: build(builder): add release-data task for phono-data releases (data-release_20261127)",
-    "cd91825: ci: add release-data workflow for phono-data releases (data-release_20261127)"
+    "cd91825: ci: add release-data workflow for phono-data releases (data-release_20261127)",
+    "89bc1e7: docs: add RELEASES.md, the tag convention and data release contract (data-release_20261127)"
   ],
   "tag_ruleset_id": 28262654
 }

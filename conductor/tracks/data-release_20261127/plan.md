@@ -70,11 +70,12 @@ One task produces everything a release contains, so CI and a local check run the
 
 ### Tasks
 
-- [~] Task 4.1: Write `docs/RELEASES.md` ([#65](https://github.com/jordanpg/phonocompressor/issues/65)):
+- [x] Task 4.1: Write `docs/RELEASES.md` ([#65](https://github.com/jordanpg/phonocompressor/issues/65)):
   - the tag convention for every artifact (`<name>/v<semver>`, Cargo package names where they exist, the dist compatibility reason);
   - the data versioning rule and how to cut a data release;
   - the manifest schema;
   - how a web client should use a release: the deploy mirrors the release to the site's origin (Releases sends no CORS headers), the client checks `unpacked_sha256`, a new format downloads without asking, and only a newer compatible version prompts.
+  - Also covers the ruleset id (28262654), the release contents, checking and reproducing a release by hand, and a deploy layout given as an example. A patch release with the same `phono.bin` updates the stored manifest without prompting.
 - [ ] Task 4.2: Update the docs ([#66](https://github.com/jordanpg/phonocompressor/issues/66)):
   - README "Data and licenses" and THIRD_PARTY.md: where the data is published, that its notices ship with it, and that releases are built in CI from a tag;
   - `conductor/tech-stack.md`: Infrastructure, plus a decision-log entry for the tag convention and data versioning;
@@ -85,7 +86,7 @@ One task produces everything a release contains, so CI and a local check run the
 
 ### Verification
 
-- [ ] The user reviews `docs/RELEASES.md` as the contract [#1](https://github.com/jordanpg/phonocompressor/issues/1) builds on.
+- [x] The user reviews `docs/RELEASES.md` as the contract [#1](https://github.com/jordanpg/phonocompressor/issues/1) builds on.
 - [ ] No doc still describes publishing a readable table.
 
 ## Final Verification
