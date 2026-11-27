@@ -1,0 +1,56 @@
+#!/bin/sh
+# Sets up a new worktree from the main checkout. Installed by `mise run hooks` (core.hooksPath);
+# plain sh, no mise or hk, so it works before any tool is installed. Skip once with HK=0.
+#
+# git passes an all-zero previous HEAD only when it creates a worktree (or clones), so ordinary
+# checkouts and branch switches return at once. Then, without overwriting anything:
+#   - LINKS are symlinked from the main checkout: they are gitignored and either secret or
+#     costly to recreate. Not linked: target/ (per-branch builds, cargo's lock),
+#     data/generated/ (built from each branch's code) and tools/results/ (written per run).
+#   - the submodules are cloned with the main checkout's copies as a reference, so only missing
+#     objects come from the network, and dissociated, so the worktree outlives the main checkout.
+#
+# For a worktree made before this hook existed, run it by hand from the worktree's root:
+#   .githooks/post-checkout 0000000000000000000000000000000000000000 HEAD 1
+
+LINKS="fnox.toml sample .cache/harness"
+
+test "${HK:-1}" = "0" && exit 0
+case "${1:-}" in
+  '' | *[!0]*) exit 0 ;;
+esac
+
+# Hooks may inherit these from the caller; every git call below names its repository itself.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+
+say() { echo "post-checkout: $*" >&2; }
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+# The main checkout holds the common .git; a bare repository has no checkout to copy from.
+test "$(basename "$common")" = ".git" || exit 0
+main=$(CDPATH='' cd -P "$(dirname "$common")" && pwd) || exit 0
+top=$(CDPATH='' cd -P "$top" && pwd) || exit 0
+test "$top" = "$main" && exit 0
+
+for path in $LINKS; do
+  src="$main/$path"
+  dst="$top/$path"
+  test -e "$src" || continue
+  if test -e "$dst" || test -L "$dst"; then continue; fi
+  mkdir -p "$(dirname "$dst")" && ln -s "$src" "$dst" && say "linked $path -> $src"
+done
+
+test -f "$top/.gitmodules" || exit 0
+git -C "$top" config -f .gitmodules --get-regexp '^submodule\..*\.path$' |
+  while read -r _key path; do
+    test -e "$top/$path/.git" && continue # already set up
+    # Without its own .git, `git -C` would find the main checkout's repository instead.
+    test -e "$main/$path/.git" || continue
+    ref=$(git -C "$main/$path" rev-parse --absolute-git-dir 2>/dev/null) || continue
+    say "cloning submodule $path (reference: $ref)"
+    git -C "$top" submodule --quiet update --init --reference "$ref" --dissociate -- "$path" ||
+      say "could not set up $path; run \`git submodule update --init\` in $top"
+  done
+
+exit 0
