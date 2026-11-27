@@ -27,11 +27,11 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
-- [x] [Publish the runtime data release](./tracks/data-release_20261127/index.md) (`data-release_20261127`, [#9](https://github.com/jordanpg/phonocompressor/issues/9)): byte-reproducible `phono.bin` published as `phono-data/vX.Y.Z` GitHub Releases (gzip, manifest, data notices, checksums), a tag ruleset, and `docs/RELEASES.md` as the contract for the web tool. 8/8 tasks, complete; archived after the first release is validated.
-
 - [x] [Use the full community sample library](./tracks/community-library_20261126/index.md) (`community-library_20261126`, [#39](https://github.com/jordanpg/phonocompressor/issues/39)): fetch the full community library (298 entries) locally, baseline it offline, probe low-scoring scripts live, run the rest and refit (not adopted). 8/8 tasks.
 
 ## Archived Tracks
+
+- [x] [Publish the runtime data release](./tracks/_archive/data-release_20261127/index.md) (`data-release_20261127`, [#9](https://github.com/jordanpg/phonocompressor/issues/9)): byte-reproducible `phono.bin` published as `phono-data/vX.Y.Z` GitHub Releases (gzip, manifest, data notices, checksums), a tag ruleset, and `docs/RELEASES.md` as the contract for the web tool. 8/8 tasks, complete; first release [`phono-data/v2.0.0`](https://github.com/jordanpg/phonocompressor/releases/tag/phono-data/v2.0.0).
 
 - [x] [Calibrate a second ElevenLabs model (Multilingual v2)](./tracks/_archive/multilingual-v2_20261125/index.md) (`multilingual-v2_20261125`, [#6](https://github.com/jordanpg/phonocompressor/issues/6)): exp11–exp14 on `eleven_multilingual_v2` and its `ModelProfile` (own script table, symbol words and glued-digit rule; Flash's weights after a fit found no held-out gain). 9/9 tasks, complete.
 
@@ -42,7 +42,7 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 - Phases 0–1 done: native CLI works end to end on `eleven_flash_v2_5`; `eleven_multilingual_v2` has a calibrated profile too (`--model`).
 - Phase 2 partly done (KN G2P shipped; reading model N not started).
 - Phase 3: WASM binding built (`wasm-binding_20261125`); the front end and deploy are next.
-- Runtime data published as `phono-data/vX.Y.Z` GitHub Releases, built in CI from the tag (`data-release_20261127`, [`docs/RELEASES.md`](../docs/RELEASES.md)); the first tag follows the merge.
+- Runtime data published as `phono-data/vX.Y.Z` GitHub Releases, built in CI from the tag (`data-release_20261127`, [`docs/RELEASES.md`](../docs/RELEASES.md)); first release [`phono-data/v2.0.0`](https://github.com/jordanpg/phonocompressor/releases/tag/phono-data/v2.0.0).
 
 ## Commands
 

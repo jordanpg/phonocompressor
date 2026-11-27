@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "complete",
   "created": "2026-11-27T00:00:00Z",
-  "updated": "2026-11-27T23:45:00Z",
+  "updated": "2026-11-27T22:30:00Z",
   "issue": 9,
   "task_issues": {
     "1.1": 59,
@@ -37,7 +37,16 @@
     "89bc1e7: docs: add RELEASES.md, the tag convention and data release contract (data-release_20261127)",
     "bd7c985: docs: describe the phono-data releases across the docs (data-release_20261127)",
     "b50f76c: Merge remote-tracking branch 'origin/main' into kepler/9-publish-transliteration-tables",
-    "c9fe0e1: chore(conductor): mark task 4.2 and phase 4 complete (data-release_20261127)"
+    "c9fe0e1: chore(conductor): mark task 4.2 and phase 4 complete (data-release_20261127)",
+    "24ca596: build(builder): move the repro task's script into repro.sh",
+    "3a65167: build(builder): make repro.sh executable"
   ],
-  "tag_ruleset_id": 28262654
+  "tag_ruleset_id": 28262654,
+  "merged": "60cd496 (PR #68)",
+  "first_release": {
+    "tag": "phono-data/v2.0.0",
+    "run": 46072585319,
+    "unpacked_sha256": "292d99dccfd89d220d2c15576bac0f18eed57cea9452e4810c2bdaecbf536d69"
+  },
+  "archived": "2026-11-27"
 }
