@@ -1,0 +1,10 @@
+#!/bin/sh
+# Runs hk's pre-commit hook (hk.pkl) through mise. Installed by `mise run hooks`, which points
+# core.hooksPath at this directory; the path is relative, so a worktree on a branch without
+# .githooks/ runs no hooks instead of failing. Skip once with --no-verify, or HK=0.
+test "${HK:-1}" = "0" && exit 0
+command -v mise >/dev/null 2>&1 || {
+  echo "pre-commit: mise not found; install it, or skip this hook with --no-verify" >&2
+  exit 1
+}
+exec mise x -- hk run pre-commit --from-hook "$@"

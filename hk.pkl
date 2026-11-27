@@ -1,0 +1,37 @@
+// Git hooks, run by hk (https://hk.jdx.dev) from the wrappers in .githooks/. `mise run hooks`
+// installs them (core.hooksPath). Skip one run with `git commit --no-verify` /
+// `git push --no-verify`, or HK=0.
+//
+// pre-commit works on the staged files only: unstaged edits are stashed while it runs, so
+// `git add -p` commits exactly what was staged. It fixes formatting and ruff's safe fixes and
+// stages the result. Crate-wide gates (clippy, tests) are too slow per commit and need whole
+// crates, so they run on push.
+//
+// pre-push runs `mise run ci:affected`: the ci gates in the projects that changed since
+// origin/main and in the projects that depend on them (see `[monorepo.projects]` in mise.toml).
+//
+// Also: `hk check` / `hk fix` run the pre-commit steps by hand (`--all` for every file).
+amends "package://github.com/jdx/hk/releases/download/v2.14.0/hk@2.14.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.14.0/hk@2.14.0#/Builtins.pkl"
+
+// Per-file tools. rustfmt reads rustfmt.toml and ruff reads tools/pyproject.toml, as they do in
+// `mise run fmt`.
+steps {
+  ["rustfmt"] = Builtins.rustfmt
+  ["ruff-format"] = Builtins.ruff_format
+  ["ruff"] = (Builtins.ruff) { depends = "ruff-format" }
+}
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps = module.steps
+  }
+  ["pre-push"] {
+    steps {
+      // No glob: it always runs, and mise picks the projects.
+      ["ci-affected"] { check = "mise run ci:affected" }
+    }
+  }
+}
