@@ -153,6 +153,7 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 | Format | No diffs | `mise run fmt:check` |
 | Lint | Clippy with `-D warnings`; ruff clean | `mise run lint` |
 | Tests | All passing: `cargo test --workspace`, then the harness's pytest | `mise run test` |
+| CLI end-to-end | All passing, with a data file built from this commit (the task builds it) | `mise run //crates/cli:e2e` |
 | Data build | Still builds, if the builder or data format changed | `mise run data` |
 | Engine output | `phono eval` checked before vs. after, on all library entries and the hand-picked 34; regressions explained | `mise run phono eval` |
 | Prediction | `phono calibrate` checked, if the reader or scorer changed | `mise run phono calibrate` |
@@ -162,13 +163,13 @@ Optional; self-review is fine. Before committing, read your own diff with the st
 
 The wasm32 gate needs the `wasm32-unknown-unknown` target, which `mise install` adds (`targets` on `rust` in the root `mise.toml`). The wasm-bindgen CLI is pinned in `crates/wasm/mise.toml`; the first `//crates/wasm:*` task installs it, or `mise install --monorepo` does.
 
-`phono eval` needs `sample/library.json` (`mise run //tools:fetch-library`; the URL comes from fnox, so a fresh worktree needs the main checkout's `fnox.toml`), and `calibrate` needs exported clips; both are gitignored and local. Compare `eval`'s summary for all entries and for the hand-picked 34. Re-fetching can add or change entries, so check the fetch's content hash before comparing runs. Over all 298 entries `eval` takes about 10 minutes (release build); `--subset tools/library-keys.tsv` scores only the 34, for a quick check while iterating. `//crates/wasm:parity` needs `phono.bin` (`mise run data`). If any is missing, say so rather than skipping silently.
+`phono eval` needs `sample/library.json` (`mise run //tools:fetch-library`; the URL comes from fnox, so a fresh worktree needs the main checkout's `fnox.toml`), and `calibrate` needs exported clips; both are gitignored and local. Compare `eval`'s summary for all entries and for the hand-picked 34. Re-fetching can add or change entries, so check the fetch's content hash before comparing runs. Over all 298 entries `eval` takes about 10 minutes (release build); `--subset tools/library-keys.tsv` scores only the 34, for a quick check while iterating. `//crates/wasm:parity` needs `phono.bin` (`mise run data`); `//crates/cli:e2e` builds it itself. If any is missing, say so rather than skipping silently.
 
 In a fresh git worktree, run `git submodule update --init` before the gates: the core's tests read Phoible's feature table from `phoible/`.
 
 To fix formatting: `mise run fmt`.
 
-`mise run ci` runs format, lint, tests and the wasm32 check in turn; GitHub Actions' `checks` job runs it on `main`. `mise run ci:affected` runs the same gates only in the projects changed since `origin/main` and the projects that depend on them; the pre-push hook and CI on pull requests run that. CI's `wasm` job also runs the data build, the notices license gate and WASM parity on every PR. Engine output and prediction stay local, since they need gitignored files. Run `mise run hooks` once per clone to enable the hooks: pre-commit fixes and checks the staged files (rustfmt, ruff), pre-push runs `ci:affected`.
+`mise run ci` runs format, lint, tests and the wasm32 check in turn; GitHub Actions' `checks` job runs it on `main`. `mise run ci:affected` runs the same gates only in the projects changed since `origin/main` and the projects that depend on them; the pre-push hook and CI on pull requests run that. CI's `wasm` job also runs the data build, the CLI's end-to-end tests, the notices license gate and WASM parity on every PR. Engine output and prediction stay local, since they need gitignored files. Run `mise run hooks` once per clone to enable the hooks: pre-commit fixes and checks the staged files (rustfmt, ruff), pre-push runs `ci:affected`.
 
 ## Development commands
 
@@ -177,7 +178,7 @@ Run these from the repo root. Workspace tasks (`data`, `phono`, `fmt`, `fmt:chec
 ```sh
 # Setup (clone with --recurse-submodules first)
 mise install --monorepo                      # every project's tools, not just the root's
-mise run data                                # build data/generated/phono.bin (~15 s)
+mise run data                                # build data/generated/phono.bin (~15 s; skipped when up to date)
 
 # Use the engine
 mise run phono compress 'bad dream'          # -n top, -m codepoint budget
@@ -189,6 +190,7 @@ mise run hooks                               # once per clone: staged-file fixes
 mise run ci                                  # fmt:check, lint, test, wasm32 check (what CI runs on main)
 mise run ci:affected                         # the same, in projects changed since origin/main (PRs, pre-push)
 mise run phono eval
+mise run //crates/cli:e2e                    # CLI end-to-end tests (builds phono.bin if it is out of date)
 mise run //crates/wasm:check && mise run //crates/wasm:parity
 
 # Browser binding

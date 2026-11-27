@@ -74,7 +74,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 - **Hosting:** GitHub Pages, serving the static web tool (HTML, JS, `.wasm`, data file) and its `third-party-notices.html` (`mise run //crates/wasm:notices`; see `THIRD_PARTY.md`). No server.
 - **Code distribution:** GitHub (`jordanpg/phonocompressor`), with submodules.
 - **Secrets:** `ELEVENLABS_API_KEY` via fnox, exposed by mise only to the tasks that call the API (`//tools:credits`, `//tools:models`, `//tools:voices`, `//tools:synth`). `fnox.toml` is gitignored.
-- **CI:** GitHub Actions, `.github/workflows/ci.yml`, on every pull request and push to `main`. Job `checks` runs `mise run ci:affected origin/<base>` on a pull request, the same task as the pre-push hook, and `mise run ci` (fmt:check, lint, test, wasm32 check, everywhere) on `main`. Job `wasm` runs `mise run data` and `mise run //crates/wasm:parity`, which builds the binding and its notices (the license gate) first. No secrets: nothing in CI calls ElevenLabs or needs `sample/library.json`, so `phono eval` stays a local gate. Actions are pinned by commit SHA.
+- **CI:** GitHub Actions, `.github/workflows/ci.yml`, on every pull request and push to `main`. Job `checks` runs `mise run ci:affected origin/<base>` on a pull request, the same task as the pre-push hook, and `mise run ci` (fmt:check, lint, test, wasm32 check, everywhere) on `main`. Job `wasm` runs `mise run data`, `mise run //crates/cli:e2e` and `mise run //crates/wasm:parity`, which builds the binding and its notices (the license gate) first. No secrets: nothing in CI calls ElevenLabs or needs `sample/library.json`, so `phono eval` stays a local gate. Actions are pinned by commit SHA.
 - **Git hooks:** hk (`hk.pkl`), run from the wrappers in `.githooks/`; `mise run hooks` enables them per clone (sets `core.hooksPath`, relative, so a worktree on a branch without `.githooks/` runs none). pre-commit fixes and checks only the staged files (rustfmt, ruff format, ruff), with unstaged work stashed under hk's own refs, not the shared `git stash` list. pre-push runs `mise run ci:affected`. `--no-verify` or `HK=0` skips them.
 - **Issue tracking:** GitHub Issues on the public repo, planned on the private user project `phonocompressor` (#8), which is linked to the repo. Managed with the `gh` CLI (2.105; needs the `project` scope). Issue types: Feature, Bug, Task. Board fields: Status, Priority, Size, Iteration. See `workflow.md`.
 
@@ -99,6 +99,7 @@ Modules: `cli`, `elevenlabs`, `asr`, `cache`, `experiments`. Experiments are def
 | Kind | Tool | Command |
 |---|---|---|
 | Rust unit tests | `cargo test` (inline `#[cfg(test)] mod tests`) | `cargo test --workspace` (or `mise run test`, which adds the harness's pytest) |
+| CLI end-to-end | `cargo test` integration tests (`crates/cli/tests/e2e/`) that run the `phono` binary; most need `phono.bin` and are `#[ignore]`d otherwise | `mise run //crates/cli:e2e` |
 | Engine regression | `phono eval` over the community library (`sample/library.json`, gitignored), with the hand-picked 34 as a subset | `mise run phono eval` |
 | Prediction vs. real clips | `phono calibrate` | `mise run phono calibrate` |
 | Real TTS experiments | harness `synth` → `transcribe` → `report` | `mise run //tools:…` (spends credits) |
