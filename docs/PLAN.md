@@ -1661,6 +1661,111 @@ were new; the adopted answers came from exp15–exp17's clips, plus one new.
 - **A future refit should hold `risk_scale`,** or be checked live on the
   answers it changes, as here.
 
+**#4 offline check (2026-11-26, no credits): the G2P's over-confidence shows
+in our answers, and trusting it less doesn't fix that.** On exp1–exp18's 1900
+Flash clips:
+- **Over-prediction (predicted − truth) by whether the reading has a G2P word:**
+
+  | clips | G2P word ≤ 4 letters | G2P word 5+ letters | no G2P word |
+  |---|---|---|---|
+  | our answers | +0.121 (truth 0.750) | +0.115 | +0.079 (truth 0.906) |
+  | community texts | +0.019 | +0.018 | +0.063 |
+
+  On community texts G2P words are no worse predicted, so this is the
+  search picking pseudo-words whose best reading happens to fit, at any
+  length, not short words being misread in general.
+- **`phono calibrate --by-word`** aligns the heard phones to each word of the
+  reading. G2P words are heard less like their reading than dictionary words
+  (fidelity 0.72–0.76 against 0.82–0.83). In 29% of G2P words a lower reading
+  of the G2P's 10 best matches the heard phones better (by ≥ 0.1). Dictionary
+  words, checked the same way, give 19% (recognizer noise). So about 10% of G2P
+  words were read as a lower G2P reading, half of them past the 3 the reader
+  averages over. The rest of the misreadings aren't in the 10 best at all
+  (`doeg` has no /æ/ or /ɛ/, `dyug` no JH).
+- **Trusting the G2P less** (`--g2p-nbest`, `--g2p-temperature`,
+  `--g2p-merge-stress`; `G2pConfidence` in the profile): 10-best readings with
+  stress variants merged and temperature 2 close the gap above (+0.027 →
+  −0.002) and raise pooled r from 0.610 to 0.642. But within-phrase ranking
+  falls (295/395 → 289/396). Refit with `risk_scale` and the substitution
+  scales held, no setting beats the current one held-out (72.5–74.2% against
+  74.5%). Letting `vowel_sub_scale` move too reaches 76.0%, by making vowel
+  swaps cheap (3.0 → 1.44), which v6 rejected: the clips can't say whether
+  the search would exploit cheap vowel swaps.
+- **On the hand-picked 34,** every setting tried swaps answers heard well for
+  worse or untested ones. Even the mildest (10-best, merged, temperature 1)
+  changes 6 answers. Entry 295's answer, heard exactly, gives way to one
+  heard wrong, and entry 14's goes back to the `됙` answer misheard in
+  exp5–exp7. The G2P's alternatives are how English spells, not how the TTS
+  misreads: the TTS mostly reads a G2P word as its best reading, so
+  spreading weight over the others penalizes the wrong words.
+- **So Flash keeps the G2P's 3 best as ranked** (`G2pConfidence::V2`).
+
+**exp19 result (real TTS, 2026-11-26, 560 credits; 6329/10000 used after): in a
+carrier phrase, Flash reads compound-vowel syllables consistently, and often
+not as the G2P says.** Setup: each of Hangul's 16 compound vowels in 4 forms
+(onset ㄷ d or ㅋ k, with or without final ㄱ g), as one syllable inside "say …
+now", plus 6 dictionary words (dag, dog, dig, dug, bag, big); 140 clips, same
+model, voice and seeds as exp1.
+- **The carrier works.** The two seeds mostly agree, unlike exp9's isolated
+  words. Dictionary words show a better-matching alternative reading in 4% of
+  clips (19% across exp1–exp18).
+- **The G2P is wrong on these syllables:** word fidelity 0.69 against 0.82 for
+  the controls. In 55% of clips another of the G2P's 10 best readings matches
+  better (32% within the 3 the reader uses).
+- **Readings consistent across both seeds and both onsets:**
+
+  | spelling | G2P | heard | examples (Whisper) |
+  |---|---|---|---|
+  | final `we` | K W, D W (no vowel) | /wiː/ | 퀘 kwe "Queen" ×2, 뒈 dwe "do we" ×2 |
+  | final `wae` | W AA1 | /weɪ/ | 쾌 kwae "quay" ×2, 돼 dwae "Dway" ×2 |
+  | `eu` + consonant | D OY1 G, K AH2 G | /ʌ/, /ɔ/, /ʊ/ | 득 deug "Doug" ×2, 큭 keug "cook" ×2 |
+  | `eo` + consonant | IY0 AO1, IY0 AA1, … | /ɔ/, /ɑː/ (often no /iː/) | 덕 deog "dog", 쿽 kweog "quag" ×2, 둭 dweog "Drog" ×2 |
+
+- **Single cases:** 퀴 kwi "quiet" /kwaɪ/ ×2 (as exp9's Latin `kwi`), but 뒤
+  dwi /dweː/, /dwiː/, where the reader spells out the dictionary initialism
+  DWI. 되 doe, 쾨 koe, 됙 doeg and 쾩 koeg came out near the G2P's OW, /ɔ/:
+  `doeg` was "dog" / "dig" here, against "Dag" / "Deg" glued into entry
+  14's answer (exp5–exp7), so neighbours matter. `y` after the onset is read
+  /aɪ/ or /iː/ unpredictably (뎌 dyeo /daːjɔ/, 됴 dyo "Dio", 댜 dya "Daya").
+
+**Respellings from exp19, and exp20 (real TTS, 2026-11-27, 38 credits):
+rejected; the search's answers stay as they were.** The consistent readings
+were made into rules for the Flash profile: final `we` → `wee`, final `wae` →
+`way`, `eo` before a consonant → `o`. `eu` → `u` was left out, since the
+exp1–exp18 words it changed read as often worse as better. Each rule
+rewrites a G2P word's letters before the G2P reads it, and the G2P's own
+reading stays as an alternative (weight 0.25). The code is on the unmerged
+branch `kepler/4-learn-pseudoword-readings`.
+- **Offline:** on exp1–exp18 the reader rules change 14 word clips (fidelity
+  to the heard phones 0.638 → 0.662) and one ranking pair (295 → 294 of 395,
+  in entry 85, where `eo` was heard /ɑː/ and the rule says OW).
+- **The search needs them backwards.** Reading `퀘` right is no use if the
+  search never spells /kwiː/ as `kwe`: entry 247's answer with `퀘` was not
+  among 17k generated candidates. So the search also tiled the phrase as the
+  model would read it back from other letters (`dway` → `dwae`, `dog` →
+  `deog`). That changes 6 of the library's 298 answers: one by `we`, five by
+  `eo` (keys in `tools/experiments/exp20.keys`).
+- **exp20 heard all of them worse or no better.** Mean truth over the 6
+  entries 0.756 (adopted) → 0.656 (new):
+
+  | entry | rule | truth, adopted → new |
+  |---|---|---|
+  | 247 | `we` (`췌`) | 0.62 → 0.40 |
+  | 247, runner-up | `we` (`퀘`) | 0.62 → 0.63 |
+  | u313db46f | `eo` (open `허`) | 0.95 → 0.77 |
+  | uffe19693 | `eo` (open `커` before `코`) | 0.87 → 0.72 |
+  | u775db31a | `eo` | 0.59 → 0.53 |
+  | u5c91fbb4 | `eo` (open `커` before `코`) | 0.89 → 0.88 |
+  | u646d47e7 | `eo` (open `커` before `코`) | 0.61 → 0.64 |
+
+- **Why:** `퀘` was "Queen" in "say 퀘 now" but not /kwiː/ glued into entry
+  247's answer, so a carrier phrase doesn't predict the run-together strings
+  the search emits. And letters don't show syllable boundaries: `eo` +
+  consonant also matched the open `커` before `코` (`keoko`), heard /kjɔ/ as
+  exp19 heard `커` alone. `췌` starts with ㅊ, unidecode `c`, which exp19
+  never tested, and Flash read it /s/.
+- **So Flash has no respellings,** and the mechanism stays on the branch.
+
 Known limitations / next steps (in priority order after exp2; status as of exp9):
 
 0. ~~**Make re-ranking robust to reading uncertainty.**~~ Done in v2–v4:
@@ -1681,16 +1786,19 @@ Known limitations / next steps (in priority order after exp2; status as of exp9)
    per-script risks. Both gain only by cutting `risk_scale`, and exp18
    heard the refit's answers worse (0.782 → 0.739). Hold `risk_scale` in
    future refits, or test the changed answers live.
-5. **Readings of short pseudo-words.** The TTS reads `kwi` like "kawaii",
-   `doeg` like "dag" and `dyug` like "jug", while our G2P is confident they
-   read K W IY, D OW G and D AY AH G. Possible fixes: widen the n-best for short unknown words, or
-   learn letter-to-sound corrections from the heard phones in the clips.
-   This now looks like a bigger lever than item 1. Learned corrections are
-   Flash observations, so store them in the model profile (`model.rs`), not
-   in module constants. exp9 adds Latin `kwi` → /kweɪ/, /kwaɪ/ (a final `i`
-   in a one-syllable pseudo-word reads /aɪ/-like). It also showed isolated
-   4-letter pseudo-words are too unstable to measure, so collect these
-   readings inside phrases.
+5. **The G2P's over-confidence in our picks (#4, parked 2026-11-27).** The
+   TTS reads `kwi` like "kawaii", `doeg` like "dag" and `dyug` like "jug",
+   while our G2P is confident they read K W IY, D OW G and D AY AH G. Tried so far, all
+   offline-measured and the last live (see "#4 offline check", "exp19 result"
+   and "Respellings from exp19"):
+   - trusting the G2P less (wider n-best, temperature): no better ranking,
+     and it swaps answers heard well;
+   - respellings from compound vowels heard in a carrier phrase: exp20 heard
+     every changed answer worse or no better.
+   What a next attempt needs: readings of syllables *glued into runs*, as the
+   search emits them, not alone in a carrier, and rules that know Hangul
+   syllable boundaries (from the codepoints, not the Latin letters). Both
+   cost credits, and the share of answers affected looks small.
 6. ~~**exp9 probe: respelling tricks and symbols on Flash v2.5.**~~ Run
    2026-11-24 (see "exp9 result"): no new lever. CamelCase gives no
    boundary, the reader was right about `& # = / ⅔`, and Flash v2.5 doesn't
