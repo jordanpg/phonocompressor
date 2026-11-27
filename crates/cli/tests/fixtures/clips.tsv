@@ -1,0 +1,14 @@
+exp	case	seed	model	text	target	whisper_en	phones
+e2e	bad-1	1	eleven_flash_v2_5	받 d레암	bad dream	Bad dream.	b æ d d ɹ i m
+e2e	bad-1	2	eleven_flash_v2_5	받 d레암	bad dream	Bad dream!	b æ d ɹ i m
+e2e	bad-2	1	eleven_flash_v2_5	받데암	bad dream	Bad deem.	b æ d d i m
+e2e	bad-3	1	eleven_flash_v2_5	ꀠꅉꀊꆏ	bad dream	Bad Dean.	b æ d d i n
+e2e	morning-1	1	eleven_flash_v2_5	고옫 모r닝	good morning	Good morning.	ɡ ʊ d m ɔ ɹ n ɪ ŋ
+e2e	morning-2	1	eleven_flash_v2_5	고옫모r 닝	good morning	Good more ning.	ɡ ʊ d m ɔ ɹ n ɪ ŋ
+e2e	morning-3	1	eleven_flash_v2_5	gud morn	good morning	Good morn.	ɡ ʊ d m ɔ ɹ n
+e2e	kilo-1	1	eleven_flash_v2_5	f레e ㌔	free kilo	Free kilo.	f ɹ i k i l oʊ
+e2e	kilo-2	1	eleven_flash_v2_5	f레e㌔e	free kilo	Free key low.	f ɹ i k i l oʊ i
+e2e	kilo-3	1	eleven_flash_v2_5	free kee	free kilo	Free key.	f ɹ i k i
+e2e	zorb-1	1	eleven_flash_v2_5	ꊝꇀ 잇헤레	zorblax is here	Zolax is here.	z oʊ l æ k s ɪ z h ɪ ɹ
+e2e	zorb-2	1	eleven_flash_v2_5	zorblax	zorblax is here	Zorblax.	z ɔ ɹ b l æ k s
+e2e	ml-1	1	eleven_multilingual_v2	받 d레암	bad dream	Bad dream.	b æ d d ɹ i m
