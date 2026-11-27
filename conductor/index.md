@@ -27,6 +27,8 @@ Each guide starts with a "phonocompressor overrides" section; the repo's tool co
 
 <!-- Auto-populated by /conductor:new-track -->
 
+- [ ] [Publish the runtime data release](./tracks/data-release_20261127/index.md) (`data-release_20261127`, [#9](https://github.com/jordanpg/phonocompressor/issues/9)): byte-reproducible `phono.bin` published as `phono-data/vX.Y.Z` GitHub Releases (gzip, manifest, data notices, checksums), a tag ruleset, and `docs/RELEASES.md` as the contract for the web tool. 0/8 tasks.
+
 - [x] [Use the full community sample library](./tracks/community-library_20261126/index.md) (`community-library_20261126`, [#39](https://github.com/jordanpg/phonocompressor/issues/39)): fetch the full community library (298 entries) locally, baseline it offline, probe low-scoring scripts live, run the rest and refit (not adopted). 8/8 tasks.
 
 ## Archived Tracks
