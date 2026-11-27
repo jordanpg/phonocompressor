@@ -64,6 +64,7 @@ pub fn check_option_names<S: AsRef<str>>(names: &[S]) -> Result<(), String> {
 /// One guess: a string to send to the TTS, how it is predicted to read it, and how close that is
 /// to the phrase.
 #[derive(Tsify, Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct Guess {
     /// The string to send.
     pub text: String,
@@ -73,15 +74,19 @@ pub struct Guess {
     pub phones: String,
     /// Predicted fidelity to the phrase, 0–1. Results are ranked by it.
     pub score: f32,
+    /// `score` reaches the model's close-enough cut, measured on its harness clips (0.90 on
+    /// Flash v2.5). When no guess is close enough, tell the user no result scores well.
+    pub close_enough: bool,
 }
 
-impl From<&Candidate> for Guess {
-    fn from(c: &Candidate) -> Self {
+impl Guess {
+    pub fn new(c: &Candidate, profile: &ModelProfile) -> Self {
         Guess {
             text: c.text.clone(),
             latin: c.latin.clone(),
             phones: fmt_word_phones(c.words.iter().map(|w| w.phones.as_slice())),
             score: c.fidelity,
+            close_enough: profile.is_close_enough(c.fidelity),
         }
     }
 }
@@ -159,7 +164,10 @@ pub fn compress(
         ));
     }
     let results = Searcher::new(engine).search(phrase, &request.config);
-    Ok(results.iter().map(Guess::from).collect())
+    Ok(results
+        .iter()
+        .map(|c| Guess::new(c, request.profile))
+        .collect())
 }
 
 /// The phonocompressor engine, decoded once from the data file and reused for every phrase.
@@ -402,14 +410,21 @@ mod tests {
             gen_cost: 0.0,
         };
         assert_eq!(
-            Guess::from(&c),
+            Guess::new(&c, model::DEFAULT),
             Guess {
                 text: "받 d레암".into(),
                 latin: "bad dream".into(),
                 phones: "B AE1 D | D R IY1 M".into(),
                 score: 0.9341593,
+                close_enough: true,
             }
         );
+        let weak = Candidate {
+            fidelity: 0.89,
+            ..c
+        };
+        assert!(!Guess::new(&weak, &model::FLASH_V2_5).close_enough);
+        assert!(Guess::new(&weak, &model::MULTILINGUAL_V2).close_enough);
     }
 
     #[test]
