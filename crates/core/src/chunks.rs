@@ -96,8 +96,11 @@ pub enum Script {
 }
 
 impl Script {
+    /// How many scripts there are.
+    pub const COUNT: usize = 18;
+
     /// Every script, in declaration order.
-    pub const ALL: [Script; 18] = [
+    pub const ALL: [Script; Script::COUNT] = [
         Script::Latin,
         Script::Hangul,
         Script::Yi,
@@ -117,6 +120,11 @@ impl Script {
         Script::Cyrillic,
         Script::Other,
     ];
+
+    /// Position in [`Script::ALL`], for per-script tables.
+    pub fn index(self) -> usize {
+        self as usize
+    }
 
     /// The script's name in options and messages (`hangul`, `cjk-compat`).
     pub fn name(self) -> &'static str {

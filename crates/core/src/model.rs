@@ -70,6 +70,11 @@ impl ModelProfile {
         text.chars().map(|c| self.script(Script::of(c)).risk).sum()
     }
 
+    /// Every script's risk, indexed by [`Script::index`].
+    pub fn risks(&self) -> [f32; Script::COUNT] {
+        Script::ALL.map(|s| self.script(s).risk)
+    }
+
     /// Rank of a script among representatives for the same chunk (lower is preferred).
     pub fn preference(&self, s: Script) -> usize {
         self.script_preference
