@@ -64,10 +64,10 @@ Requirements: [mise](https://mise.jdx.dev/) (it installs Rust with the wasm32 ta
 git clone --recurse-submodules https://github.com/jordanpg/phonocompressor.git
 cd phonocompressor
 
-mise run data      # build data/generated/phono.bin (~15 s)
+mise run data      # build data/generated/phono.bin (~15 s; skipped when it is up to date)
 ```
 
-Tasks are split across mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`, `test`, `ci`, `ci:affected`, `hooks`), the harness in `tools/`, and each crate in `crates/` (`lint`, `test`; the binding's build tasks too). Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front. `mise run ci` runs the format, lint, test and wasm32 checks that GitHub Actions runs, and `mise run ci:affected` runs them only in the projects changed since `origin/main` (and the ones that depend on them). `mise run hooks` turns on the git hooks (`hk.pkl`): each commit formats and lints its staged files, and each push runs `ci:affected`. The `post-checkout` hook sets up each new git worktree from the main checkout: it symlinks the gitignored `fnox.toml`, `sample/` and `.cache/harness/` (so secrets and paid TTS clips are shared) and clones the submodules from the main checkout's copies. For a worktree made before the hook existed, run `.githooks/post-checkout 0000000000000000000000000000000000000000 HEAD 1` from its root.
+Tasks are split across mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`, `test`, `ci`, `ci:affected`, `hooks`), the harness in `tools/`, and each crate in `crates/` (`lint`, `test`; the CLI's `e2e`, and the binding's build tasks too). Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front. `mise run ci` runs the format, lint, test and wasm32 checks that GitHub Actions runs (CI also runs `//crates/cli:e2e` and the wasm parity check), and `mise run ci:affected` runs them only in the projects changed since `origin/main` (and the ones that depend on them). `mise run hooks` turns on the git hooks (`hk.pkl`): each commit formats and lints its staged files, and each push runs `ci:affected`. The `post-checkout` hook sets up each new git worktree from the main checkout: it symlinks the gitignored `fnox.toml`, `sample/` and `.cache/harness/` (so secrets and paid TTS clips are shared) and clones the submodules from the main checkout's copies. For a worktree made before the hook existed, run `.githooks/post-checkout 0000000000000000000000000000000000000000 HEAD 1` from its root.
 
 ### CLI
 
@@ -76,7 +76,7 @@ mise run phono compress 'hundred thousand apartments'   # find strings (-n top, 
 mise run phono score '҈㌀s' 'hundred thousand apartments' # fidelity + alignment
 mise run phono read 'ꀠddꏒꀊm'                            # how the TTS should read a string
 mise run phono phones 'bad dream'                        # target pronunciation
-mise run phono spell 'K AE1 T'                           # spelling options for ARPAbet phones
+mise run phono spell 'K S'                               # spelling options for one G2P unit's phones
 ```
 
 Global flags: `--model <id>` (default `eleven_flash_v2_5`), `--all-scripts` (also search scripts the profile leaves off by default), `--scripts <names>` (search only these, e.g. `latin,hangul,yi`), `--data <path>`.
@@ -88,6 +88,8 @@ mise run phono eval                 # score the community library and compress i
 mise run phono calibrate            # predicted vs. actual fidelity on harness clips
 mise run phono fit                  # fit scorer weights with cross-validation
 ```
+
+`mise run //crates/cli:e2e` runs the CLI's end-to-end tests (`crates/cli/tests/e2e/`): they run the built binary on public or made-up phrases and small made-up fixtures, and check what should hold whatever the weights (the JSON shape, budgets, ranking, commands agreeing with each other, error messages) plus a few quality floors. They need `phono.bin`, so the task builds it first; plain `cargo test` runs only the ones that don't.
 
 `eval` reads `sample/library.json`, the community message library (gitignored; `mise run //tools:fetch-library` writes it, with the library URL from fnox). It also summarizes the 34 hand-picked messages that exp1–exp10 used (`tools/library-keys.tsv`). `--subset <keys>` scores only some entries, and `eval sample/messages.json` still reads the old file. `calibrate` and `fit` need clips exported by the harness.
 

@@ -2,7 +2,8 @@
 # same task as the pre-push hook: the gates in the projects the PR changes and in the projects
 # that depend on them (mise's project graph; see `[monorepo.projects]` in mise.toml). On main it
 # runs every gate (`mise run ci`). `wasm` builds phono.bin and the browser binding, runs the
-# license gate (notices) and checks the binding against the CLI, every time.
+# license gate (notices), checks the binding against the CLI and runs the CLI's end-to-end tests,
+# every time. Its name stays as it is: ruleset 28203271 requires both jobs by name.
 # Neither job needs secrets: nothing here calls ElevenLabs or fetches the community library.
 # Both jobs always run (no `paths` filter), so they can be required checks.
 name: ci
@@ -60,5 +61,7 @@ jobs:
         with:
           shared-key: wasm
       - run: mise run data
+      # The CLI's end-to-end tests, with the data just built (the task's data build is skipped).
+      - run: mise run //crates/cli:e2e
       # parity depends on build, which depends on notices (fails on a license about.toml rejects).
       - run: mise run //crates/wasm:parity

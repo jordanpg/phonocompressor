@@ -47,9 +47,20 @@ experimental = true         # mise secrets is experimental
 
 # --- Data file for the Rust engine (data/generated/, not committed) ---
 
+# Skipped while phono.bin is newer than everything it is built from; `mise run --force data`
+# rebuilds anyway. The core is a source because it defines the format and the G2P training.
 [tasks.data]
 description = "Build data/generated/phono.bin: Phoible features, CMUdict, G2P model, transliteration (deunicode)"
 run = "cargo run --release -p phono-builder"
+sources = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "crates/core/**",
+  "crates/builder/**",
+  "phoible/raw-data/FEATURES/phoible-segments-features.tsv",
+  "cmudict/cmudict.dict",
+]
+outputs = ["data/generated/phono.bin"]
 
 [tasks.phono]
 description = "Run the phonocompressor CLI, e.g. `mise run phono compress 'bad dream'`"

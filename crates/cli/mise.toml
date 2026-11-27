@@ -5,3 +5,10 @@ extends = "cargo:lint"
 [tasks.test]
 description = "Run this crate's tests"
 extends = "cargo:test"
+
+# Not part of `test`: most of these tests need a data file built from this commit, so they are
+# #[ignore]d there. CI's wasm job runs this after its data build.
+[tasks.e2e]
+description = "Run the CLI's end-to-end tests, including those that need phono.bin (builds it first)"
+depends = ["//:data"]
+run = "cargo test --test e2e -- --include-ignored"
