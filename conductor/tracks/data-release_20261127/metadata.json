@@ -4,7 +4,7 @@
   "type": "feature",
   "status": "in_progress",
   "created": "2026-11-27T00:00:00Z",
-  "updated": "2026-11-27T14:00:00Z",
+  "updated": "2026-11-27T14:05:00Z",
   "issue": 9,
   "task_issues": {
     "1.1": 59,
@@ -25,7 +25,7 @@
     "completed": 1
   },
   "current_phase": 1,
-  "current_task": "1.1",
+  "current_task": "1.2",
   "commits": [
     "56acf96: feat(data): write phono.bin maps in key order (data-release_20261127)"
   ]
