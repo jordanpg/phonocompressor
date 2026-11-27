@@ -1,0 +1,21 @@
+name = "exp20"
+description = """
+Live check of exp19's respellings on Flash v2.5 (#4): final `we` → `wee`, final `wae` → `way`, and
+`eo` before a consonant → `o`, in the reader and, read backwards, in the tiler. Cases: the new top
+answer for the 6 library entries where it changes (keys in exp20.keys), the adopted answer for the
+same entries (cached from exp15–exp18), and for one entry the runner-up that uses `퀘` "kwe". One
+change comes from the `we` rule, five from the `eo` rule. Same model, voice and seeds as exp1.
+Cases come from gitignored files written from `phono eval sample/library.json --export`, with
+and without `--no-respellings` (they contain the library's phrases).
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 60
+cases_from = [
+    "data/generated/ours-exp20-base.json",
+    "data/generated/ours-exp20.json",
+    "data/generated/ours-exp20-alt.json",
+]
+cases_keys = "tools/experiments/exp20.keys"

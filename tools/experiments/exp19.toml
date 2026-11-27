@@ -1,0 +1,475 @@
+name = "exp19"
+description = """
+Probe of how Flash v2.5 reads the Latin of single Hangul syllables with compound vowels (#4, PLAN.md
+next steps item 5). The search builds most pseudo-words from such syllables, and the G2P (trained
+on English) guesses their unidecode spellings badly: `doeg` D OW G was heard "Dag", `dyug` D AY AH G
+"Jug", `kwi` K W IY "kawaii", `kweo` "cold". Each of Hangul's 16 compound vowels in 4 forms (onset
+ㄷ d or ㅋ k, with or without final ㄱ g), inside the carrier "say … now": exp9 found isolated
+4-letter pseudo-words too unstable to measure. Six dictionary words in the same carrier measure
+the noise. `t` = what phono's reader predicts (v6, G2P 3-best). The per-word readings come from
+`phono calibrate --by-word --word-dump`. Same model, voice and seeds as exp1–exp18.
+"""
+# Stand-in for "weeb" (Edward), which free accounts can't use via the API. See exp0.toml.
+voice_id = "pNInz6obpgDQGcFmaJgB"
+models = ["eleven_flash_v2_5"]
+seeds = [1, 2]
+max_credits = 700
+
+# --- ae ---
+
+[[cases]]
+id = "ae_d"
+text = "say 대 now"
+target = "say dae now"
+t = "say[S EY1] dae[D EY1] now[N AW1]"
+
+[[cases]]
+id = "ae_dg"
+text = "say 댁 now"
+target = "say daeg now"
+t = "say[S EY1] daeg[D EY1 G] now[N AW1]"
+
+[[cases]]
+id = "ae_k"
+text = "say 캐 now"
+target = "say kae now"
+t = "say[S EY1] kae[K EY1] now[N AW1]"
+
+[[cases]]
+id = "ae_kg"
+text = "say 캑 now"
+target = "say kaeg now"
+t = "say[S EY1] kaeg[K EH1 G] now[N AW1]"
+
+# --- ya ---
+
+[[cases]]
+id = "ya_d"
+text = "say 댜 now"
+target = "say dya now"
+t = "say[S EY1] dya[D AY1 AH0] now[N AW1]"
+
+[[cases]]
+id = "ya_dg"
+text = "say 댝 now"
+target = "say dyag now"
+t = "say[S EY1] dyag[D AY0 AE1 G] now[N AW1]"
+
+[[cases]]
+id = "ya_k"
+text = "say 캬 now"
+target = "say kya now"
+t = "say[S EY1] kya[K Y AH0] now[N AW1]"
+
+[[cases]]
+id = "ya_kg"
+text = "say 캭 now"
+target = "say kyag now"
+t = "say[S EY1] kyag[K Y AH0 G] now[N AW1]"
+
+# --- yae ---
+
+[[cases]]
+id = "yae_d"
+text = "say 댸 now"
+target = "say dyae now"
+t = "say[S EY1] dyae[D AY1 AH0] now[N AW1]"
+
+[[cases]]
+id = "yae_dg"
+text = "say 댹 now"
+target = "say dyaeg now"
+t = "say[S EY1] dyaeg[D AY0 AE1 G] now[N AW1]"
+
+[[cases]]
+id = "yae_k"
+text = "say 컈 now"
+target = "say kyae now"
+t = "say[S EY1] kyae[K Y AY1] now[N AW1]"
+
+[[cases]]
+id = "yae_kg"
+text = "say 컉 now"
+target = "say kyaeg now"
+t = "say[S EY1] kyaeg[K Y IY1 JH] now[N AW1]"
+
+# --- eo ---
+
+[[cases]]
+id = "eo_d"
+text = "say 더 now"
+target = "say deo now"
+t = "say[S EY1] deo[D IY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "eo_dg"
+text = "say 덕 now"
+target = "say deog now"
+t = "say[S EY1] deog[D IY0 AO1 G] now[N AW1]"
+
+[[cases]]
+id = "eo_k"
+text = "say 커 now"
+target = "say keo now"
+t = "say[S EY1] keo[K IY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "eo_kg"
+text = "say 컥 now"
+target = "say keog now"
+t = "say[S EY1] keog[K IY1 AH0 G] now[N AW1]"
+
+# --- yeo ---
+
+[[cases]]
+id = "yeo_d"
+text = "say 뎌 now"
+target = "say dyeo now"
+t = "say[S EY1] dyeo[D AY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "yeo_dg"
+text = "say 뎍 now"
+target = "say dyeog now"
+t = "say[S EY1] dyeog[D AY1 AO0 G] now[N AW1]"
+
+[[cases]]
+id = "yeo_k"
+text = "say 켜 now"
+target = "say kyeo now"
+t = "say[S EY1] kyeo[K Y IY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "yeo_kg"
+text = "say 켝 now"
+target = "say kyeog now"
+t = "say[S EY1] kyeog[K Y IY0 AA1 G] now[N AW1]"
+
+# --- ye ---
+
+[[cases]]
+id = "ye_d"
+text = "say 뎨 now"
+target = "say dye now"
+t = "say[S EY1] dye[D AY1] now[N AW1]"
+
+[[cases]]
+id = "ye_dg"
+text = "say 뎩 now"
+target = "say dyeg now"
+t = "say[S EY1] dyeg[D AY1 G] now[N AW1]"
+
+[[cases]]
+id = "ye_k"
+text = "say 켸 now"
+target = "say kye now"
+t = "say[S EY1] kye[K AY1] now[N AW1]"
+
+[[cases]]
+id = "ye_kg"
+text = "say 켹 now"
+target = "say kyeg now"
+t = "say[S EY1] kyeg[K Y EH2 G] now[N AW1]"
+
+# --- wa ---
+
+[[cases]]
+id = "wa_d"
+text = "say 돠 now"
+target = "say dwa now"
+t = "say[S EY1] dwa[D W AH0] now[N AW1]"
+
+[[cases]]
+id = "wa_dg"
+text = "say 돡 now"
+target = "say dwag now"
+t = "say[S EY1] dwag[D W AE2 G] now[N AW1]"
+
+[[cases]]
+id = "wa_k"
+text = "say 콰 now"
+target = "say kwa now"
+t = "say[S EY1] kwa[K W AH0] now[N AW1]"
+
+[[cases]]
+id = "wa_kg"
+text = "say 콱 now"
+target = "say kwag now"
+t = "say[S EY1] kwag[K W AE1 G] now[N AW1]"
+
+# --- wae ---
+
+[[cases]]
+id = "wae_d"
+text = "say 돼 now"
+target = "say dwae now"
+t = "say[S EY1] dwae[D W AA1] now[N AW1]"
+
+[[cases]]
+id = "wae_dg"
+text = "say 돽 now"
+target = "say dwaeg now"
+t = "say[S EY1] dwaeg[D W EH1 G] now[N AW1]"
+
+[[cases]]
+id = "wae_k"
+text = "say 쾌 now"
+target = "say kwae now"
+t = "say[S EY1] kwae[K W AA1] now[N AW1]"
+
+[[cases]]
+id = "wae_kg"
+text = "say 쾍 now"
+target = "say kwaeg now"
+t = "say[S EY1] kwaeg[K W EH1 G] now[N AW1]"
+
+# --- oe ---
+
+[[cases]]
+id = "oe_d"
+text = "say 되 now"
+target = "say doe now"
+t = "say[S EY1] doe[D OW1] now[N AW1]"
+
+[[cases]]
+id = "oe_dg"
+text = "say 됙 now"
+target = "say doeg now"
+t = "say[S EY1] doeg[D OW1 G] now[N AW1]"
+note = "exp5–exp7 heard 'Dag' / 'Deg'."
+
+[[cases]]
+id = "oe_k"
+text = "say 쾨 now"
+target = "say koe now"
+t = "say[S EY1] koe[K OW1] now[N AW1]"
+
+[[cases]]
+id = "oe_kg"
+text = "say 쾩 now"
+target = "say koeg now"
+t = "say[S EY1] koeg[K OW1 G] now[N AW1]"
+
+# --- yo ---
+
+[[cases]]
+id = "yo_d"
+text = "say 됴 now"
+target = "say dyo now"
+t = "say[S EY1] dyo[D AY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "yo_dg"
+text = "say 됵 now"
+target = "say dyog now"
+t = "say[S EY1] dyog[D AY1 AH0 G] now[N AW1]"
+
+[[cases]]
+id = "yo_k"
+text = "say 쿄 now"
+target = "say kyo now"
+t = "say[S EY1] kyo[K Y OW1] now[N AW1]"
+
+[[cases]]
+id = "yo_kg"
+text = "say 쿅 now"
+target = "say kyog now"
+t = "say[S EY1] kyog[K Y AA0 G] now[N AW1]"
+
+# --- weo ---
+
+[[cases]]
+id = "weo_d"
+text = "say 둬 now"
+target = "say dweo now"
+t = "say[S EY1] dweo[D W IY1 OW0] now[N AW1]"
+
+[[cases]]
+id = "weo_dg"
+text = "say 둭 now"
+target = "say dweog now"
+t = "say[S EY1] dweog[D W EH1 AO0 G] now[N AW1]"
+
+[[cases]]
+id = "weo_k"
+text = "say 쿼 now"
+target = "say kweo now"
+t = "say[S EY1] kweo[K W IY1 OW0] now[N AW1]"
+note = "exp6 heard 'cold' / 'Cueo'."
+
+[[cases]]
+id = "weo_kg"
+text = "say 쿽 now"
+target = "say kweog now"
+t = "say[S EY1] kweog[K W IY0 AA1 G] now[N AW1]"
+
+# --- we ---
+
+[[cases]]
+id = "we_d"
+text = "say 뒈 now"
+target = "say dwe now"
+t = "say[S EY1] dwe[D W] now[N AW1]"
+
+[[cases]]
+id = "we_dg"
+text = "say 뒉 now"
+target = "say dweg now"
+t = "say[S EY1] dweg[D W EH1 G] now[N AW1]"
+
+[[cases]]
+id = "we_k"
+text = "say 퀘 now"
+target = "say kwe now"
+t = "say[S EY1] kwe[K W] now[N AW1]"
+
+[[cases]]
+id = "we_kg"
+text = "say 퀙 now"
+target = "say kweg now"
+t = "say[S EY1] kweg[K W IH0 G] now[N AW1]"
+
+# --- wi ---
+
+[[cases]]
+id = "wi_d"
+text = "say 뒤 now"
+target = "say dwi now"
+t = "say[S EY1] dwi[D IY1 D AH1 B AH0 L Y UW1 AY1] now[N AW1]"
+
+[[cases]]
+id = "wi_dg"
+text = "say 뒥 now"
+target = "say dwig now"
+t = "say[S EY1] dwig[D W IH0 G] now[N AW1]"
+
+[[cases]]
+id = "wi_k"
+text = "say 퀴 now"
+target = "say kwi now"
+t = "say[S EY1] kwi[K W IY0] now[N AW1]"
+note = "exp5 heard 'kawaii'; Latin kwi in exp9 /kweɪ/, /kwaɪ/."
+
+[[cases]]
+id = "wi_kg"
+text = "say 퀵 now"
+target = "say kwig now"
+t = "say[S EY1] kwig[K W IH0 G] now[N AW1]"
+
+# --- yu ---
+
+[[cases]]
+id = "yu_d"
+text = "say 듀 now"
+target = "say dyu now"
+t = "say[S EY1] dyu[D Y UW0] now[N AW1]"
+
+[[cases]]
+id = "yu_dg"
+text = "say 듁 now"
+target = "say dyug now"
+t = "say[S EY1] dyug[D AY1 AH2 G] now[N AW1]"
+note = "exp7 heard 'Doug' / 'Jug'."
+
+[[cases]]
+id = "yu_k"
+text = "say 큐 now"
+target = "say kyu now"
+t = "say[S EY1] kyu[K Y UW1] now[N AW1]"
+
+[[cases]]
+id = "yu_kg"
+text = "say 큑 now"
+target = "say kyug now"
+t = "say[S EY1] kyug[K Y AH1 G] now[N AW1]"
+
+# --- eu ---
+
+[[cases]]
+id = "eu_d"
+text = "say 드 now"
+target = "say deu now"
+t = "say[S EY1] deu[D UW0] now[N AW1]"
+
+[[cases]]
+id = "eu_dg"
+text = "say 득 now"
+target = "say deug now"
+t = "say[S EY1] deug[D OY1 G] now[N AW1]"
+
+[[cases]]
+id = "eu_k"
+text = "say 크 now"
+target = "say keu now"
+t = "say[S EY1] keu[K Y UW1] now[N AW1]"
+
+[[cases]]
+id = "eu_kg"
+text = "say 큭 now"
+target = "say keug now"
+t = "say[S EY1] keug[K AH2 G] now[N AW1]"
+
+# --- yi ---
+
+[[cases]]
+id = "yi_d"
+text = "say 듸 now"
+target = "say dyi now"
+t = "say[S EY1] dyi[D AY1 IY0] now[N AW1]"
+
+[[cases]]
+id = "yi_dg"
+text = "say 듹 now"
+target = "say dyig now"
+t = "say[S EY1] dyig[D AY1 IH0 G] now[N AW1]"
+
+[[cases]]
+id = "yi_k"
+text = "say 킈 now"
+target = "say kyi now"
+t = "say[S EY1] kyi[K IY1] now[N AW1]"
+
+[[cases]]
+id = "yi_kg"
+text = "say 킉 now"
+target = "say kyig now"
+t = "say[S EY1] kyig[K Y IH0 G] now[N AW1]"
+
+# --- controls: dictionary words ---
+
+[[cases]]
+id = "control_dag"
+text = "say 닥 now"
+target = "say dag now"
+t = "say[S EY1] dag[D AE1 G] now[N AW1]"
+
+[[cases]]
+id = "control_dog"
+text = "say 독 now"
+target = "say dog now"
+t = "say[S EY1] dog[D AO1 G] now[N AW1]"
+
+[[cases]]
+id = "control_dig"
+text = "say 딕 now"
+target = "say dig now"
+t = "say[S EY1] dig[D IH1 G] now[N AW1]"
+
+[[cases]]
+id = "control_dug"
+text = "say 둑 now"
+target = "say dug now"
+t = "say[S EY1] dug[D AH1 G] now[N AW1]"
+
+[[cases]]
+id = "control_bag"
+text = "say 박 now"
+target = "say bag now"
+t = "say[S EY1] bag[B AE1 G] now[N AW1]"
+
+[[cases]]
+id = "control_big"
+text = "say 빅 now"
+target = "say big now"
+t = "say[S EY1] big[B IH1 G] now[N AW1]"
+

@@ -1,5 +1,6 @@
 //! `phono`: try the phonocompressor engine from the command line.
 
+mod by_word;
 mod fit;
 mod risks;
 
@@ -37,8 +38,47 @@ struct Cli {
         conflicts_with = "all_scripts"
     )]
     scripts: Option<Vec<String>>,
+    #[command(flatten)]
+    g2p: G2pArgs,
     #[command(subcommand)]
     command: Command,
+}
+
+/// How far the reader trusts the G2P on unknown words ([`phono_core::reading::G2pConfidence`]).
+/// Each defaults to the model profile's.
+#[derive(clap::Args)]
+struct G2pArgs {
+    /// G2P readings averaged over per unknown word.
+    #[arg(long, global = true)]
+    g2p_nbest: Option<usize>,
+    /// Flatten the alternatives' weights: `(p / p_best)^(1 / t)`.
+    #[arg(long, global = true)]
+    g2p_temperature: Option<f32>,
+    /// Treat readings that differ only in stress as one, with their probabilities summed.
+    #[arg(long, global = true)]
+    g2p_merge_stress: Option<bool>,
+}
+
+impl G2pArgs {
+    fn apply(&self, engine: &mut Engine) -> Result<(), String> {
+        let g = &mut engine.reader_params.g2p;
+        if let Some(n) = self.g2p_nbest {
+            if n == 0 {
+                return Err("--g2p-nbest must be at least 1".into());
+            }
+            g.nbest = n;
+        }
+        if let Some(t) = self.g2p_temperature {
+            if t.is_nan() || t <= 0.0 {
+                return Err("--g2p-temperature must be above 0".into());
+            }
+            g.temperature = t;
+        }
+        if let Some(m) = self.g2p_merge_stress {
+            g.merge_stress = m;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Subcommand)]
@@ -113,6 +153,15 @@ enum Command {
         /// the script-risk penalty it paid and the over-prediction with and without it.
         #[arg(long)]
         by_script: bool,
+        /// Also summarize how each word of the reading was heard (recognized phones aligned
+        /// per word), by word source and answer source, and list the worst-heard G2P words with
+        /// any lower-ranked G2P reading that matches what was heard better.
+        #[arg(long)]
+        by_word: bool,
+        /// With --by-word, also write one row per reader word (what it reads, what was heard
+        /// for it, its fidelity and any G2P reading that matches better) as TSV.
+        #[arg(long, requires = "by_word")]
+        word_dump: Option<PathBuf>,
         /// Whisper text similarity from which an answer counts as heard well, for the
         /// close-enough table (each answer is the mean over its clips).
         #[arg(long, default_value_t = 0.8)]
@@ -289,6 +338,7 @@ fn main() -> Result<(), String> {
         None => Scripts::Default,
     };
     engine.configure(profile, scripts)?;
+    cli.g2p.apply(&mut engine)?;
     eprintln!(
         "loaded {} in {:.2}s",
         cli.data.display(),
@@ -419,6 +469,8 @@ fn main() -> Result<(), String> {
             dump,
             hand,
             by_script,
+            by_word,
+            word_dump,
             heard_well,
             fit_risks,
             risk_fit,
@@ -450,6 +502,8 @@ fn main() -> Result<(), String> {
                 worst,
                 dump,
                 by_script,
+                by_word,
+                word_dump,
                 heard_well,
                 fit_risks: if fit_risks {
                     Some(risk_fit.opts()?)
@@ -1066,6 +1120,8 @@ struct Report {
     worst: usize,
     dump: Option<PathBuf>,
     by_script: bool,
+    by_word: bool,
+    word_dump: Option<PathBuf>,
     heard_well: f32,
     /// Fit script risks with these options.
     fit_risks: Option<risks::Opts>,
@@ -1226,6 +1282,17 @@ fn calibrate(
             })
             .collect();
         print_risk_fit(engine, &items, predict.risk_scale, opts);
+    }
+    if report.by_word {
+        by_word::report(
+            engine,
+            &clips,
+            &scorer,
+            heard,
+            engine.reader_params.g2p.nbest,
+            report.worst,
+            report.word_dump.as_deref(),
+        )?;
     }
     rows.sort_by(|a, b| (b.predicted - b.actual).total_cmp(&(a.predicted - a.actual)));
     println!("\nworst over-predictions (predicted − actual):");
