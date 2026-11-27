@@ -38,8 +38,47 @@ struct Cli {
         conflicts_with = "all_scripts"
     )]
     scripts: Option<Vec<String>>,
+    #[command(flatten)]
+    g2p: G2pArgs,
     #[command(subcommand)]
     command: Command,
+}
+
+/// How far the reader trusts the G2P on unknown words ([`phono_core::reading::G2pConfidence`]).
+/// Each defaults to the model profile's.
+#[derive(clap::Args)]
+struct G2pArgs {
+    /// G2P readings averaged over per unknown word.
+    #[arg(long, global = true)]
+    g2p_nbest: Option<usize>,
+    /// Flatten the alternatives' weights: `(p / p_best)^(1 / t)`.
+    #[arg(long, global = true)]
+    g2p_temperature: Option<f32>,
+    /// Treat readings that differ only in stress as one, with their probabilities summed.
+    #[arg(long, global = true)]
+    g2p_merge_stress: Option<bool>,
+}
+
+impl G2pArgs {
+    fn apply(&self, engine: &mut Engine) -> Result<(), String> {
+        let g = &mut engine.reader_params.g2p;
+        if let Some(n) = self.g2p_nbest {
+            if n == 0 {
+                return Err("--g2p-nbest must be at least 1".into());
+            }
+            g.nbest = n;
+        }
+        if let Some(t) = self.g2p_temperature {
+            if t.is_nan() || t <= 0.0 {
+                return Err("--g2p-temperature must be above 0".into());
+            }
+            g.temperature = t;
+        }
+        if let Some(m) = self.g2p_merge_stress {
+            g.merge_stress = m;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Subcommand)]
@@ -295,6 +334,7 @@ fn main() -> Result<(), String> {
         None => Scripts::Default,
     };
     engine.configure(profile, scripts)?;
+    cli.g2p.apply(&mut engine)?;
     eprintln!(
         "loaded {} in {:.2}s",
         cli.data.display(),
@@ -1242,7 +1282,7 @@ fn calibrate(
             &clips,
             &scorer,
             heard,
-            phono_core::reading::READING_NBEST,
+            engine.reader_params.g2p.nbest,
             report.worst,
         );
     }
