@@ -64,7 +64,7 @@ Requirements: [mise](https://mise.jdx.dev/) (it installs Rust with the wasm32 ta
 git clone --recurse-submodules https://github.com/jordanpg/phonocompressor.git
 cd phonocompressor
 
-mise run data      # export transliteration table + build data/generated/phono.bin (~15 s)
+mise run data      # build data/generated/phono.bin (~15 s)
 ```
 
 Tasks are split across mise configs: the root (`data`, `phono`, `fmt`, `fmt:check`, `lint`, `test`, `ci`, `ci:affected`, `hooks`), the harness in `tools/`, and each crate in `crates/` (`lint`, `test`; the binding's build tasks too). Project tasks are named by path, such as `mise run //tools:synth`; `mise tasks --all` lists them all. Each task installs the tools it needs on first run; `mise install --monorepo` installs them all up front. `mise run ci` runs the format, lint, test and wasm32 checks that GitHub Actions runs, and `mise run ci:affected` runs them only in the projects changed since `origin/main` (and the ones that depend on them). `mise run hooks` turns on the git hooks (`hk.pkl`): each commit formats and lints its staged files, and each push runs `ci:affected`. The `post-checkout` hook sets up each new git worktree from the main checkout: it symlinks the gitignored `fnox.toml`, `sample/` and `.cache/harness/` (so secrets and paid TTS clips are shared) and clones the submodules from the main checkout's copies. For a worktree made before the hook existed, run `.githooks/post-checkout 0000000000000000000000000000000000000000 HEAD 1` from its root.
@@ -158,3 +158,5 @@ hello this is human. this was larely developed with agentic coding methods, with
 | Python `unidecode` | dev comparison only (`mise run //tools:translit-unidecode`); never feeds the data file | GPL-2.0+ |
 
 Generated data lives in `data/generated/` and is not committed. See [THIRD_PARTY.md](THIRD_PARTY.md) for attribution. The browser build ships a generated `third-party-notices.html` with these data notices and the licenses of the Rust crates compiled into the `.wasm`. The code is licensed Apache-2.0.
+
+The built data file is published as GitHub Releases tagged `phono-data/vX.Y.Z`, built in CI from the tag. Each release has `phono.bin.gz`, a `manifest.json` with checksums and inputs, `SHA256SUMS`, and the data's own `third-party-notices.html`, which must ship with any copy. The tag convention, versioning and how a client should use a release are in [docs/RELEASES.md](docs/RELEASES.md).

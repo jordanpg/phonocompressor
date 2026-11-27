@@ -1935,17 +1935,22 @@ What this says:
 | Unihan | CJK readings (model N) | Unicode License |
 | Transliteration table | chunk inventory | Built by `phono-build` from Rust `deunicode` (BSD-3) plus our own overrides. Python `unidecode` (**GPL-2.0+**) is a dev-only comparison; see "Transliteration source" below. |
 
+The built data file is published as `phono-data/vX.Y.Z` GitHub Releases, with its notices; see
+[`RELEASES.md`](RELEASES.md).
+
 ### Transliteration source: move from `unidecode` to `deunicode`
 
 **Decision (2026-11-25):** switch the chunk table's source to the `deunicode`
 crate (BSD-3). The goal is a browser-only web tool, so we will distribute the
-table inside the WASM bundle, and we also want to publish the tables on GitHub.
+table inside the WASM bundle, and we also want to publish the data on GitHub.
 Shipping tables derived from GPL-2.0+ `unidecode` would pull the bundle and the
-published tables under the GPL, which blocks a permissive repo license
-(MIT OR Apache-2.0 is the plan).
+published data under the GPL, which blocks a permissive repo license
+(the repo is now Apache-2.0).
 
-**Status (2026-11-25): steps 1–4 and 6 done on branch `worktree-deunicode`; step 5 only as
-attribution (`THIRD_PARTY.md`), the table itself is not published yet.**
+**Status (2026-11-27): done.** Steps 1–4 and 6 were merged to `main` on 2026-11-25 (`c86da12`).
+Step 5 became the data release ([#9](https://github.com/jordanpg/phonocompressor/issues/9)):
+`phono.bin`, which holds the table, is published as `phono-data/vX.Y.Z` GitHub Releases with
+its notices ([`RELEASES.md`](RELEASES.md)).
 
 Step 1 table diff (BMP; `phono-build --dump-translit` vs `mise run //tools:translit-unidecode`):
 - 40,557 codepoints in unidecode, 54,893 in deunicode. 40,172 are identical (99.1%); 383
@@ -2017,11 +2022,17 @@ To do:
    were fitted on clips chosen under the old table. Check that `calibrate`
    output is unchanged on the existing clips, and spend credits on a fresh
    experiment only if chunks changed.
-5. **Publish the tables.** Release the chunk table (and ideally the
-   per-script reading notes) as files on GitHub, with attribution for
-   `deunicode`, Phoible (CC BY 4.0) and CMUdict in a `THIRD_PARTY.md`.
-6. **Then license the repo.** Add `license = "MIT OR Apache-2.0"` to
-   `[workspace.package]`, plus `LICENSE-MIT` and `LICENSE-APACHE`.
+5. **Publish the tables.** Done (2026-11-27) as the runtime data release
+   rather than readable tables. CI builds `phono.bin` (Phoible features,
+   CMUdict, the G2P model and the chunk table) from a `phono-data/vX.Y.Z` tag. It
+   publishes it gzipped with a manifest, checksums and the data's third-party
+   notices; see [`RELEASES.md`](RELEASES.md). Attribution for `deunicode`, Phoible
+   (CC BY 4.0) and CMUdict is in `THIRD_PARTY.md`. The readable TSV and the
+   per-script reading notes were dropped: the web tool needs the data file,
+   and nothing reads the tables on their own.
+6. **Then license the repo.** Done (2026-11-25): `license = "Apache-2.0"` in
+   `[workspace.package]`, plus `LICENSE-APACHE`. The plan's `MIT OR Apache-2.0`
+   became Apache-2.0 only.
 
 ## Open questions
 

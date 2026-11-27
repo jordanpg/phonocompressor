@@ -60,7 +60,7 @@ Calibration fits the ElevenLabs free tier (10,000 credits/month).
 
 ### 4. License-clean distribution
 
-Only permissively licensed code and data ships (in the WASM bundle, on GitHub Pages, or as published tables). The repo is Apache-2.0.
+Only permissively licensed code and data ships (in the WASM bundle, on GitHub Pages, or in the `phono-data` releases). The repo is Apache-2.0.
 
 - **Do:** Build the transliteration table from `deunicode` (BSD-3) plus overrides written from observed TTS behaviour. Attribute data sources in `THIRD_PARTY.md`.
 - **Do:** Check a new dependency's or dataset's license before adding it.
