@@ -1,0 +1,80 @@
+# GitHub Pages: hosts the wasm test page (crates/wasm/www) for now; the web project replaces it
+# later. Manual runs only (workflow_dispatch).
+#
+# The site has the layout `mise run //crates/wasm:serve` gives: the page at /, the wasm-bindgen
+# package at /pkg/ (with third-party-notices.html) and phono.bin at /phono.bin. phono.bin is
+# mirrored from the newest phono-data release whose major equals the data format, since browsers
+# can't fetch release assets (docs/RELEASES.md), and unpacked because the test page reads it raw.
+#
+# Only the deploy job can write to Pages, and it runs no repo code.
+name: pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: pages
+      - run: mise run //crates/wasm:build
+      - name: "data: the newest phono-data release for this data format"
+        run: |
+          format="$(cargo run --release --locked -q -p phono-builder -- --format-version)"
+          tag="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+              --exclude-drafts --exclude-pre-releases --json tagName --jq '.[].tagName' \
+            | grep -E "^phono-data/v${format}\.[0-9]+\.[0-9]+$" | sort -V | tail -n 1)"
+          if [ -z "$tag" ]; then
+            echo "::error::no phono-data release for data format $format"
+            exit 1
+          fi
+          echo "data format $format: $tag"
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir phono-data
+          (cd phono-data && sha256sum -c SHA256SUMS)
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: assemble the site
+        run: |
+          mkdir -p _site/pkg
+          cp -R crates/wasm/www/. _site/
+          cp -R target/wasm-pkg/. _site/pkg/
+          gunzip -c phono-data/phono.bin.gz > _site/phono.bin
+          find _site -type f | sort
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
